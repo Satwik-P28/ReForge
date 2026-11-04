@@ -83,10 +83,7 @@ impl Store {
         Ok(())
     }
 
-    pub fn load_instance(
-        &self,
-        instance: &str,
-    ) -> Result<Option<InstanceSnapshot>, PersistError> {
+    pub fn load_instance(&self, instance: &str) -> Result<Option<InstanceSnapshot>, PersistError> {
         let mut stmt = self.conn.prepare(
             "SELECT current_state, variables_json FROM instance_state WHERE instance = ?1",
         )?;
