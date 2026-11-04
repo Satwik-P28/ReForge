@@ -56,6 +56,7 @@ jobs:
           PREFIX="reforge-${GITHUB_SHA:0:12}"
           OUT="dist/${PREFIX}-src.tar.gz"
           git archive --format=tar.gz --prefix="${PREFIX}/" -o "${OUT}" "${GITHUB_SHA}"
-          tar -tzf "${OUT}" | head -5
+          tar -tzf "${OUT}" > /tmp/archive-list.txt
+          head -5 /tmp/archive-list.txt
           (cd dist && sha256sum "$(basename "${OUT}")" | tee SHA256SUMS)
           sha256sum -c dist/SHA256SUMS

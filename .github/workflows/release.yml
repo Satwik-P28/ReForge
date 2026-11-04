@@ -97,17 +97,20 @@ jobs:
           git archive --format=tar.gz --prefix="${PREFIX}/" -o "${OUT}" "${REF}"
           ls -lh "${OUT}"
           # Validate: gzip readable, versioned top-level, no dist/ nesting, tracked-only.
-          tar -tzf "${OUT}" | head -40
-          TOPLEVEL="$(tar -tzf "${OUT}" | head -1 | cut -d/ -f1)"
+          LIST="$(mktemp)"
+          tar -tzf "${OUT}" > "${LIST}"
+          head -40 "${LIST}"
+          TOPLEVEL="$(head -1 "${LIST}" | cut -d/ -f1)"
           test "${TOPLEVEL}" = "${PREFIX}"
-          if tar -tzf "${OUT}" | grep -E "^${PREFIX}/(dist|target)/" >/dev/null; then
+          if grep -E "^${PREFIX}/(dist|target)/" "${LIST}" >/dev/null; then
             echo "Archive unexpectedly contains dist/ or target/" >&2
             exit 1
           fi
           # Spot-check required tracked paths
-          tar -tzf "${OUT}" | grep -qx "${PREFIX}/Cargo.toml"
-          tar -tzf "${OUT}" | grep -qx "${PREFIX}/LICENSE"
-          tar -tzf "${OUT}" | grep -q "^${PREFIX}/crates/reforge-cli/"
+          grep -qx "${PREFIX}/Cargo.toml" "${LIST}"
+          grep -qx "${PREFIX}/LICENSE" "${LIST}"
+          grep -q "^${PREFIX}/crates/reforge-cli/" "${LIST}"
+          rm -f "${LIST}"
           echo "Source archive validated: ${OUT}"
 
       - name: checksums
