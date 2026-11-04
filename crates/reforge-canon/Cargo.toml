@@ -1,0 +1,19 @@
+[package]
+name = "reforge-canon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Deterministic canonicalization and content hashing for ReForge"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_json_canonicalizer = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

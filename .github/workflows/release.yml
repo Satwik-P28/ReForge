@@ -1,0 +1,51 @@
+name: Release
+
+# Prepared automation. Does not publish unless a maintainer creates a v* tag
+# AND approves the workflow / provides authorization for GitHub release upload.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build artifacts without creating a GitHub Release"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: validate tests
+        run: cargo test --workspace --all-targets
+      - name: build release binaries
+        run: |
+          cargo build -p reforge-cli --release
+          cargo build -p reforge-studio --release
+          mkdir -p dist
+          cp target/release/reforge dist/reforge-linux-x86_64 || cp target/release/reforge-cli dist/reforge-linux-x86_64
+          cp target/release/reforge-studio dist/reforge-studio-linux-x86_64
+          tar --exclude=target --exclude=.git -czf dist/reforge-src.tar.gz .
+          (cd dist && sha256sum * > SHA256SUMS)
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reforge-release-artifacts
+          path: dist/
+      - name: create GitHub release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: RELEASE_NOTES_v0.1.0.md
+          draft: true

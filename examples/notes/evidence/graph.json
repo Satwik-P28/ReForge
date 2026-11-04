@@ -1,0 +1,97 @@
+{
+  "evidence": {
+    "ev-notes-spec": {
+      "schema_version": "1.0.0",
+      "id": "ev-notes-spec",
+      "evidence_type": "specification",
+      "source": {
+        "kind": "package",
+        "package_id": "reforge.examples.notes"
+      },
+      "acquisition_method": "generated_fixture",
+      "collection_context": "examples/notes",
+      "timestamp": "2026-11-02T00:00:00Z",
+      "environment": "reforge-phase1-fixtures",
+      "content_digest": {
+        "algorithm": "sha256",
+        "hex": "0eec3dd7f64ffe43514b3efe6fc6ff37c9c5efc8cbace3da1dcf140c01d7977e"
+      },
+      "payload_ref": "0eec3dd7f64ffe43514b3efe6fc6ff37c9c5efc8cbace3da1dcf140c01d7977e",
+      "related_claims": [
+        "note-creation"
+      ],
+      "tool": "reforge-fixtures",
+      "tool_version": "0.1.0",
+      "integrity": "verified",
+      "hierarchy": "user_requirement",
+      "metadata": {
+        "capability": "notes",
+        "topic": "create_note"
+      }
+    }
+  },
+  "claims": {
+    "note-creation": {
+      "schema_version": "1.0.0",
+      "id": "note-creation",
+      "subject": "create_note",
+      "statement": "create_note inserts a new id into the notes map with title/body/tags=[]; duplicate id yields duplicate_id without mutating state.",
+      "certainty": "specified",
+      "supporting_evidence": [
+        "ev-notes-spec"
+      ],
+      "contradicting_evidence": [],
+      "derived_from": [],
+      "verified_by_tests": [],
+      "notes": "Modeled by transitions t-create and t-create-dup in multi-entity notes-twin"
+    }
+  },
+  "relations": [
+    {
+      "kind": "supports",
+      "evidence_id": "ev-notes-spec",
+      "claim_id": "note-creation"
+    }
+  ],
+  "store": {
+    "entries": {
+      "0eec3dd7f64ffe43514b3efe6fc6ff37c9c5efc8cbace3da1dcf140c01d7977e": [
+        110,
+        111,
+        116,
+        101,
+        115,
+        32,
+        99,
+        97,
+        112,
+        97,
+        98,
+        105,
+        108,
+        105,
+        116,
+        121,
+        32,
+        115,
+        112,
+        101,
+        99,
+        105,
+        102,
+        105,
+        101,
+        100,
+        32,
+        98,
+        101,
+        104,
+        97,
+        118,
+        105,
+        111,
+        114
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "reforge-export"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Export independently runnable local applications"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-compose = { workspace = true }
+reforge-runtime = { workspace = true }
+reforge-canon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+indexmap = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

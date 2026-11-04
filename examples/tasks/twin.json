@@ -1,0 +1,1614 @@
+{
+  "schema_version": "1.0.0",
+  "id": "tasks-twin",
+  "name": "Tasks Behavioral Twin",
+  "description": "Multi-task map CRUD encoded entirely in portable twin+expr (map_put/get/remove/keys). No host builtin required. query_tasks is limited (returns all keys).",
+  "initial_state": "ready",
+  "states": {
+    "ready": {
+      "name": "ready",
+      "terminal": false
+    }
+  },
+  "variables": {
+    "tasks": {
+      "name": "tasks",
+      "ty": {
+        "kind": "map",
+        "value": {
+          "kind": "map",
+          "value": {
+            "kind": "string"
+          }
+        }
+      },
+      "initial": {
+        "kind": "map",
+        "value": {}
+      },
+      "required": true
+    },
+    "op_count": {
+      "name": "op_count",
+      "ty": {
+        "kind": "int"
+      },
+      "initial": {
+        "kind": "int",
+        "value": 0
+      },
+      "required": true
+    }
+  },
+  "actions": {
+    "create_task": {
+      "name": "create_task",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "title": {
+          "kind": "string"
+        }
+      },
+      "description": "Create a task with status open and priority 0"
+    },
+    "update_task": {
+      "name": "update_task",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "title": {
+          "kind": "string"
+        }
+      },
+      "description": "Update title of an existing task"
+    },
+    "set_priority": {
+      "name": "set_priority",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "priority": {
+          "kind": "int"
+        }
+      },
+      "description": "Set priority of an existing task"
+    },
+    "set_status": {
+      "name": "set_status",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "status": {
+          "kind": "string"
+        }
+      },
+      "description": "Set status string of an existing task"
+    },
+    "complete_task": {
+      "name": "complete_task",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      },
+      "description": "Mark an open task as completed"
+    },
+    "reopen_task": {
+      "name": "reopen_task",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      },
+      "description": "Reopen a completed task"
+    },
+    "delete_task": {
+      "name": "delete_task",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      },
+      "description": "Delete a task by id"
+    },
+    "query_tasks": {
+      "name": "query_tasks",
+      "parameters": {
+        "status": {
+          "kind": "optional",
+          "inner": {
+            "kind": "string"
+          }
+        }
+      },
+      "description": "Limited Phase 1 query: returns all task keys (status filter ignored)"
+    }
+  },
+  "transitions": [
+    {
+      "id": "t-create",
+      "from": "ready",
+      "to": "ready",
+      "action": "create_task",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "title"
+                  ]
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "lit_string",
+                  "value": "open"
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "lit_int",
+                  "value": 0
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [
+        "task_created"
+      ],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-create-dup",
+      "from": "ready",
+      "to": "ready",
+      "action": "create_task",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "tasks"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "duplicate_id",
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-update",
+      "from": "ready",
+      "to": "ready",
+      "action": "update_task",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "tasks"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "title"
+                  ]
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "status"
+                  }
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "priority"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-update-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "update_task",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-set-priority",
+      "from": "ready",
+      "to": "ready",
+      "action": "set_priority",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "tasks"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "title"
+                  }
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "status"
+                  }
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "priority"
+                  ]
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-set-priority-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "set_priority",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-set-status",
+      "from": "ready",
+      "to": "ready",
+      "action": "set_status",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "tasks"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "title"
+                  }
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "status"
+                  ]
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "priority"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-set-status-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "set_status",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-complete",
+      "from": "ready",
+      "to": "ready",
+      "action": "complete_task",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "tasks"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "id"
+              ]
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "tasks"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "status"
+              }
+            },
+            "right": {
+              "op": "lit_string",
+              "value": "open"
+            }
+          }
+        ]
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "title"
+                  }
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "lit_string",
+                  "value": "completed"
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "priority"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [
+        "task_completed"
+      ],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-complete-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "complete_task",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-complete-invalid",
+      "from": "ready",
+      "to": "ready",
+      "action": "complete_task",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "tasks"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "id"
+              ]
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "tasks"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "status"
+              }
+            },
+            "right": {
+              "op": "lit_string",
+              "value": "open"
+            }
+          }
+        ]
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "invalid_status",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-reopen",
+      "from": "ready",
+      "to": "ready",
+      "action": "reopen_task",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "tasks"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "id"
+              ]
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "tasks"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "status"
+              }
+            },
+            "right": {
+              "op": "lit_string",
+              "value": "completed"
+            }
+          }
+        ]
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "title"
+                  }
+                }
+              ],
+              [
+                "status",
+                {
+                  "op": "lit_string",
+                  "value": "open"
+                }
+              ],
+              [
+                "priority",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "tasks"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "priority"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-reopen-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "reopen_task",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-reopen-invalid",
+      "from": "ready",
+      "to": "ready",
+      "action": "reopen_task",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "tasks"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "id"
+              ]
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "tasks"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "status"
+              }
+            },
+            "right": {
+              "op": "lit_string",
+              "value": "completed"
+            }
+          }
+        ]
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "invalid_status",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-delete",
+      "from": "ready",
+      "to": "ready",
+      "action": "delete_task",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "tasks"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "tasks": {
+          "op": "map_remove",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [
+        "task_deleted"
+      ],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-tasks-spec"
+      ]
+    },
+    {
+      "id": "t-delete-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "delete_task",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-query",
+      "from": "ready",
+      "to": "ready",
+      "action": "query_tasks",
+      "guard": {
+        "op": "lit_bool",
+        "value": true
+      },
+      "updates": {},
+      "outputs": {
+        "ids": {
+          "op": "keys",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "tasks"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    }
+  ],
+  "invariants": [
+    {
+      "id": "op-nonneg",
+      "expression": "state.op_count >= 0",
+      "description": "op_count never negative"
+    },
+    {
+      "id": "tasks-defined",
+      "expression": "is_defined(state.tasks)",
+      "description": "tasks map always defined"
+    }
+  ],
+  "unknowns": [],
+  "hypotheses": [],
+  "evidence_refs": [
+    "ev-tasks-spec"
+  ],
+  "coverage": {},
+  "certainty": "specified"
+}

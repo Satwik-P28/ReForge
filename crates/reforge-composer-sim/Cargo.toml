@@ -1,0 +1,16 @@
+[package]
+name = "reforge-composer-sim"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Minimal external Phase 2 Composer simulation consumer (does not compose)"
+publish = false
+
+[[bin]]
+name = "reforge-composer-sim"
+path = "src/main.rs"
+
+[dependencies]
+reforge = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

@@ -1,0 +1,31 @@
+[package]
+name = "reforge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Public developer API for ReForge"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+reforge-expr = { workspace = true }
+reforge-behavior = { workspace = true }
+reforge-capability = { workspace = true }
+reforge-evidence = { workspace = true }
+reforge-dependency = { workspace = true }
+reforge-schema = { workspace = true }
+reforge-compose = { workspace = true }
+reforge-runtime = { workspace = true }
+reforge-verify = { workspace = true }
+reforge-export = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = { workspace = true }
+indexmap = { workspace = true }

@@ -1,0 +1,72 @@
+{
+  "description": "Independent expectation for inventory add+reserve; not derived from twin implementation.",
+  "sequence": {
+    "actions": [
+      {
+        "action": "add_item",
+        "parameters": {
+          "sku": {
+            "kind": "string",
+            "value": "SKU-A"
+          },
+          "name": {
+            "kind": "string",
+            "value": "Widget"
+          },
+          "qty": {
+            "kind": "int",
+            "value": 10
+          }
+        }
+      },
+      {
+        "action": "reserve",
+        "parameters": {
+          "sku": {
+            "kind": "string",
+            "value": "SKU-A"
+          },
+          "qty": {
+            "kind": "int",
+            "value": 3
+          }
+        }
+      }
+    ]
+  },
+  "expected_final": {
+    "current_state": "ready",
+    "variables": {
+      "op_count": {
+        "kind": "int",
+        "value": 2
+      },
+      "items": {
+        "kind": "map",
+        "value": {
+          "SKU-A": {
+            "kind": "map",
+            "value": {
+              "name": {
+                "kind": "string",
+                "value": "Widget"
+              },
+              "qty": {
+                "kind": "int",
+                "value": 10
+              },
+              "reserved": {
+                "kind": "int",
+                "value": 3
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "expected_step_kinds": [
+    "success",
+    "success"
+  ]
+}

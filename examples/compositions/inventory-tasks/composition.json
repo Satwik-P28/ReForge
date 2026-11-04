@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "id": "app.inventory-tasks",
+  "name": "Inventory + Tasks",
+  "description": "Second composition: reserving inventory can create a fulfillment task via an explicit event binding. Proves the engine is not Notes+Tasks-specific.",
+  "capabilities": [
+    {
+      "instance": "inventory",
+      "package_path": "../../inventory"
+    },
+    {
+      "instance": "tasks",
+      "package_path": "../../tasks"
+    }
+  ],
+  "bindings": [
+    {
+      "id": "on-reserved-create-task",
+      "source": {
+        "instance": "inventory",
+        "name": "reserved",
+        "kind": "event"
+      },
+      "target": {
+        "instance": "tasks",
+        "name": "create_task",
+        "kind": "command"
+      },
+      "parameter_map": {
+        "id": "sku",
+        "title": "sku"
+      },
+      "description": "Maps reserved event sku into create_task id/title. Title will be the sku string; acceptable for alpha demo."
+    }
+  ],
+  "relationships": [],
+  "customization": {
+    "app_title": "Inventory Fulfillment",
+    "theme": "light",
+    "layout": "tabs",
+    "nav_order": ["inventory", "tasks"],
+    "labels": {},
+    "hidden_views": []
+  },
+  "runtime": {
+    "persistence": "sqlite",
+    "export_target": "local-web"
+  },
+  "verification": []
+}

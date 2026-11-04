@@ -1,0 +1,100 @@
+{
+  "actions": [
+    {
+      "action": "create_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t1"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Ship Phase 1"
+        }
+      }
+    },
+    {
+      "action": "create_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t2"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Write docs"
+        }
+      }
+    },
+    {
+      "action": "query_tasks",
+      "parameters": {}
+    },
+    {
+      "action": "set_priority",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t1"
+        },
+        "priority": {
+          "kind": "int",
+          "value": 2
+        }
+      }
+    },
+    {
+      "action": "set_status",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t2"
+        },
+        "status": {
+          "kind": "string",
+          "value": "blocked"
+        }
+      }
+    },
+    {
+      "action": "update_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t1"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Ship Phase 1 demos"
+        }
+      }
+    },
+    {
+      "action": "complete_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t1"
+        }
+      }
+    },
+    {
+      "action": "reopen_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t1"
+        }
+      }
+    },
+    {
+      "action": "delete_task",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "t2"
+        }
+      }
+    }
+  ]
+}

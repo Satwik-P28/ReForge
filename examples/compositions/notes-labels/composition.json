@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "id": "app.notes-labels",
+  "name": "Notes + Labels",
+  "description": "Third composition using Labels (public-API-only capability) linked to Notes. Engine unchanged.",
+  "capabilities": [
+    {
+      "instance": "notes",
+      "package_path": "../../notes"
+    },
+    {
+      "instance": "labels",
+      "package_path": "../../labels"
+    }
+  ],
+  "bindings": [],
+  "relationships": [
+    {
+      "id": "note-label-link",
+      "name": "note_label_links",
+      "from_instance": "notes",
+      "from_key": "id",
+      "to_instance": "labels",
+      "to_key": "id",
+      "on_delete": "unlink",
+      "description": "When a label is deleted, note links are unlinked."
+    }
+  ],
+  "customization": {
+    "app_title": "Notes & Labels",
+    "theme": "light",
+    "layout": "tabs",
+    "nav_order": [
+      "notes",
+      "labels"
+    ],
+    "labels": {
+      "notes": "Notes",
+      "labels": "Labels"
+    },
+    "hidden_views": []
+  },
+  "runtime": {
+    "persistence": "sqlite",
+    "export_target": "local-web"
+  },
+  "verification": [
+    "unlink-on-label-delete"
+  ]
+}

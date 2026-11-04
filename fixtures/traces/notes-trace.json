@@ -1,0 +1,99 @@
+{
+  "actions": [
+    {
+      "action": "create_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n1"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Hello"
+        },
+        "body": {
+          "kind": "string",
+          "value": "World"
+        }
+      }
+    },
+    {
+      "action": "create_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n2"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Second"
+        },
+        "body": {
+          "kind": "string",
+          "value": "Note"
+        }
+      }
+    },
+    {
+      "action": "list_notes",
+      "parameters": {}
+    },
+    {
+      "action": "read_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n1"
+        }
+      }
+    },
+    {
+      "action": "update_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n1"
+        },
+        "title": {
+          "kind": "string",
+          "value": "Hello updated"
+        },
+        "body": {
+          "kind": "string",
+          "value": "World updated"
+        }
+      }
+    },
+    {
+      "action": "tag_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n1"
+        },
+        "tag": {
+          "kind": "string",
+          "value": "demo"
+        }
+      }
+    },
+    {
+      "action": "search_notes",
+      "parameters": {
+        "query": {
+          "kind": "string",
+          "value": "updated"
+        }
+      }
+    },
+    {
+      "action": "delete_note",
+      "parameters": {
+        "id": {
+          "kind": "string",
+          "value": "n2"
+        }
+      }
+    }
+  ]
+}

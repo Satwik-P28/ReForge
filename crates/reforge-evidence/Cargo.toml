@@ -1,0 +1,20 @@
+[package]
+name = "reforge-evidence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Evidence knowledge graph and content-addressed storage"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = { workspace = true }

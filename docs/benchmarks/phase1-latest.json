@@ -1,0 +1,268 @@
+{
+  "env": {
+    "os": "macos",
+    "arch": "aarch64",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "timestamp_unix": 1793679906,
+    "hostname_hash": "omitted"
+  },
+  "methodology": {
+    "runs_per_measurement": 7,
+    "warmup": 2,
+    "aggregation": "median_with_min_max",
+    "notes": [
+      "Synthetic fixtures; not application reconstruction benchmarks.",
+      "Memory usage reported only when available via allocator snapshot proxy (RSS not portable)."
+    ]
+  },
+  "results": [
+    {
+      "metric": "package_parse_latency",
+      "size": 10,
+      "median_ns": 36666,
+      "min_ns": 35083,
+      "max_ns": 38291,
+      "extra": {
+        "bytes": 3486
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 10,
+      "median_ns": 1916,
+      "min_ns": 1833,
+      "max_ns": 2250,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 10,
+      "median_ns": 125125,
+      "min_ns": 113167,
+      "max_ns": 133458,
+      "extra": {
+        "actions_per_sec_est": 79920
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 10,
+      "median_ns": 10375,
+      "min_ns": 10250,
+      "max_ns": 11375,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 10,
+      "median_ns": 8042,
+      "min_ns": 7917,
+      "max_ns": 8542,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 10,
+      "median_ns": 73250,
+      "min_ns": 72625,
+      "max_ns": 77708,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 10,
+      "median_ns": 290959,
+      "min_ns": 290250,
+      "max_ns": 298500,
+      "extra": {
+        "output_size_bytes": 6086
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 100,
+      "median_ns": 326208,
+      "min_ns": 322875,
+      "max_ns": 329792,
+      "extra": {
+        "bytes": 30578
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 100,
+      "median_ns": 18833,
+      "min_ns": 18250,
+      "max_ns": 19417,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 100,
+      "median_ns": 1023334,
+      "min_ns": 1014667,
+      "max_ns": 1043375,
+      "extra": {
+        "actions_per_sec_est": 97719
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 100,
+      "median_ns": 99708,
+      "min_ns": 99458,
+      "max_ns": 101291,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 100,
+      "median_ns": 80667,
+      "min_ns": 78000,
+      "max_ns": 82541,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 100,
+      "median_ns": 99875,
+      "min_ns": 97083,
+      "max_ns": 102000,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 100,
+      "median_ns": 2878542,
+      "min_ns": 2848500,
+      "max_ns": 2972584,
+      "extra": {
+        "output_size_bytes": 56848
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 1000,
+      "median_ns": 3658541,
+      "min_ns": 3634083,
+      "max_ns": 4033750,
+      "extra": {
+        "bytes": 305980
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 1000,
+      "median_ns": 191333,
+      "min_ns": 188125,
+      "max_ns": 193125,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 1000,
+      "median_ns": 9318625,
+      "min_ns": 9104833,
+      "max_ns": 9979958,
+      "extra": {
+        "actions_per_sec_est": 107311
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 1000,
+      "median_ns": 476750,
+      "min_ns": 476084,
+      "max_ns": 482333,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 1000,
+      "median_ns": 827041,
+      "min_ns": 818125,
+      "max_ns": 845833,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 1000,
+      "median_ns": 397458,
+      "min_ns": 394833,
+      "max_ns": 474250,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 1000,
+      "median_ns": 13286292,
+      "min_ns": 13064083,
+      "max_ns": 13598458,
+      "extra": {
+        "output_size_bytes": 285648
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 10000,
+      "median_ns": 4052583,
+      "min_ns": 3933083,
+      "max_ns": 4144166,
+      "extra": {
+        "bytes": 305980
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 10000,
+      "median_ns": 197416,
+      "min_ns": 192333,
+      "max_ns": 248583,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 10000,
+      "median_ns": 51780542,
+      "min_ns": 51022667,
+      "max_ns": 53068209,
+      "extra": {
+        "actions_per_sec_est": 96561
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 10000,
+      "median_ns": 486042,
+      "min_ns": 463000,
+      "max_ns": 545958,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 10000,
+      "median_ns": 1694500,
+      "min_ns": 1623917,
+      "max_ns": 3151000,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 10000,
+      "median_ns": 4175708,
+      "min_ns": 3432250,
+      "max_ns": 6194458,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 10000,
+      "median_ns": 13183542,
+      "min_ns": 12964375,
+      "max_ns": 13320292,
+      "extra": {
+        "output_size_bytes": 285648
+      }
+    }
+  ]
+}

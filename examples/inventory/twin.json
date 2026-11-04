@@ -1,0 +1,1506 @@
+{
+  "schema_version": "1.0.0",
+  "id": "inventory-twin",
+  "name": "Inventory Reservation Twin",
+  "description": "Multi-SKU inventory with stock and reservations, encoded entirely in portable twin+expr (map_put/get/remove/keys). No host builtin required.",
+  "initial_state": "ready",
+  "states": {
+    "ready": {
+      "name": "ready",
+      "terminal": false
+    }
+  },
+  "variables": {
+    "items": {
+      "name": "items",
+      "ty": {
+        "kind": "map",
+        "value": {
+          "kind": "map",
+          "value": {
+            "kind": "int"
+          }
+        }
+      },
+      "initial": {
+        "kind": "map",
+        "value": {}
+      },
+      "required": true
+    },
+    "op_count": {
+      "name": "op_count",
+      "ty": {
+        "kind": "int"
+      },
+      "initial": {
+        "kind": "int",
+        "value": 0
+      },
+      "required": true
+    }
+  },
+  "actions": {
+    "add_item": {
+      "name": "add_item",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        },
+        "name": {
+          "kind": "string"
+        },
+        "qty": {
+          "kind": "int"
+        }
+      }
+    },
+    "adjust_stock": {
+      "name": "adjust_stock",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        },
+        "delta": {
+          "kind": "int"
+        }
+      }
+    },
+    "reserve": {
+      "name": "reserve",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        },
+        "qty": {
+          "kind": "int"
+        }
+      }
+    },
+    "release": {
+      "name": "release",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        },
+        "qty": {
+          "kind": "int"
+        }
+      }
+    },
+    "fulfill": {
+      "name": "fulfill",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        },
+        "qty": {
+          "kind": "int"
+        }
+      }
+    },
+    "query_item": {
+      "name": "query_item",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        }
+      }
+    },
+    "list_items": {
+      "name": "list_items",
+      "parameters": {}
+    },
+    "remove_item": {
+      "name": "remove_item",
+      "parameters": {
+        "sku": {
+          "kind": "string"
+        }
+      }
+    }
+  },
+  "transitions": [
+    {
+      "id": "t-add",
+      "from": "ready",
+      "to": "ready",
+      "action": "add_item",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "not",
+            "arg": {
+              "op": "contains",
+              "collection": {
+                "op": "ref",
+                "root": "state",
+                "path": [
+                  "items"
+                ]
+              },
+              "item": {
+                "op": "ref",
+                "root": "input",
+                "path": [
+                  "sku"
+                ]
+              }
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "qty"
+              ]
+            },
+            "right": {
+              "op": "lit_int",
+              "value": 0
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "name",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "name"
+                  ]
+                }
+              ],
+              [
+                "qty",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "qty"
+                  ]
+                }
+              ],
+              [
+                "reserved",
+                {
+                  "op": "lit_int",
+                  "value": 0
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "events": [
+        "item_added"
+      ],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-add-dup",
+      "from": "ready",
+      "to": "ready",
+      "action": "add_item",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "items"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "duplicate_sku",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-adjust",
+      "from": "ready",
+      "to": "ready",
+      "action": "adjust_stock",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "map_get",
+                "map": {
+                  "op": "map_get",
+                  "map": {
+                    "op": "ref",
+                    "root": "state",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "key": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "sku"
+                    ]
+                  }
+                },
+                "key": {
+                  "op": "lit_string",
+                  "value": "qty"
+                }
+              },
+              "right": {
+                "op": "ref",
+                "root": "input",
+                "path": [
+                  "delta"
+                ]
+              }
+            },
+            "right": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "items"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "sku"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "reserved"
+              }
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "name",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "name"
+                  }
+                }
+              ],
+              [
+                "qty",
+                {
+                  "op": "add",
+                  "left": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "items"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "sku"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "qty"
+                    }
+                  },
+                  "right": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "delta"
+                    ]
+                  }
+                }
+              ],
+              [
+                "reserved",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "reserved"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-reserve",
+      "from": "ready",
+      "to": "ready",
+      "action": "reserve",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "qty"
+              ]
+            },
+            "right": {
+              "op": "lit_int",
+              "value": 1
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "sub",
+              "left": {
+                "op": "map_get",
+                "map": {
+                  "op": "map_get",
+                  "map": {
+                    "op": "ref",
+                    "root": "state",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "key": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "sku"
+                    ]
+                  }
+                },
+                "key": {
+                  "op": "lit_string",
+                  "value": "qty"
+                }
+              },
+              "right": {
+                "op": "map_get",
+                "map": {
+                  "op": "map_get",
+                  "map": {
+                    "op": "ref",
+                    "root": "state",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "key": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "sku"
+                    ]
+                  }
+                },
+                "key": {
+                  "op": "lit_string",
+                  "value": "reserved"
+                }
+              }
+            },
+            "right": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "qty"
+              ]
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "name",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "name"
+                  }
+                }
+              ],
+              [
+                "qty",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "qty"
+                  }
+                }
+              ],
+              [
+                "reserved",
+                {
+                  "op": "add",
+                  "left": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "items"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "sku"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "reserved"
+                    }
+                  },
+                  "right": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "qty"
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        },
+        "reserved_added": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "qty"
+          ]
+        }
+      },
+      "events": [
+        "reserved"
+      ],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-reserve-fail",
+      "from": "ready",
+      "to": "ready",
+      "action": "reserve",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "ge",
+              "left": {
+                "op": "sub",
+                "left": {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "qty"
+                  }
+                },
+                "right": {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "reserved"
+                  }
+                }
+              },
+              "right": {
+                "op": "ref",
+                "root": "input",
+                "path": [
+                  "qty"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "insufficient_stock",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-release",
+      "from": "ready",
+      "to": "ready",
+      "action": "release",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "items"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "sku"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "reserved"
+              }
+            },
+            "right": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "qty"
+              ]
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "name",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "name"
+                  }
+                }
+              ],
+              [
+                "qty",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "qty"
+                  }
+                }
+              ],
+              [
+                "reserved",
+                {
+                  "op": "sub",
+                  "left": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "items"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "sku"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "reserved"
+                    }
+                  },
+                  "right": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "qty"
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-fulfill",
+      "from": "ready",
+      "to": "ready",
+      "action": "fulfill",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "ge",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "items"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "sku"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "reserved"
+              }
+            },
+            "right": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "qty"
+              ]
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "name",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "items"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "sku"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "name"
+                  }
+                }
+              ],
+              [
+                "qty",
+                {
+                  "op": "sub",
+                  "left": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "items"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "sku"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "qty"
+                    }
+                  },
+                  "right": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "qty"
+                    ]
+                  }
+                }
+              ],
+              [
+                "reserved",
+                {
+                  "op": "sub",
+                  "left": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "items"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "sku"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "reserved"
+                    }
+                  },
+                  "right": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "qty"
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "events": [
+        "fulfilled"
+      ],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-query",
+      "from": "ready",
+      "to": "ready",
+      "action": "query_item",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "items"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "updates": {},
+      "outputs": {
+        "item": {
+          "op": "map_get",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-query-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "query_item",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-list",
+      "from": "ready",
+      "to": "ready",
+      "action": "list_items",
+      "guard": {
+        "op": "lit_bool",
+        "value": true
+      },
+      "updates": {},
+      "outputs": {
+        "skus": {
+          "op": "keys",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-remove",
+      "from": "ready",
+      "to": "ready",
+      "action": "remove_item",
+      "guard": {
+        "op": "and",
+        "args": [
+          {
+            "op": "contains",
+            "collection": {
+              "op": "ref",
+              "root": "state",
+              "path": [
+                "items"
+              ]
+            },
+            "item": {
+              "op": "ref",
+              "root": "input",
+              "path": [
+                "sku"
+              ]
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "op": "map_get",
+              "map": {
+                "op": "map_get",
+                "map": {
+                  "op": "ref",
+                  "root": "state",
+                  "path": [
+                    "items"
+                  ]
+                },
+                "key": {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "sku"
+                  ]
+                }
+              },
+              "key": {
+                "op": "lit_string",
+                "value": "reserved"
+              }
+            },
+            "right": {
+              "op": "lit_int",
+              "value": 0
+            }
+          }
+        ]
+      },
+      "updates": {
+        "items": {
+          "op": "map_remove",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "items"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "sku"
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "sku": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "sku"
+          ]
+        }
+      },
+      "events": [
+        "item_removed"
+      ],
+      "certainty": "specified",
+      "evidence_refs": []
+    }
+  ],
+  "invariants": [
+    {
+      "id": "op-nonneg",
+      "expression": "state.op_count >= 0",
+      "description": "op_count never negative"
+    },
+    {
+      "id": "items-defined",
+      "expression": "is_defined(state.items)",
+      "description": "items map always defined"
+    }
+  ],
+  "unknowns": [],
+  "hypotheses": [],
+  "evidence_refs": [
+    "ev-inventory-spec"
+  ],
+  "coverage": {},
+  "certainty": "specified"
+}

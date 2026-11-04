@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.9.0",
+  "capability_id": "example.notes",
+  "name": "Notes",
+  "version": "0.1.0",
+  "ops": {
+    "commands": {
+      "create_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "title": {
+            "kind": "string"
+          },
+          "body": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "duplicate_id"
+        ]
+      },
+      "delete_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "deleted": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ]
+      }
+    },
+    "queries": {
+      "read_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "note": {
+            "kind": "map",
+            "value": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": [
+          "not_found"
+        ]
+      },
+      "list_notes": {
+        "inputs": {},
+        "outputs": {
+          "ids": {
+            "kind": "list",
+            "item": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": []
+      }
+    }
+  },
+  "deps": [
+    "example.tags@^1.0"
+  ]
+}

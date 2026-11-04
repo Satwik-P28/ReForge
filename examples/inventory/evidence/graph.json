@@ -1,0 +1,113 @@
+{
+  "evidence": {
+    "ev-inventory-spec": {
+      "schema_version": "1.0.0",
+      "id": "ev-inventory-spec",
+      "evidence_type": "specification",
+      "source": {
+        "kind": "package",
+        "package_id": "reforge.examples.inventory"
+      },
+      "acquisition_method": "generated_fixture",
+      "collection_context": "examples/inventory",
+      "timestamp": "2026-11-03T00:00:00Z",
+      "environment": "reforge-phase1-audit",
+      "content_digest": {
+        "algorithm": "sha256",
+        "hex": "0fc70e37f4569ad257176cb4bdeaf646f396968fe141e20db817e93640a6389c"
+      },
+      "payload_ref": "0fc70e37f4569ad257176cb4bdeaf646f396968fe141e20db817e93640a6389c",
+      "related_claims": [
+        "inventory-reserve"
+      ],
+      "tool": "reforge-audit",
+      "tool_version": "0.1.0",
+      "integrity": "verified",
+      "hierarchy": "user_requirement",
+      "metadata": {}
+    }
+  },
+  "claims": {
+    "inventory-reserve": {
+      "schema_version": "1.0.0",
+      "id": "inventory-reserve",
+      "subject": "reserve",
+      "statement": "reserve(sku,q) succeeds only when qty-reserved >= q; then reserved increases by q.",
+      "certainty": "specified",
+      "supporting_evidence": [
+        "ev-inventory-spec"
+      ],
+      "contradicting_evidence": [],
+      "derived_from": [],
+      "verified_by_tests": [],
+      "notes": "Encoded in twin transitions t-reserve and t-reserve-fail"
+    }
+  },
+  "relations": [
+    {
+      "kind": "supports",
+      "evidence_id": "ev-inventory-spec",
+      "claim_id": "inventory-reserve"
+    }
+  ],
+  "store": {
+    "entries": {
+      "0fc70e37f4569ad257176cb4bdeaf646f396968fe141e20db817e93640a6389c": [
+        105,
+        110,
+        118,
+        101,
+        110,
+        116,
+        111,
+        114,
+        121,
+        32,
+        114,
+        101,
+        115,
+        101,
+        114,
+        118,
+        97,
+        116,
+        105,
+        111,
+        110,
+        32,
+        99,
+        97,
+        112,
+        97,
+        98,
+        105,
+        108,
+        105,
+        116,
+        121,
+        32,
+        115,
+        112,
+        101,
+        99,
+        105,
+        102,
+        105,
+        101,
+        100,
+        32,
+        98,
+        101,
+        104,
+        97,
+        118,
+        105,
+        111,
+        114,
+        32,
+        118,
+        49
+      ]
+    }
+  }
+}

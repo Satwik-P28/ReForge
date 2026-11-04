@@ -1,0 +1,46 @@
+{
+  "name": "link-and-delete-unlink",
+  "description": "Independent expectation: delete task unlinks notes under unlink policy",
+  "steps": [
+    {
+      "instance": "tasks",
+      "action": "create_task",
+      "parameters": { "id": "t1", "title": "Write docs" },
+      "expect_kind": "success"
+    },
+    {
+      "instance": "notes",
+      "action": "create_note",
+      "parameters": { "id": "n1", "title": "Ideas", "body": "..." },
+      "expect_kind": "success"
+    },
+    {
+      "instance": "reforge",
+      "action": "reforge.link",
+      "parameters": {
+        "relationship": "note-task-link",
+        "from_id": "n1",
+        "to_id": "t1"
+      },
+      "expect_kind": "success"
+    },
+    {
+      "instance": "tasks",
+      "action": "delete_task",
+      "parameters": { "id": "t1" },
+      "expect_kind": "success"
+    }
+  ],
+  "expected_links": [
+    {
+      "relationship": "note-task-link",
+      "from_id": "n1",
+      "to_id": "t1",
+      "present": false
+    }
+  ],
+  "forbidden_dangling_to": {
+    "relationship": "note-task-link",
+    "to_id": "t1"
+  }
+}

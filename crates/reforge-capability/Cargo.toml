@@ -1,0 +1,22 @@
+[package]
+name = "reforge-capability"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Capability Package format, validation, import/export"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+reforge-behavior = { workspace = true }
+reforge-evidence = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+walkdir = { workspace = true }
+semver = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

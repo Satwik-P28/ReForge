@@ -1,0 +1,928 @@
+{
+  "schema_version": "1.0.0",
+  "id": "notes-twin",
+  "name": "Notes Behavioral Twin",
+  "description": "Multi-note map CRUD encoded entirely in portable twin+expr (map_put/get/remove/keys/list_append). No host builtin required. search_notes is limited (returns all keys).",
+  "initial_state": "ready",
+  "states": {
+    "ready": {
+      "name": "ready",
+      "terminal": false
+    }
+  },
+  "variables": {
+    "notes": {
+      "name": "notes",
+      "ty": {
+        "kind": "map",
+        "value": {
+          "kind": "map",
+          "value": {
+            "kind": "string"
+          }
+        }
+      },
+      "initial": {
+        "kind": "map",
+        "value": {}
+      },
+      "required": true
+    },
+    "op_count": {
+      "name": "op_count",
+      "ty": {
+        "kind": "int"
+      },
+      "initial": {
+        "kind": "int",
+        "value": 0
+      },
+      "required": true
+    }
+  },
+  "actions": {
+    "create_note": {
+      "name": "create_note",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "title": {
+          "kind": "string"
+        },
+        "body": {
+          "kind": "string"
+        }
+      },
+      "description": "Create a note with unique id and empty tags"
+    },
+    "update_note": {
+      "name": "update_note",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "title": {
+          "kind": "string"
+        },
+        "body": {
+          "kind": "string"
+        }
+      },
+      "description": "Update title and body of an existing note (both required)"
+    },
+    "delete_note": {
+      "name": "delete_note",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      },
+      "description": "Delete a note by id"
+    },
+    "read_note": {
+      "name": "read_note",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      },
+      "description": "Read a note map by id"
+    },
+    "list_notes": {
+      "name": "list_notes",
+      "parameters": {},
+      "description": "List all note ids"
+    },
+    "search_notes": {
+      "name": "search_notes",
+      "parameters": {
+        "query": {
+          "kind": "string"
+        }
+      },
+      "description": "Limited Phase 1 search: returns all note keys (query ignored)"
+    },
+    "tag_note": {
+      "name": "tag_note",
+      "parameters": {
+        "id": {
+          "kind": "string"
+        },
+        "tag": {
+          "kind": "string"
+        }
+      },
+      "description": "Append a tag string to a note's tags list"
+    }
+  },
+  "transitions": [
+    {
+      "id": "t-create",
+      "from": "ready",
+      "to": "ready",
+      "action": "create_note",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {
+        "notes": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "id"
+                  ]
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "title"
+                  ]
+                }
+              ],
+              [
+                "body",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "body"
+                  ]
+                }
+              ],
+              [
+                "tags",
+                {
+                  "op": "list_lit",
+                  "items": []
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [
+        "note_created"
+      ],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-notes-spec"
+      ]
+    },
+    {
+      "id": "t-create-dup",
+      "from": "ready",
+      "to": "ready",
+      "action": "create_note",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "notes"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "duplicate_id",
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-notes-spec"
+      ]
+    },
+    {
+      "id": "t-update",
+      "from": "ready",
+      "to": "ready",
+      "action": "update_note",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "notes"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "notes": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "notes"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "title"
+                  ]
+                }
+              ],
+              [
+                "body",
+                {
+                  "op": "ref",
+                  "root": "input",
+                  "path": [
+                    "body"
+                  ]
+                }
+              ],
+              [
+                "tags",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "notes"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "tags"
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-notes-spec"
+      ]
+    },
+    {
+      "id": "t-update-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "update_note",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-delete",
+      "from": "ready",
+      "to": "ready",
+      "action": "delete_note",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "notes"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "notes": {
+          "op": "map_remove",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "deleted": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [
+        "note_deleted"
+      ],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-notes-spec"
+      ]
+    },
+    {
+      "id": "t-delete-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "delete_note",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-read",
+      "from": "ready",
+      "to": "ready",
+      "action": "read_note",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "notes"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {},
+      "outputs": {
+        "note": {
+          "op": "map_get",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": [
+        "ev-notes-spec"
+      ]
+    },
+    {
+      "id": "t-read-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "read_note",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-list",
+      "from": "ready",
+      "to": "ready",
+      "action": "list_notes",
+      "guard": {
+        "op": "lit_bool",
+        "value": true
+      },
+      "updates": {},
+      "outputs": {
+        "ids": {
+          "op": "keys",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-search",
+      "from": "ready",
+      "to": "ready",
+      "action": "search_notes",
+      "guard": {
+        "op": "lit_bool",
+        "value": true
+      },
+      "updates": {},
+      "outputs": {
+        "ids": {
+          "op": "keys",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          }
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-tag",
+      "from": "ready",
+      "to": "ready",
+      "action": "tag_note",
+      "guard": {
+        "op": "contains",
+        "collection": {
+          "op": "ref",
+          "root": "state",
+          "path": [
+            "notes"
+          ]
+        },
+        "item": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "updates": {
+        "notes": {
+          "op": "map_put",
+          "map": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "key": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          },
+          "value": {
+            "op": "map_lit",
+            "entries": [
+              [
+                "id",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "notes"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "id"
+                  }
+                }
+              ],
+              [
+                "title",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "notes"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "title"
+                  }
+                }
+              ],
+              [
+                "body",
+                {
+                  "op": "map_get",
+                  "map": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "ref",
+                      "root": "state",
+                      "path": [
+                        "notes"
+                      ]
+                    },
+                    "key": {
+                      "op": "ref",
+                      "root": "input",
+                      "path": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "key": {
+                    "op": "lit_string",
+                    "value": "body"
+                  }
+                }
+              ],
+              [
+                "tags",
+                {
+                  "op": "list_append",
+                  "list": {
+                    "op": "map_get",
+                    "map": {
+                      "op": "map_get",
+                      "map": {
+                        "op": "ref",
+                        "root": "state",
+                        "path": [
+                          "notes"
+                        ]
+                      },
+                      "key": {
+                        "op": "ref",
+                        "root": "input",
+                        "path": [
+                          "id"
+                        ]
+                      }
+                    },
+                    "key": {
+                      "op": "lit_string",
+                      "value": "tags"
+                    }
+                  },
+                  "item": {
+                    "op": "ref",
+                    "root": "input",
+                    "path": [
+                      "tag"
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        },
+        "op_count": {
+          "op": "add",
+          "left": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "op_count"
+            ]
+          },
+          "right": {
+            "op": "lit_int",
+            "value": 1
+          }
+        }
+      },
+      "outputs": {
+        "id": {
+          "op": "ref",
+          "root": "input",
+          "path": [
+            "id"
+          ]
+        }
+      },
+      "events": [],
+      "certainty": "specified",
+      "evidence_refs": []
+    },
+    {
+      "id": "t-tag-miss",
+      "from": "ready",
+      "to": "ready",
+      "action": "tag_note",
+      "guard": {
+        "op": "not",
+        "arg": {
+          "op": "contains",
+          "collection": {
+            "op": "ref",
+            "root": "state",
+            "path": [
+              "notes"
+            ]
+          },
+          "item": {
+            "op": "ref",
+            "root": "input",
+            "path": [
+              "id"
+            ]
+          }
+        }
+      },
+      "updates": {},
+      "outputs": {},
+      "events": [],
+      "error": "not_found",
+      "certainty": "specified",
+      "evidence_refs": []
+    }
+  ],
+  "invariants": [
+    {
+      "id": "op-nonneg",
+      "expression": "state.op_count >= 0",
+      "description": "op_count never negative"
+    },
+    {
+      "id": "notes-defined",
+      "expression": "is_defined(state.notes)",
+      "description": "notes map always defined"
+    }
+  ],
+  "unknowns": [],
+  "hypotheses": [],
+  "evidence_refs": [
+    "ev-notes-spec"
+  ],
+  "coverage": {},
+  "certainty": "specified"
+}

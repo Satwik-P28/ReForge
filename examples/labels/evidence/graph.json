@@ -1,0 +1,83 @@
+{
+  "evidence": {
+    "ev-labels-spec": {
+      "schema_version": "1.0.0",
+      "id": "ev-labels-spec",
+      "evidence_type": "specification",
+      "source": {
+        "kind": "package",
+        "package_id": "reforge.examples.labels"
+      },
+      "acquisition_method": "generated_fixture",
+      "collection_context": "examples/labels",
+      "timestamp": "2026-11-03T00:00:00Z",
+      "environment": "reforge-v0.1-fixtures",
+      "content_digest": {
+        "algorithm": "sha256",
+        "hex": "4b2a2d5e50c59852c074f288046f12ef9b7ca91b3f638bc64e352536c5007a43"
+      },
+      "payload_ref": "4b2a2d5e50c59852c074f288046f12ef9b7ca91b3f638bc64e352536c5007a43",
+      "related_claims": [
+        "label-creation"
+      ],
+      "tool": "reforge-fixtures",
+      "tool_version": "0.1.0",
+      "integrity": "verified",
+      "hierarchy": "user_requirement",
+      "metadata": {
+        "capability": "labels"
+      }
+    }
+  },
+  "claims": {
+    "label-creation": {
+      "schema_version": "1.0.0",
+      "id": "label-creation",
+      "subject": "create_label",
+      "statement": "create_label inserts a unique label; duplicates fail.",
+      "certainty": "specified",
+      "supporting_evidence": [
+        "ev-labels-spec"
+      ],
+      "contradicting_evidence": [],
+      "derived_from": [],
+      "verified_by_tests": [],
+      "notes": "Fourth public-API capability"
+    }
+  },
+  "relations": [
+    {
+      "kind": "supports",
+      "evidence_id": "ev-labels-spec",
+      "claim_id": "label-creation"
+    }
+  ],
+  "store": {
+    "entries": {
+      "4b2a2d5e50c59852c074f288046f12ef9b7ca91b3f638bc64e352536c5007a43": [
+        108,
+        97,
+        98,
+        101,
+        108,
+        115,
+        32,
+        99,
+        97,
+        112,
+        97,
+        98,
+        105,
+        108,
+        105,
+        116,
+        121,
+        32,
+        115,
+        112,
+        101,
+        99
+      ]
+    }
+  }
+}

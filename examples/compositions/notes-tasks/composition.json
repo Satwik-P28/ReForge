@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "id": "app.notes-tasks",
+  "name": "Notes + Tasks",
+  "description": "Flagship composition: notes linked to tasks with unlink-on-delete policy. Integration is expressed only in this manifest.",
+  "capabilities": [
+    {
+      "instance": "notes",
+      "package_path": "../../notes"
+    },
+    {
+      "instance": "tasks",
+      "package_path": "../../tasks"
+    }
+  ],
+  "bindings": [],
+  "relationships": [
+    {
+      "id": "note-task-link",
+      "name": "note_task_links",
+      "from_instance": "notes",
+      "from_key": "id",
+      "to_instance": "tasks",
+      "to_key": "id",
+      "on_delete": "unlink",
+      "description": "When a task is deleted, linked notes are retained and unlinked."
+    }
+  ],
+  "customization": {
+    "app_title": "Notes & Tasks",
+    "theme": "light",
+    "layout": "split",
+    "nav_order": ["tasks", "notes"],
+    "labels": {
+      "notes": "Notes",
+      "tasks": "Tasks"
+    },
+    "hidden_views": []
+  },
+  "runtime": {
+    "persistence": "sqlite",
+    "export_target": "local-web"
+  },
+  "verification": ["unlink-on-task-delete"]
+}

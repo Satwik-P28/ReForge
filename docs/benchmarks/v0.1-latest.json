@@ -1,0 +1,295 @@
+{
+  "env": {
+    "os": "macos",
+    "arch": "aarch64",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "timestamp_unix": 1793681715,
+    "hostname_hash": "omitted"
+  },
+  "methodology": {
+    "runs_per_measurement": 7,
+    "warmup": 2,
+    "aggregation": "median_with_min_max",
+    "notes": [
+      "Synthetic fixtures; not application reconstruction benchmarks.",
+      "Composition metrics use examples/compositions/notes-tasks when present.",
+      "Memory usage reported only when available via allocator snapshot proxy (RSS not portable)."
+    ]
+  },
+  "results": [
+    {
+      "metric": "package_parse_latency",
+      "size": 10,
+      "median_ns": 37958,
+      "min_ns": 36417,
+      "max_ns": 39125,
+      "extra": {
+        "bytes": 3486
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 10,
+      "median_ns": 1958,
+      "min_ns": 1791,
+      "max_ns": 2000,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 10,
+      "median_ns": 127209,
+      "min_ns": 116167,
+      "max_ns": 135667,
+      "extra": {
+        "actions_per_sec_est": 78610
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 10,
+      "median_ns": 10208,
+      "min_ns": 10083,
+      "max_ns": 11292,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 10,
+      "median_ns": 8250,
+      "min_ns": 7875,
+      "max_ns": 9125,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 10,
+      "median_ns": 76041,
+      "min_ns": 73792,
+      "max_ns": 79250,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 10,
+      "median_ns": 308917,
+      "min_ns": 300584,
+      "max_ns": 353542,
+      "extra": {
+        "output_size_bytes": 6086
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 100,
+      "median_ns": 345375,
+      "min_ns": 340167,
+      "max_ns": 353875,
+      "extra": {
+        "bytes": 30578
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 100,
+      "median_ns": 19416,
+      "min_ns": 18625,
+      "max_ns": 24375,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 100,
+      "median_ns": 1023375,
+      "min_ns": 1012000,
+      "max_ns": 1084792,
+      "extra": {
+        "actions_per_sec_est": 97715
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 100,
+      "median_ns": 98292,
+      "min_ns": 97958,
+      "max_ns": 107167,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 100,
+      "median_ns": 81375,
+      "min_ns": 75333,
+      "max_ns": 83833,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 100,
+      "median_ns": 101625,
+      "min_ns": 96375,
+      "max_ns": 108875,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 100,
+      "median_ns": 2645916,
+      "min_ns": 2636250,
+      "max_ns": 2707542,
+      "extra": {
+        "output_size_bytes": 56848
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 1000,
+      "median_ns": 3609375,
+      "min_ns": 3457166,
+      "max_ns": 4277458,
+      "extra": {
+        "bytes": 305980
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 1000,
+      "median_ns": 196791,
+      "min_ns": 191667,
+      "max_ns": 208625,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 1000,
+      "median_ns": 17498041,
+      "min_ns": 12927666,
+      "max_ns": 18988042,
+      "extra": {
+        "actions_per_sec_est": 57149
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 1000,
+      "median_ns": 634500,
+      "min_ns": 561416,
+      "max_ns": 704833,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 1000,
+      "median_ns": 1146959,
+      "min_ns": 892875,
+      "max_ns": 1244958,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 1000,
+      "median_ns": 575167,
+      "min_ns": 509083,
+      "max_ns": 670333,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 1000,
+      "median_ns": 15450583,
+      "min_ns": 13430375,
+      "max_ns": 19621458,
+      "extra": {
+        "output_size_bytes": 285648
+      }
+    },
+    {
+      "metric": "package_parse_latency",
+      "size": 10000,
+      "median_ns": 3979041,
+      "min_ns": 3797916,
+      "max_ns": 4995375,
+      "extra": {
+        "bytes": 305980
+      }
+    },
+    {
+      "metric": "package_validation_latency",
+      "size": 10000,
+      "median_ns": 206667,
+      "min_ns": 191959,
+      "max_ns": 259416,
+      "extra": {}
+    },
+    {
+      "metric": "behavioral_replay_throughput",
+      "size": 10000,
+      "median_ns": 70370542,
+      "min_ns": 50984916,
+      "max_ns": 127858709,
+      "extra": {
+        "actions_per_sec_est": 71052
+      }
+    },
+    {
+      "metric": "invariant_checking_overhead",
+      "size": 10000,
+      "median_ns": 478916,
+      "min_ns": 476000,
+      "max_ns": 486667,
+      "extra": {}
+    },
+    {
+      "metric": "dependency_graph_analysis",
+      "size": 10000,
+      "median_ns": 1628584,
+      "min_ns": 1594542,
+      "max_ns": 1662625,
+      "extra": {}
+    },
+    {
+      "metric": "evidence_import_verify",
+      "size": 10000,
+      "median_ns": 3469875,
+      "min_ns": 3412667,
+      "max_ns": 3521500,
+      "extra": {}
+    },
+    {
+      "metric": "serialization_canonical_digest",
+      "size": 10000,
+      "median_ns": 13793375,
+      "min_ns": 13779667,
+      "max_ns": 13878875,
+      "extra": {
+        "output_size_bytes": 285648
+      }
+    },
+    {
+      "metric": "composition_compile",
+      "size": 2,
+      "median_ns": 1865875,
+      "min_ns": 1833375,
+      "max_ns": 2090041,
+      "extra": {
+        "fixture": "notes-tasks"
+      }
+    },
+    {
+      "metric": "app_startup_plus_command",
+      "size": 2,
+      "median_ns": 2319250,
+      "min_ns": 2237417,
+      "max_ns": 2449084,
+      "extra": {}
+    },
+    {
+      "metric": "command_execution",
+      "size": 2,
+      "median_ns": 127750,
+      "min_ns": 106208,
+      "max_ns": 155750,
+      "extra": {}
+    }
+  ]
+}

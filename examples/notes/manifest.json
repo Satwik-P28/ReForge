@@ -1,0 +1,333 @@
+{
+  "schema_version": "1.0.0",
+  "package_format_version": "1.0.0",
+  "id": "reforge.examples.notes",
+  "name": "Notes",
+  "description": "Multi-note capability. Executable behavior is fully encoded in the portable Behavioral Twin via map_put/get/remove/keys/list_append (no host builtin).",
+  "version": "0.1.0",
+  "author": "ReForge Contributors",
+  "license": "Apache-2.0",
+  "interfaces": {
+    "commands": {
+      "create_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "title": {
+            "kind": "string"
+          },
+          "body": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "duplicate_id",
+          "invariant_violation"
+        ],
+        "description": "Create a note with a unique id"
+      },
+      "update_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "title": {
+            "kind": "string"
+          },
+          "body": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Update title and body of an existing note"
+      },
+      "delete_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "deleted": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Delete a note"
+      },
+      "tag_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "tag": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Append a tag to a note"
+      }
+    },
+    "queries": {
+      "read_note": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "note": {
+            "kind": "map",
+            "value": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Read a note by id"
+      },
+      "list_notes": {
+        "inputs": {},
+        "outputs": {
+          "ids": {
+            "kind": "list",
+            "item": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": [],
+        "description": "List note ids"
+      },
+      "search_notes": {
+        "inputs": {
+          "query": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "ids": {
+            "kind": "list",
+            "item": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": [],
+        "description": "Limited Phase 1 search: returns all note keys (query ignored)"
+      }
+    },
+    "events": {
+      "note_created": {
+        "payload": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "description": "Emitted when a note is created"
+      },
+      "note_deleted": {
+        "payload": {
+          "id": {
+            "kind": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "duplicate_id": {
+        "code": "duplicate_id",
+        "description": "Note id already exists"
+      },
+      "not_found": {
+        "code": "not_found",
+        "description": "Note id does not exist"
+      }
+    }
+  },
+  "data_models": {
+    "Note": {
+      "kind": "object",
+      "fields": {
+        "id": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "title": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "body": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "tags": {
+          "ty": {
+            "kind": "list",
+            "item": {
+              "kind": "string"
+            }
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "state_schema": {
+    "notes": {
+      "kind": "map",
+      "value": {
+        "kind": "ref",
+        "name": "Note"
+      }
+    },
+    "op_count": {
+      "kind": "int"
+    }
+  },
+  "contracts": [
+    "notes-contract"
+  ],
+  "contract_inline": [
+    {
+      "schema_version": "1.0.0",
+      "id": "notes-contract",
+      "name": "Notes behavioral contract",
+      "description": "Specified invariants for the multi-note portable twin",
+      "preconditions": [],
+      "postconditions": [],
+      "invariants": [
+        {
+          "id": "op-nonneg",
+          "expression": "state.op_count >= 0",
+          "description": "op_count non-negative"
+        },
+        {
+          "id": "notes-defined",
+          "expression": "is_defined(state.notes)",
+          "description": "notes map defined"
+        }
+      ],
+      "transition_constraints": [],
+      "error_conditions": [
+        {
+          "id": "dup",
+          "error": "duplicate_id",
+          "when": "create_note with existing id",
+          "description": "Creating a duplicate id must fail without corrupting state"
+        }
+      ],
+      "permitted_side_effects": [
+        {
+          "kind": "persist",
+          "store": "memory"
+        },
+        {
+          "kind": "emit_event",
+          "event": "note_created"
+        }
+      ],
+      "event_production": [
+        {
+          "name": "note_created",
+          "payload": {
+            "id": {
+              "kind": "string"
+            }
+          }
+        }
+      ],
+      "persistence_assumptions": [
+        "In-memory twin state only"
+      ],
+      "interface_requirements": [],
+      "environmental_assumptions": [
+        "Deterministic twin interpreter; no host builtin required"
+      ]
+    }
+  ],
+  "dependencies": [],
+  "permissions": [],
+  "runtime_requirements": [
+    {
+      "name": "reforge-behavior",
+      "version_req": ">=0.1.0",
+      "notes": "Requires map_put/map_get/map_remove/keys/list_append expr ops"
+    }
+  ],
+  "implementations": [
+    {
+      "id": "notes-twin",
+      "kind": "reference_twin",
+      "path": "twin.json",
+      "version": "0.1.0",
+      "operations": [
+        "create_note",
+        "read_note",
+        "update_note",
+        "delete_note",
+        "list_notes",
+        "search_notes",
+        "tag_note"
+      ],
+      "environment": [
+        "reforge-twin-engine"
+      ],
+      "demonstrated_by_tests": [
+        "crates/reforge/tests/e2e_notes.rs"
+      ],
+      "notes": "No host builtin. Portable twin is the sole executable reference."
+    }
+  ],
+  "test_fixtures": [
+    "fixtures/traces/notes-trace.json"
+  ],
+  "evidence": [
+    "ev-notes-spec"
+  ],
+  "twin_ref": "notes-twin",
+  "ui_bindings": [
+    {
+      "surface": "unspecified",
+      "notes": "UI is intentionally unbound in Phase 1"
+    }
+  ],
+  "persistence_bindings": [
+    {
+      "store": "memory",
+      "notes": "No durable store in Phase 1 reference"
+    }
+  ],
+  "implementation_status": "reference_available",
+  "certainty": "specified"
+}

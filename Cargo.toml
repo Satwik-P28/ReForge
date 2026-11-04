@@ -1,0 +1,74 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/reforge-types",
+    "crates/reforge-canon",
+    "crates/reforge-expr",
+    "crates/reforge-behavior",
+    "crates/reforge-capability",
+    "crates/reforge-evidence",
+    "crates/reforge-dependency",
+    "crates/reforge-schema",
+    "crates/reforge",
+    "crates/reforge-cli",
+    "crates/reforge-bench",
+    "crates/reforge-composer-sim",
+    "crates/reforge-compose",
+    "crates/reforge-runtime",
+    "crates/reforge-verify",
+    "crates/reforge-export",
+    "crates/reforge-studio",
+]
+default-members = ["crates/reforge-cli", "crates/reforge"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["ReForge Contributors"]
+repository = "https://github.com/Satwik-P28/ReForge"
+rust-version = "1.75"
+
+[workspace.dependencies]
+reforge-types = { path = "crates/reforge-types" }
+reforge-canon = { path = "crates/reforge-canon" }
+reforge-expr = { path = "crates/reforge-expr" }
+reforge-behavior = { path = "crates/reforge-behavior" }
+reforge-capability = { path = "crates/reforge-capability" }
+reforge-evidence = { path = "crates/reforge-evidence" }
+reforge-dependency = { path = "crates/reforge-dependency" }
+reforge-schema = { path = "crates/reforge-schema" }
+reforge-compose = { path = "crates/reforge-compose" }
+reforge-runtime = { path = "crates/reforge-runtime" }
+reforge-verify = { path = "crates/reforge-verify" }
+reforge-export = { path = "crates/reforge-export" }
+reforge = { path = "crates/reforge" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde_json_canonicalizer = "0.3"
+thiserror = "2.0"
+anyhow = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+semver = { version = "1.0", features = ["serde"] }
+indexmap = { version = "2.7", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+clap = { version = "4.5", features = ["derive"] }
+proptest = "1.6"
+regex = "1.11"
+walkdir = "2.5"
+tempfile = "3.14"
+criterion = { version = "0.5", features = ["html_reports"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[profile.bench]
+lto = true

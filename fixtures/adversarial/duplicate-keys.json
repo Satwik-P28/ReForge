@@ -1,0 +1,20 @@
+{
+  "note": "Intentional duplicate object keys for parser/canonicalization tests. RFC 8785 / JCS and serde_json do not treat duplicate keys as a portable semantic; this file exists to document and test rejection or last-key-wins behavior.",
+  "schema_version": "1.0.0",
+  "id": "reforge.adversarial.duplicate-keys",
+  "id": "reforge.adversarial.duplicate-keys-SECOND",
+  "name": "first-name",
+  "name": "second-name",
+  "version": "0.1.0",
+  "interfaces": {
+    "commands": {
+      "op": {
+        "inputs": { "x": { "kind": "string" } },
+        "outputs": { "y": { "kind": "string" } },
+        "errors": []
+      }
+    }
+  },
+  "certainty": "unknown",
+  "certainty": "contradictory"
+}

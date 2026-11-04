@@ -1,0 +1,24 @@
+[package]
+name = "reforge-verify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cross-capability composition verification"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-behavior = { workspace = true }
+reforge-compose = { workspace = true }
+reforge-runtime = { workspace = true }
+reforge-canon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+reforge-capability = { workspace = true }

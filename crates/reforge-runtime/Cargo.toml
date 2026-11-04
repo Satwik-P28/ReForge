@@ -1,0 +1,23 @@
+[package]
+name = "reforge-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Multi-capability application runtime with events and SQLite persistence"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-behavior = { workspace = true }
+reforge-capability = { workspace = true }
+reforge-compose = { workspace = true }
+reforge-canon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+anyhow = { workspace = true }
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

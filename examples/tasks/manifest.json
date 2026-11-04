@@ -1,0 +1,376 @@
+{
+  "schema_version": "1.0.0",
+  "package_format_version": "1.0.0",
+  "id": "reforge.examples.tasks",
+  "name": "Tasks",
+  "description": "Multi-task capability. Executable behavior is fully encoded in the portable Behavioral Twin via map_put/get/remove/keys (no host builtin).",
+  "version": "0.1.0",
+  "author": "ReForge Contributors",
+  "license": "Apache-2.0",
+  "interfaces": {
+    "commands": {
+      "create_task": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "title": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "duplicate_id",
+          "invariant_violation"
+        ],
+        "description": "Create a task with a unique id"
+      },
+      "update_task": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "title": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Update an existing task title"
+      },
+      "set_priority": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "priority": {
+            "kind": "int"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Set task priority"
+      },
+      "set_status": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          },
+          "status": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Set task status string"
+      },
+      "complete_task": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found",
+          "invalid_status"
+        ],
+        "description": "Mark an open task completed"
+      },
+      "reopen_task": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found",
+          "invalid_status"
+        ],
+        "description": "Reopen a completed task"
+      },
+      "delete_task": {
+        "inputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "outputs": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "errors": [
+          "not_found"
+        ],
+        "description": "Delete a task"
+      }
+    },
+    "queries": {
+      "query_tasks": {
+        "inputs": {
+          "status": {
+            "kind": "optional",
+            "inner": {
+              "kind": "string"
+            }
+          }
+        },
+        "outputs": {
+          "ids": {
+            "kind": "list",
+            "item": {
+              "kind": "string"
+            }
+          }
+        },
+        "errors": [],
+        "description": "Limited Phase 1 query: returns all task keys (status filter ignored)"
+      }
+    },
+    "events": {
+      "task_created": {
+        "payload": {
+          "id": {
+            "kind": "string"
+          }
+        },
+        "description": "Emitted when a task is created"
+      },
+      "task_completed": {
+        "payload": {
+          "id": {
+            "kind": "string"
+          }
+        }
+      },
+      "task_deleted": {
+        "payload": {
+          "id": {
+            "kind": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "duplicate_id": {
+        "code": "duplicate_id",
+        "description": "Task id already exists"
+      },
+      "not_found": {
+        "code": "not_found",
+        "description": "Task id does not exist"
+      },
+      "invalid_status": {
+        "code": "invalid_status",
+        "description": "Invalid status transition"
+      }
+    }
+  },
+  "data_models": {
+    "Task": {
+      "kind": "object",
+      "fields": {
+        "id": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "title": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "status": {
+          "ty": {
+            "kind": "string"
+          },
+          "required": true
+        },
+        "priority": {
+          "ty": {
+            "kind": "int"
+          },
+          "required": true
+        }
+      }
+    }
+  },
+  "state_schema": {
+    "tasks": {
+      "kind": "map",
+      "value": {
+        "kind": "ref",
+        "name": "Task"
+      }
+    },
+    "op_count": {
+      "kind": "int"
+    }
+  },
+  "contracts": [
+    "tasks-contract"
+  ],
+  "contract_inline": [
+    {
+      "schema_version": "1.0.0",
+      "id": "tasks-contract",
+      "name": "Tasks behavioral contract",
+      "description": "Specified invariants for the multi-task portable twin",
+      "preconditions": [],
+      "postconditions": [],
+      "invariants": [
+        {
+          "id": "op-nonneg",
+          "expression": "state.op_count >= 0",
+          "description": "op_count non-negative"
+        },
+        {
+          "id": "tasks-defined",
+          "expression": "is_defined(state.tasks)",
+          "description": "tasks map defined"
+        }
+      ],
+      "transition_constraints": [],
+      "error_conditions": [
+        {
+          "id": "dup",
+          "error": "duplicate_id",
+          "when": "create_task with existing id",
+          "description": "Creating a duplicate id must fail without corrupting state"
+        }
+      ],
+      "permitted_side_effects": [
+        {
+          "kind": "persist",
+          "store": "memory"
+        },
+        {
+          "kind": "emit_event",
+          "event": "task_created"
+        }
+      ],
+      "event_production": [
+        {
+          "name": "task_created",
+          "payload": {
+            "id": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "task_completed",
+          "payload": {
+            "id": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "task_deleted",
+          "payload": {
+            "id": {
+              "kind": "string"
+            }
+          }
+        }
+      ],
+      "persistence_assumptions": [
+        "In-memory twin state only"
+      ],
+      "interface_requirements": [],
+      "environmental_assumptions": [
+        "Deterministic twin interpreter; no host builtin required"
+      ]
+    }
+  ],
+  "dependencies": [],
+  "permissions": [],
+  "runtime_requirements": [
+    {
+      "name": "reforge-behavior",
+      "version_req": ">=0.1.0",
+      "notes": "Requires map_put/map_get/map_remove/keys expr ops"
+    }
+  ],
+  "implementations": [
+    {
+      "id": "tasks-twin",
+      "kind": "reference_twin",
+      "path": "twin.json",
+      "version": "0.1.0",
+      "operations": [
+        "create_task",
+        "update_task",
+        "set_priority",
+        "set_status",
+        "complete_task",
+        "reopen_task",
+        "delete_task",
+        "query_tasks"
+      ],
+      "environment": [
+        "reforge-twin-engine"
+      ],
+      "demonstrated_by_tests": [
+        "crates/reforge/tests/e2e_tasks.rs"
+      ],
+      "notes": "No host builtin. Portable twin is the sole executable reference."
+    }
+  ],
+  "test_fixtures": [
+    "fixtures/traces/tasks-trace.json"
+  ],
+  "evidence": [
+    "ev-tasks-spec"
+  ],
+  "twin_ref": "tasks-twin",
+  "ui_bindings": [
+    {
+      "surface": "unspecified",
+      "notes": "UI is intentionally unbound in Phase 1"
+    }
+  ],
+  "persistence_bindings": [
+    {
+      "store": "memory",
+      "notes": "No durable store in Phase 1 reference"
+    }
+  ],
+  "implementation_status": "reference_available",
+  "certainty": "specified"
+}

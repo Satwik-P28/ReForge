@@ -1,0 +1,26 @@
+[package]
+name = "reforge-studio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ReForge Studio Lite — local loopback web UI"
+rust-version.workspace = true
+
+[[bin]]
+name = "reforge-studio"
+path = "src/main.rs"
+
+[dependencies]
+reforge = { workspace = true }
+reforge-compose = { workspace = true }
+reforge-runtime = { workspace = true }
+reforge-verify = { workspace = true }
+reforge-export = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+indexmap = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+clap = { workspace = true }

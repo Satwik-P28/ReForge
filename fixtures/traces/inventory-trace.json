@@ -1,0 +1,81 @@
+{
+  "actions": [
+    {
+      "action": "add_item",
+      "parameters": {
+        "sku": {
+          "kind": "string",
+          "value": "SKU-A"
+        },
+        "name": {
+          "kind": "string",
+          "value": "Widget"
+        },
+        "qty": {
+          "kind": "int",
+          "value": 10
+        }
+      }
+    },
+    {
+      "action": "add_item",
+      "parameters": {
+        "sku": {
+          "kind": "string",
+          "value": "SKU-B"
+        },
+        "name": {
+          "kind": "string",
+          "value": "Gadget"
+        },
+        "qty": {
+          "kind": "int",
+          "value": 3
+        }
+      }
+    },
+    {
+      "action": "reserve",
+      "parameters": {
+        "sku": {
+          "kind": "string",
+          "value": "SKU-A"
+        },
+        "qty": {
+          "kind": "int",
+          "value": 4
+        }
+      }
+    },
+    {
+      "action": "fulfill",
+      "parameters": {
+        "sku": {
+          "kind": "string",
+          "value": "SKU-A"
+        },
+        "qty": {
+          "kind": "int",
+          "value": 2
+        }
+      }
+    },
+    {
+      "action": "list_items",
+      "parameters": {}
+    },
+    {
+      "action": "reserve",
+      "parameters": {
+        "sku": {
+          "kind": "string",
+          "value": "SKU-B"
+        },
+        "qty": {
+          "kind": "int",
+          "value": 99
+        }
+      }
+    }
+  ]
+}

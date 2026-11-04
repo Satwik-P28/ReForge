@@ -1,0 +1,19 @@
+/target/
+**/target/
+Cargo.lock.bak
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+*.profraw
+*.profdata
+# Machine-local benchmark runs (committed snapshots live under docs/benchmarks/)
+/bench-results/
+.reforge/
+*.log
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+/dist/
+/tmp/

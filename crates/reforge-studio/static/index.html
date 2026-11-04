@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReForge Studio Lite</title>
+  <style>
+    :root { --bg:#eef2f6; --ink:#15202b; --accent:#0f6a8a; --card:#ffffff; --line:#c5d0db; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.45 "Source Sans 3", "Segoe UI", sans-serif; background:linear-gradient(160deg,#eef2f6,#dce8f0); color:var(--ink); }
+    header { padding:1rem 1.5rem; border-bottom:1px solid var(--line); background:rgba(255,255,255,.7); backdrop-filter:blur(6px); }
+    h1 { margin:0; font:700 1.35rem "Source Serif 4", "Iowan Old Style", serif; letter-spacing:.02em; }
+    main { display:grid; grid-template-columns: 280px 1fr; gap:1rem; padding:1rem 1.5rem 2rem; min-height:calc(100vh - 64px); }
+    nav button, .panel button { display:block; width:100%; margin:.35rem 0; padding:.55rem .7rem; border:1px solid var(--line); background:var(--card); border-radius:8px; cursor:pointer; text-align:left; }
+    nav button.active, .panel button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem; }
+    label { display:block; font-size:.8rem; margin-top:.6rem; opacity:.8; }
+    input, textarea, select { width:100%; margin-top:.2rem; padding:.45rem .55rem; border:1px solid var(--line); border-radius:6px; font:inherit; }
+    pre { background:#1c1a16; color:#e8eef0; padding:.8rem; border-radius:8px; overflow:auto; max-height:420px; font-size:12px; }
+    .row { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .row > * { flex:1; min-width:140px; }
+    .muted { opacity:.7; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ReForge Studio Lite</h1>
+    <p class="muted">Local loopback UI · real engine APIs · no cloud</p>
+  </header>
+  <main>
+    <nav>
+      <button class="active" data-view="project">Project</button>
+      <button data-view="library">Capability Library</button>
+      <button data-view="compose">Composition</button>
+      <button data-view="preview">Application Preview</button>
+      <button data-view="customize">Customization</button>
+      <button data-view="verify">Verification</button>
+      <button data-view="export">Export</button>
+    </nav>
+    <section class="panel" id="view"></section>
+  </main>
+  <script>
+    const view = document.getElementById('view');
+    const state = { snapshot: null };
+
+    document.querySelectorAll('nav button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        render(btn.dataset.view);
+      };
+    });
+
+    async function api(path, opts) {
+      const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+      const text = await res.text();
+      let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      if (!res.ok) throw new Error(data || text);
+      return data;
+    }
+
+    function render(name) {
+      if (name === 'project') {
+        view.innerHTML = `
+          <h2>Project Workspace</h2>
+          <label>Composition path</label>
+          <input id="compPath" value="examples/compositions/notes-tasks/composition.json" />
+          <div class="row" style="margin-top:.8rem">
+            <button class="primary" id="loadBtn">Load &amp; Compile</button>
+          </div>
+          <p class="muted">Loads packages, compiles Application IR, attaches SQLite under .reforge/</p>
+          <pre id="out">{}</pre>`;
+        document.getElementById('loadBtn').onclick = async () => {
+          try {
+            const path = document.getElementById('compPath').value;
+            state.snapshot = await api('/api/compose/load', { method:'POST', body: JSON.stringify({ path }) });
+            document.getElementById('out').textContent = JSON.stringify(state.snapshot, null, 2);
+          } catch (e) { document.getElementById('out').textContent = String(e); }
+        };
+      } else if (name === 'library') {
+        view.innerHTML = `
+          <h2>Capability Library</h2>
+          <label>Package path</label>
+          <input id="pkgPath" value="examples/notes" />
+          <button class="primary" id="insp">Inspect</button>
+          <pre id="out">{}</pre>`;
+        document.getElementById('insp').onclick = async () => {
+          try {
+            const path = document.getElementById('pkgPath').value;
+            const data = await api('/api/package/inspect?path=' + encodeURIComponent(path));
+            document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+          } catch (e) { document.getElementById('out').textContent = String(e); }
+        };
+      } else if (name === 'compose') {
+        view.innerHTML = `<h2>Composition Workspace</h2>
+          <p>Edit composition JSON on disk, then reload from Project. Bindings and relationships are validated by the compiler.</p>
+          <pre id="out">${JSON.stringify(state.snapshot && state.snapshot.customization || {}, null, 2)}</pre>`;
+      } else if (name === 'preview') {
+        view.innerHTML = `
+          <h2>Application Preview</h2>
+          <div class="row">
+            <div><label>Instance</label><input id="inst" value="notes" /></div>
+            <div><label>Action</label><input id="act" value="create_note" /></div>
+          </div>
+          <label>Parameters (TypedValue JSON object)</label>
+          <textarea id="params" rows="6">{"id":{"kind":"string","value":"n1"},"title":{"kind":"string","value":"Hello"},"body":{"kind":"string","value":"World"}}</textarea>
+          <div class="row" style="margin-top:.8rem">
+            <button class="primary" id="run">Dispatch</button>
+            <button id="snap">Refresh Snapshot</button>
+          </div>
+          <pre id="out">{}</pre>`;
+        document.getElementById('run').onclick = async () => {
+          try {
+            const body = {
+              instance: document.getElementById('inst').value,
+              action: document.getElementById('act').value,
+              parameters: JSON.parse(document.getElementById('params').value || '{}')
+            };
+            const data = await api('/api/dispatch', { method:'POST', body: JSON.stringify(body) });
+            document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+          } catch (e) { document.getElementById('out').textContent = String(e); }
+        };
+        document.getElementById('snap').onclick = async () => {
+          state.snapshot = await api('/api/snapshot');
+          document.getElementById('out').textContent = JSON.stringify(state.snapshot, null, 2);
+        };
+      } else if (name === 'customize') {
+        view.innerHTML = `<h2>Customization</h2>
+          <p class="muted">Customization is declared in the composition manifest (title, theme, nav_order, labels).</p>
+          <pre id="out">${JSON.stringify((state.snapshot||{}).customization || {}, null, 2)}</pre>`;
+      } else if (name === 'verify') {
+        view.innerHTML = `
+          <h2>Verification Center</h2>
+          <label>Expectation JSON</label>
+          <textarea id="exp" rows="12">{
+  "name": "studio-smoke",
+  "steps": [
+    {"instance":"tasks","action":"create_task","parameters":{"id":{"kind":"string","value":"t1"},"title":{"kind":"string","value":"Task"}},"expect_kind":"success"},
+    {"instance":"notes","action":"create_note","parameters":{"id":{"kind":"string","value":"n1"},"title":{"kind":"string","value":"N"},"body":{"kind":"string","value":""}},"expect_kind":"success"},
+    {"instance":"reforge","action":"reforge.link","parameters":{"relationship":{"kind":"string","value":"note-task-link"},"from_id":{"kind":"string","value":"n1"},"to_id":{"kind":"string","value":"t1"}},"expect_kind":"success"}
+  ],
+  "expected_links":[{"relationship":"note-task-link","from_id":"n1","to_id":"t1","present":true}]
+}</textarea>
+          <button class="primary" id="ver">Run Verification</button>
+          <pre id="out">{}</pre>`;
+        document.getElementById('ver').onclick = async () => {
+          try {
+            const expectation = JSON.parse(document.getElementById('exp').value);
+            const data = await api('/api/verify', { method:'POST', body: JSON.stringify(expectation) });
+            document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+          } catch (e) { document.getElementById('out').textContent = String(e); }
+        };
+      } else if (name === 'export') {
+        view.innerHTML = `
+          <h2>Export Panel</h2>
+          <label>Output directory</label>
+          <input id="outDir" value="/tmp/reforge-export-notes-tasks" />
+          <button class="primary" id="exp">Export local-web</button>
+          <pre id="out">{}</pre>`;
+        document.getElementById('exp').onclick = async () => {
+          try {
+            const data = await api('/api/export', { method:'POST', body: JSON.stringify({ out: document.getElementById('outDir').value }) });
+            document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+          } catch (e) { document.getElementById('out').textContent = String(e); }
+        };
+      }
+    }
+    render('project');
+  </script>
+</body>
+</html>

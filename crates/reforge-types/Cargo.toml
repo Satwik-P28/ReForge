@@ -1,0 +1,21 @@
+[package]
+name = "reforge-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Canonical semantic models for ReForge Phase 1"
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+semver = { workspace = true }
+indexmap = { workspace = true }
+chrono = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tempfile = { workspace = true }

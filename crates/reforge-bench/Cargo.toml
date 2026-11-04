@@ -1,0 +1,25 @@
+[package]
+name = "reforge-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ReForgeBench Phase 1 semantic core benchmarks"
+rust-version.workspace = true
+
+[[bin]]
+name = "reforge-bench"
+path = "src/main.rs"
+
+[[bench]]
+name = "semantic_core"
+harness = false
+
+[dependencies]
+reforge = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

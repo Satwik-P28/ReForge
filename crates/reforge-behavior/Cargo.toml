@@ -1,0 +1,19 @@
+[package]
+name = "reforge-behavior"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Executable Behavioral Twin engine for ReForge"
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-expr = { workspace = true }
+reforge-canon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
