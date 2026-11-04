@@ -1,7 +1,12 @@
 name: Release
 
-# Prepared automation. Does not publish unless a maintainer creates a v* tag
-# AND approves the workflow / provides authorization for GitHub release upload.
+# Builds release artifacts. Does not publish a GitHub Release unless a v* tag
+# push is processed AND dry_run is not true. Prefer workflow_dispatch with
+# dry_run=true for packaging validation without publishing.
+#
+# Note: Tag-triggered runs use the workflow file from the tagged commit.
+# Fixes on main after a tag do not apply to a re-run of that tag job; dispatch
+# from the corrected branch instead (do not move the tag without authorization).
 
 on:
   workflow_dispatch:
@@ -10,6 +15,11 @@ on:
         description: "Build artifacts without creating a GitHub Release"
         type: boolean
         default: true
+      ref:
+        description: "Git ref to package (tag, branch, or commit). Empty = current checkout."
+        type: string
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -21,27 +31,101 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need full history/tags so `git archive` can resolve release refs.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve archive ref and version prefix
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.ref }}" ]; then
+            REF="${{ inputs.ref }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            REF="${GITHUB_REF#refs/tags/}"
+          else
+            REF="${GITHUB_SHA}"
+          fi
+          git rev-parse --verify "${REF}^{commit}" >/dev/null
+          COMMIT="$(git rev-parse "${REF}^{commit}")"
+          # Versioned top-level directory: prefer tag name, else short SHA.
+          if [[ "${REF}" == v* ]] || git show-ref --tags --verify --quiet "refs/tags/${REF}"; then
+            PREFIX="${REF#refs/tags/}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            PREFIX="${GITHUB_REF#refs/tags/}"
+          else
+            PREFIX="reforge-${COMMIT:0:12}"
+          fi
+          # Normalize prefix for archive path (no slashes).
+          PREFIX="${PREFIX//\//-}"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "prefix=${PREFIX}" >> "$GITHUB_OUTPUT"
+          echo "Archive ref=${REF} commit=${COMMIT} prefix=${PREFIX}"
+
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+
       - uses: Swatinem/rust-cache@v2
+
       - name: validate tests
         run: cargo test --workspace --all-targets
+
       - name: build release binaries
         run: |
+          set -euo pipefail
           cargo build -p reforge-cli --release
           cargo build -p reforge-studio --release
           mkdir -p dist
-          cp target/release/reforge dist/reforge-linux-x86_64 || cp target/release/reforge-cli dist/reforge-linux-x86_64
+          cp target/release/reforge dist/reforge-linux-x86_64
           cp target/release/reforge-studio dist/reforge-studio-linux-x86_64
-          tar --exclude=target --exclude=.git -czf dist/reforge-src.tar.gz .
-          (cd dist && sha256sum * > SHA256SUMS)
+          test -x dist/reforge-linux-x86_64
+          test -x dist/reforge-studio-linux-x86_64
+
+      - name: package source with git archive
+        run: |
+          set -euo pipefail
+          REF="${{ steps.meta.outputs.ref }}"
+          PREFIX="${{ steps.meta.outputs.prefix }}"
+          OUT="dist/${PREFIX}-src.tar.gz"
+          # Archive only tracked files at REF; write outside the tree being archived.
+          git archive --format=tar.gz --prefix="${PREFIX}/" -o "${OUT}" "${REF}"
+          ls -lh "${OUT}"
+          # Validate: gzip readable, versioned top-level, no dist/ nesting, tracked-only.
+          tar -tzf "${OUT}" | head -40
+          TOPLEVEL="$(tar -tzf "${OUT}" | head -1 | cut -d/ -f1)"
+          test "${TOPLEVEL}" = "${PREFIX}"
+          if tar -tzf "${OUT}" | grep -E "^${PREFIX}/(dist|target)/" >/dev/null; then
+            echo "Archive unexpectedly contains dist/ or target/" >&2
+            exit 1
+          fi
+          # Spot-check required tracked paths
+          tar -tzf "${OUT}" | grep -qx "${PREFIX}/Cargo.toml"
+          tar -tzf "${OUT}" | grep -qx "${PREFIX}/LICENSE"
+          tar -tzf "${OUT}" | grep -q "^${PREFIX}/crates/reforge-cli/"
+          echo "Source archive validated: ${OUT}"
+
+      - name: checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum reforge-linux-x86_64 reforge-studio-linux-x86_64 *.tar.gz | tee SHA256SUMS
+          # Verify checksums round-trip
+          sha256sum -c SHA256SUMS
+          echo "SHA256SUMS:"
+          cat SHA256SUMS
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: reforge-release-artifacts
           path: dist/
+
       - name: create GitHub release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
         uses: softprops/action-gh-release@v2
