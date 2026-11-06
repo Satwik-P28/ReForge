@@ -1,0 +1,34 @@
+{
+  "suite": "reforgebench-final2",
+  "description": "Second independently authored final evaluation workflows, frozen before execution after the implementation was fixed on development suites.",
+  "apps": [
+    {
+      "spec": "fixtures/v02/cli-taskboard/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-inventory/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-forms/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-contacts/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v02/cli-events/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v03/cli-library/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v03/cli-tickets/target.json",
+      "split": "holdout"
+    }
+  ]
+}

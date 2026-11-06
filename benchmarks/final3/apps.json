@@ -1,0 +1,14 @@
+{
+  "suite": "reforgebench-final3",
+  "description": "Fresh application-level holdout authored after the final2 implementation and frozen before its first execution.",
+  "apps": [
+    {
+      "spec": "fixtures/v04/cli-garden/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v04/cli-ledger/target.json",
+      "split": "holdout"
+    }
+  ]
+}

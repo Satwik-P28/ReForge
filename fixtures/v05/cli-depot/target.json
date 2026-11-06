@@ -1,0 +1,68 @@
+{
+  "target_id": "cli-depot",
+  "target_name": "depot",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/depot.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v05-work-depot",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "create",
+      "argv": [
+        "create",
+        "$name"
+      ],
+      "params": {
+        "name": {
+          "kind": "fresh_id",
+          "prefix": "acme"
+        }
+      }
+    },
+    {
+      "action": "show",
+      "argv": [
+        "show"
+      ]
+    },
+    {
+      "action": "audit",
+      "argv": [
+        "audit"
+      ]
+    },
+    {
+      "action": "advance",
+      "argv": [
+        "advance",
+        "$shipment_id"
+      ],
+      "params": {
+        "shipment_id": {
+          "kind": "last_entity",
+          "pool": "shipment"
+        }
+      }
+    },
+    {
+      "action": "close",
+      "argv": [
+        "close",
+        "$shipment_id"
+      ],
+      "params": {
+        "shipment_id": {
+          "kind": "last_entity",
+          "pool": "shipment"
+        }
+      }
+    }
+  ]
+}

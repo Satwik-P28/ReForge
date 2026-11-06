@@ -1,0 +1,22 @@
+{
+  "target_id": "cli-contacts",
+  "target_name": "contacts",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/contacts.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v02-work-contacts",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "create", "argv": ["create", "$name"], "params": { "name": { "kind": "fresh_id", "prefix": "person" } } },
+    { "action": "update", "argv": ["update", "$contact_id", "$name"], "params": { "contact_id": { "kind": "last_entity", "pool": "contact" }, "name": { "kind": "fresh_id", "prefix": "renamed" } } },
+    { "action": "tag", "argv": ["tag", "$contact_id", "$tag"], "params": { "contact_id": { "kind": "last_entity", "pool": "contact" }, "tag": { "kind": "literal", "value": { "kind": "string", "value": "vip" } } } },
+    { "action": "archive", "argv": ["archive", "$contact_id"], "params": { "contact_id": { "kind": "last_entity", "pool": "contact" } } },
+    { "action": "unarchive", "argv": ["unarchive", "$contact_id"], "params": { "contact_id": { "kind": "last_entity", "pool": "contact" } } },
+    { "action": "search", "argv": ["search", "$query"], "params": { "query": { "kind": "literal", "value": { "kind": "string", "value": "x" } } } },
+    { "action": "remove", "argv": ["remove", "$contact_id"], "params": { "contact_id": { "kind": "last_entity", "pool": "contact" } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "target_id": "cli-taskboard",
+  "target_name": "taskboard",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/taskboard.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v02-work",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "add", "argv": ["add", "$title"], "params": { "title": { "kind": "fresh_id", "prefix": "x" } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] },
+    {
+      "action": "detail",
+      "argv": ["detail", "$task_id"],
+      "params": { "task_id": { "kind": "last_entity", "pool": "task" } }
+    },
+    {
+      "action": "note",
+      "argv": ["note", "$task_id", "$text"],
+      "params": {
+        "task_id": { "kind": "last_entity", "pool": "task" },
+        "text": { "kind": "fresh_id", "prefix": "n" }
+      }
+    },
+    {
+      "action": "done",
+      "argv": ["done", "$task_id"],
+      "params": { "task_id": { "kind": "last_entity", "pool": "task" } }
+    },
+    {
+      "action": "delete",
+      "argv": ["delete", "$task_id"],
+      "params": { "task_id": { "kind": "last_entity", "pool": "task" } }
+    }
+  ]
+}

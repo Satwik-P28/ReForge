@@ -1,0 +1,19 @@
+{
+  "target_id": "cli-events",
+  "target_name": "eventbus",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/events.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v02-work-events",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "subscribe", "argv": ["subscribe", "$channel"], "params": { "channel": { "kind": "literal", "value": { "kind": "string", "value": "orders" } } } },
+    { "action": "publish", "argv": ["publish", "$channel", "$payload"], "params": { "channel": { "kind": "literal", "value": { "kind": "string", "value": "orders" } }, "payload": { "kind": "fresh_id", "prefix": "payload" } } },
+    { "action": "process", "argv": ["process"] },
+    { "action": "ack", "argv": ["ack"] },
+    { "action": "purge", "argv": ["purge"] },
+    { "action": "status", "argv": ["status"] }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "app": "cli-garden",
+  "workflows": [
+    {
+      "name": "water-harvest-remove",
+      "steps": [
+        { "action": "add", "params": { "name": "mint" } },
+        { "action": "water", "params": { "plot_id": "p1" } },
+        { "action": "harvest", "params": { "plot_id": "p1" } },
+        { "action": "remove", "params": { "plot_id": "p1" } },
+        { "action": "stats", "params": {} }
+      ]
+    },
+    {
+      "name": "invalid-harvest-then-recover",
+      "steps": [
+        { "action": "harvest", "params": { "plot_id": "p9" } },
+        { "action": "add", "params": { "name": "basil" } },
+        { "action": "harvest", "params": { "plot_id": "p1" } },
+        { "action": "water", "params": { "plot_id": "p1" } },
+        { "action": "water", "params": { "plot_id": "p1" } },
+        { "action": "harvest", "params": { "plot_id": "p1" } },
+        { "action": "list", "params": {} }
+      ]
+    }
+  ]
+}

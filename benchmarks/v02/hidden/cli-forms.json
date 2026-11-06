@@ -1,0 +1,24 @@
+{
+  "app": "cli-forms",
+  "workflows": [
+    {
+      "name": "happy-path",
+      "steps": [
+        { "action": "start", "params": {} },
+        { "action": "set-name", "params": { "name": "ada" } },
+        { "action": "set-email", "params": { "email": "ada@example.test" } },
+        { "action": "set-plan", "params": { "plan": "pro" } },
+        { "action": "confirm", "params": {} }
+      ]
+    },
+    {
+      "name": "out-of-order",
+      "steps": [
+        { "action": "confirm", "params": {} },
+        { "action": "start", "params": {} },
+        { "action": "set-email", "params": { "email": "bad" } },
+        { "action": "cancel", "params": {} }
+      ]
+    }
+  ]
+}

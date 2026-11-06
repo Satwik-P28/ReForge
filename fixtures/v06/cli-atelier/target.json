@@ -1,0 +1,89 @@
+{
+  "target_id": "cli-atelier",
+  "target_name": "atelier",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/atelier.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v06-work-atelier",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "intake",
+      "argv": ["intake", "$customer"],
+      "params": {
+        "customer": {
+          "kind": "fresh_id",
+          "prefix": "acme"
+        }
+      }
+    },
+    {
+      "action": "quote",
+      "argv": ["quote", "$job_id"],
+      "params": {
+        "job_id": {
+          "kind": "last_entity",
+          "pool": "job"
+        }
+      }
+    },
+    {
+      "action": "assign",
+      "argv": ["assign", "$job_id", "$tech"],
+      "params": {
+        "job_id": {
+          "kind": "last_entity",
+          "pool": "job"
+        },
+        "tech": {
+          "kind": "fresh_id",
+          "prefix": "tech"
+        }
+      }
+    },
+    {
+      "action": "add-part",
+      "argv": ["add-part", "$job_id", "$part"],
+      "params": {
+        "job_id": {
+          "kind": "last_entity",
+          "pool": "job"
+        },
+        "part": {
+          "kind": "fresh_id",
+          "prefix": "part"
+        }
+      }
+    },
+    {
+      "action": "finish",
+      "argv": ["finish", "$job_id"],
+      "params": {
+        "job_id": {
+          "kind": "last_entity",
+          "pool": "job"
+        }
+      }
+    },
+    {
+      "action": "drop",
+      "argv": ["drop", "$job_id"],
+      "params": {
+        "job_id": {
+          "kind": "last_entity",
+          "pool": "job"
+        }
+      }
+    },
+    {
+      "action": "status",
+      "argv": ["status"]
+    }
+  ]
+}

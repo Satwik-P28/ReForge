@@ -1,0 +1,28 @@
+{
+  "app": "cli-taskboard",
+  "workflows": [
+    {
+      "name": "notes-done-and-stats",
+      "steps": [
+        { "action": "add", "params": { "title": "alpha" } },
+        { "action": "add", "params": { "title": "beta" } },
+        { "action": "note", "params": { "task_id": "t1", "text": "first" } },
+        { "action": "done", "params": { "task_id": "t2" } },
+        { "action": "detail", "params": { "task_id": "t2" } },
+        { "action": "stats", "params": {} },
+        { "action": "list", "params": {} }
+      ]
+    },
+    {
+      "name": "invalid-done-then-delete",
+      "steps": [
+        { "action": "detail", "params": { "task_id": "t7" } },
+        { "action": "done", "params": { "task_id": "t7" } },
+        { "action": "add", "params": { "title": "gamma" } },
+        { "action": "note", "params": { "task_id": "t1", "text": "later" } },
+        { "action": "delete", "params": { "task_id": "t1" } },
+        { "action": "list", "params": {} }
+      ]
+    }
+  ]
+}

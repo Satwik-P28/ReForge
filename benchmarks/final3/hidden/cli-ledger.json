@@ -1,0 +1,28 @@
+{
+  "app": "cli-ledger",
+  "workflows": [
+    {
+      "name": "deposit-withdraw-close-reopen",
+      "steps": [
+        { "action": "open", "params": { "owner": "ada" } },
+        { "action": "deposit", "params": { "account_id": "a1" } },
+        { "action": "withdraw", "params": { "account_id": "a1" } },
+        { "action": "close", "params": { "account_id": "a1" } },
+        { "action": "reopen", "params": { "account_id": "a1" } },
+        { "action": "stats", "params": {} }
+      ]
+    },
+    {
+      "name": "invalid-withdraw-and-close",
+      "steps": [
+        { "action": "withdraw", "params": { "account_id": "a9" } },
+        { "action": "open", "params": { "owner": "grace" } },
+        { "action": "withdraw", "params": { "account_id": "a1" } },
+        { "action": "close", "params": { "account_id": "a1" } },
+        { "action": "deposit", "params": { "account_id": "a1" } },
+        { "action": "close", "params": { "account_id": "a1" } },
+        { "action": "list", "params": {} }
+      ]
+    }
+  ]
+}

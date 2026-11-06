@@ -21,3 +21,7 @@ reforge-compose = { workspace = true }
 reforge-runtime = { workspace = true }
 reforge-verify = { workspace = true }
 reforge-export = { workspace = true }
+reforge-observe = { workspace = true }
+reforge-investigate = { workspace = true }
+reforge-extract = { workspace = true }
+reforge-diff = { workspace = true }

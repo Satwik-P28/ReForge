@@ -10,8 +10,14 @@ use reforge::runtime::AppRuntime;
 use reforge::schema::migrate_json_str;
 use reforge::types::*;
 use reforge::verify::{verify_expectation, ComposeExpectation};
+use reforge_diff::{differential_campaign, CampaignConfig};
+use reforge_extract::{extract_capability, ExtractionConfig};
+use reforge_investigate::{
+    investigate, synthesize_twin, CliTarget, CliTargetSpec, InvestigationConfig,
+    InvestigationRecord, PolicyKind, TwinSynthConfig, WebTargetSpec,
+};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 #[derive(Parser, Debug)]
@@ -91,6 +97,66 @@ enum Commands {
         params: String,
         #[arg(long)]
         db: Option<PathBuf>,
+    },
+    Investigate {
+        #[arg(long)]
+        spec: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value_t = 60)]
+        budget: u32,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        #[arg(long, default_value = "coverage")]
+        policy: String,
+        #[arg(long)]
+        workdir: Option<PathBuf>,
+        #[arg(long)]
+        dataset: Option<PathBuf>,
+        #[arg(long)]
+        model: Option<PathBuf>,
+    },
+    InvestigateWeb {
+        #[arg(long)]
+        spec: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value_t = 30)]
+        budget: u32,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        #[arg(long, default_value = "coverage")]
+        policy: String,
+    },
+    Extract {
+        #[arg(long)]
+        record: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        candidate: usize,
+    },
+    Reconstruct {
+        #[arg(long)]
+        record: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    Differential {
+        #[arg(long)]
+        record: PathBuf,
+        #[arg(long)]
+        spec: PathBuf,
+        #[arg(long)]
+        workdir: Option<PathBuf>,
+        #[arg(long)]
+        no_minimize: bool,
+        /// Hold out every Nth episode from twin synthesis (0 = in-sample).
+        #[arg(long, default_value_t = 3)]
+        holdout: usize,
+        /// Replay the training episodes instead of held-out ones.
+        #[arg(long)]
+        in_sample: bool,
     },
     Bench,
 }
@@ -361,6 +427,180 @@ fn run() -> Result<ExitCode> {
             print_json(&result)?;
             Ok(exit_ok(matches!(result.step.result, StepResult::Success)))
         }
+        Commands::Investigate {
+            spec,
+            out,
+            budget,
+            seed,
+            policy,
+            workdir,
+            dataset,
+            model,
+        } => {
+            let mut target = load_target(&spec, workdir.as_deref())?;
+            let mut config = InvestigationConfig::default()
+                .with_policy(parse_policy(&policy)?)
+                .with_budget(budget)
+                .with_seed(seed);
+            config.record_dataset = true;
+            config.neural_model = model;
+            let record = investigate(&mut target, &config).map_err(|e| anyhow::anyhow!(e))?;
+            write_json(&out, &record)?;
+            if let Some(dataset_path) = dataset {
+                let mut lines = String::new();
+                for row in &record.dataset {
+                    lines.push_str(&serde_json::to_string(row)?);
+                    lines.push('\n');
+                }
+                if let Some(parent) = dataset_path.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        fs::create_dir_all(parent)?;
+                    }
+                }
+                fs::write(&dataset_path, lines)?;
+            }
+            print_json(&serde_json::json!({
+                "record": out,
+                "steps": record.steps.len(),
+                "transitions": record.transitions.len(),
+                "classes": record.abstraction.classes.len(),
+                "unknowns": record.unknowns.len(),
+                "conflicts": record.conflicts.len(),
+                "policy_requested": record.policy_requested,
+                "policy_used": record.policy_used,
+                "dataset_rows": record.dataset.len(),
+            }))?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::InvestigateWeb {
+            spec,
+            out,
+            budget,
+            seed,
+            policy,
+        } => {
+            let spec = WebTargetSpec::load(&spec).map_err(|e| anyhow::anyhow!(e))?;
+            let mut target = spec.build().map_err(|e| anyhow::anyhow!(e))?;
+            let config = InvestigationConfig::default()
+                .with_policy(parse_policy(&policy)?)
+                .with_budget(budget)
+                .with_seed(seed);
+            let record = investigate(&mut target, &config).map_err(|e| anyhow::anyhow!(e))?;
+            write_json(&out, &record)?;
+            target.close();
+            print_json(&serde_json::json!({
+                "record": out,
+                "platform": "web",
+                "steps": record.steps.len(),
+                "transitions": record.transitions.len(),
+                "classes": record.abstraction.classes.len(),
+                "unknowns": record.unknowns.len(),
+                "screenshots": record.log.observations.iter().filter(|o| !o.payloads.is_empty()).count(),
+            }))?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Extract {
+            record,
+            out,
+            candidate,
+        } => {
+            let record = load_record(&record)?;
+            let mut config = ExtractionConfig::new(&out);
+            config.candidate_index = candidate;
+            let report = extract_capability(&record, &config).map_err(|e| anyhow::anyhow!(e))?;
+            print_json(&report)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Reconstruct { record, out } => {
+            let record = load_record(&record)?;
+            let (twin, report) = synthesize_twin(
+                &record.transitions,
+                &record.alphabet,
+                &record.abstraction,
+                &record.initial_class,
+                &TwinSynthConfig::default(),
+            );
+            write_json(&out, &twin)?;
+            print_json(&serde_json::json!({
+                "twin": out,
+                "states": report.states,
+                "transitions": report.transitions,
+                "contradictory_transitions": report.contradictory_transitions,
+                "unknown_cells": report.unknown_cells,
+            }))?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Differential {
+            record,
+            spec,
+            workdir,
+            no_minimize,
+            holdout,
+            in_sample,
+        } => {
+            let record = load_record(&record)?;
+            let split = reforge_diff::split_record(&record, if in_sample { 0 } else { holdout });
+            let programs = if in_sample {
+                split.in_sample_programs.clone()
+            } else {
+                split.holdout_programs.clone()
+            };
+            if programs.is_empty() {
+                bail!("investigation record has no episodes to replay");
+            }
+            let train_transitions = if in_sample {
+                record.transitions.clone()
+            } else {
+                split.train_transitions.clone()
+            };
+            let (twin, _) = synthesize_twin(
+                &train_transitions,
+                &record.alphabet,
+                &record.abstraction,
+                &record.initial_class,
+                &TwinSynthConfig::default(),
+            );
+            let mut target = load_target(&spec, workdir.as_deref())?;
+            let report = differential_campaign(
+                &mut target,
+                &twin,
+                &record.abstraction,
+                &programs,
+                &CampaignConfig {
+                    minimize: !no_minimize,
+                    stop_after: 8,
+                    comparison_set: if in_sample {
+                        "in-sample-episodes".into()
+                    } else {
+                        "held-out-episodes".into()
+                    },
+                },
+            )
+            .map_err(|e| anyhow::anyhow!(e))?;
+            if in_sample {
+                print_json(&report)?;
+                return Ok(exit_ok(!report.diverged()));
+            }
+            // Report the split explicitly: which episodes trained the twin and
+            // which were replayed is part of the result, not an implementation
+            // detail.
+            let mut value = serde_json::to_value(&report)?;
+            if let Some(object) = value.as_object_mut() {
+                object.insert(
+                    "split".into(),
+                    serde_json::json!({
+                        "episodes": split.episodes,
+                        "holdout_episodes": split.holdout_episodes,
+                        "train_steps": split.train_steps,
+                        "holdout_steps": split.holdout_steps,
+                        "twin_transitions": twin.transitions.len(),
+                        "abstraction_shared": true,
+                    }),
+                );
+            }
+            print_json(&value)?;
+            Ok(exit_ok(!report.diverged()))
+        }
         Commands::Bench => {
             println!("Run: cargo run -p reforge-bench --release");
             Ok(ExitCode::SUCCESS)
@@ -445,4 +685,44 @@ fn load_expectation(path: &PathBuf) -> Result<ComposeExpectation> {
         }
     }
     Ok(serde_json::from_value(v)?)
+}
+
+fn write_json<T: serde::Serialize>(path: &PathBuf, value: &T) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(path, serde_json::to_string_pretty(value)?)?;
+    Ok(())
+}
+
+fn load_record(path: &PathBuf) -> Result<InvestigationRecord> {
+    let text = fs::read_to_string(path)
+        .with_context(|| format!("read investigation record {}", path.display()))?;
+    serde_json::from_str(&text)
+        .with_context(|| format!("parse investigation record {}", path.display()))
+}
+
+fn parse_policy(name: &str) -> Result<PolicyKind> {
+    Ok(match name {
+        "random" => PolicyKind::Random,
+        "coverage" => PolicyKind::Coverage,
+        "hypothesis" => PolicyKind::Hypothesis,
+        "prerequisite" => PolicyKind::Prerequisite,
+        "neural" => PolicyKind::Neural,
+        other => {
+            bail!(
+                "unknown policy '{other}' (expected random, coverage, hypothesis, prerequisite, or neural)"
+            )
+        }
+    })
+}
+
+/// Load a declarative CLI target. Path resolution and `{spec_dir}`
+/// substitution live in `reforge-investigate` so every caller (CLI, tests,
+/// benchmark) investigates through the same adapter configuration.
+fn load_target(spec_path: &Path, workdir_override: Option<&std::path::Path>) -> Result<CliTarget> {
+    let spec = CliTargetSpec::load(spec_path).map_err(|e| anyhow::anyhow!(e))?;
+    spec.build(workdir_override).map_err(|e| anyhow::anyhow!(e))
 }

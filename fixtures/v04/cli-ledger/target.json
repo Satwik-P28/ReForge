@@ -1,0 +1,20 @@
+{
+  "target_id": "cli-ledger",
+  "target_name": "ledger",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/ledger.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v04-work-ledger",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "open", "argv": ["open", "$owner"], "params": { "owner": { "kind": "fresh_id", "prefix": "owner" } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] },
+    { "action": "deposit", "argv": ["deposit", "$account_id"], "params": { "account_id": { "kind": "last_entity", "pool": "account" } } },
+    { "action": "withdraw", "argv": ["withdraw", "$account_id"], "params": { "account_id": { "kind": "last_entity", "pool": "account" } } },
+    { "action": "close", "argv": ["close", "$account_id"], "params": { "account_id": { "kind": "last_entity", "pool": "account" } } },
+    { "action": "reopen", "argv": ["reopen", "$account_id"], "params": { "account_id": { "kind": "last_entity", "pool": "account" } } }
+  ]
+}

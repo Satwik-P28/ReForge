@@ -1,0 +1,10 @@
+{
+  "suite": "reforgebench-final5",
+  "description": "Fresh application-level holdout authored after final4 remediation, frozen before first execution.",
+  "apps": [
+    {
+      "spec": "fixtures/v06/cli-atelier/target.json",
+      "split": "holdout"
+    }
+  ]
+}
