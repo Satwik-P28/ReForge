@@ -1,0 +1,97 @@
+{
+  "app": "cli-tickets",
+  "workflows": [
+    {
+      "name": "assign-comment-close-reopen-escalate",
+      "steps": [
+        {
+          "action": "create",
+          "params": {
+            "title": "alpha"
+          }
+        },
+        {
+          "action": "assign",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "comment",
+          "params": {
+            "ticket_id": "t1",
+            "text": "triage"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "reopen",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "escalate",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "purge",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "invalid-assign-then-close",
+      "steps": [
+        {
+          "action": "assign",
+          "params": {
+            "ticket_id": "t9"
+          }
+        },
+        {
+          "action": "create",
+          "params": {
+            "title": "beta"
+          }
+        },
+        {
+          "action": "escalate",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "comment",
+          "params": {
+            "ticket_id": "t1",
+            "text": "late"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

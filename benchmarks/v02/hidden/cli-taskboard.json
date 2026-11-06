@@ -1,0 +1,27 @@
+{
+  "app": "cli-taskboard",
+  "workflows": [
+    {
+      "name": "complete-and-archive",
+      "steps": [
+        { "action": "add", "params": { "title": "alpha" } },
+        { "action": "add", "params": { "title": "beta" } },
+        { "action": "detail", "params": { "task_id": "t1" } },
+        { "action": "done", "params": { "task_id": "t1" } },
+        { "action": "done", "params": { "task_id": "t2" } },
+        { "action": "archive", "params": {} },
+        { "action": "purge", "params": {} }
+      ]
+    },
+    {
+      "name": "notes-block-delete",
+      "steps": [
+        { "action": "add", "params": { "title": "gamma" } },
+        { "action": "detail", "params": { "task_id": "t1" } },
+        { "action": "note", "params": { "task_id": "t1", "text": "hello" } },
+        { "action": "delete", "params": { "task_id": "t1" } },
+        { "action": "done", "params": { "task_id": "t1" } }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "target_id": "cli-library",
+  "target_name": "library",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/library.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v03-work-library",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "add-book", "argv": ["add-book", "$title", "$copies"], "params": { "title": { "kind": "fresh_id", "prefix": "book" }, "copies": { "kind": "literal", "value": { "kind": "int", "value": 2 } } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] },
+    { "action": "audit", "argv": ["audit"] },
+    { "action": "detail", "argv": ["detail", "$book_id"], "params": { "book_id": { "kind": "last_entity", "pool": "book" } } },
+    { "action": "borrow", "argv": ["borrow", "$book_id"], "params": { "book_id": { "kind": "last_entity", "pool": "book" } } },
+    { "action": "return", "argv": ["return", "$book_id"], "params": { "book_id": { "kind": "last_entity", "pool": "book" } } },
+    { "action": "archive", "argv": ["archive", "$book_id"], "params": { "book_id": { "kind": "last_entity", "pool": "book" } } },
+    { "action": "purge", "argv": ["purge"] }
+  ]
+}

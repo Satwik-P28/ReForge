@@ -1,0 +1,69 @@
+{
+  "app": "cli-forms",
+  "workflows": [
+    {
+      "name": "plan-before-confirm",
+      "steps": [
+        {
+          "action": "start",
+          "params": {}
+        },
+        {
+          "action": "set-name",
+          "params": {
+            "name": "bob"
+          }
+        },
+        {
+          "action": "set-plan",
+          "params": {
+            "plan": "pro"
+          }
+        },
+        {
+          "action": "confirm",
+          "params": {}
+        },
+        {
+          "action": "status",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "cancel-after-edits",
+      "steps": [
+        {
+          "action": "set-plan",
+          "params": {
+            "plan": "pro"
+          }
+        },
+        {
+          "action": "start",
+          "params": {}
+        },
+        {
+          "action": "set-email",
+          "params": {
+            "email": "a@b.co"
+          }
+        },
+        {
+          "action": "set-name",
+          "params": {
+            "name": "carol"
+          }
+        },
+        {
+          "action": "cancel",
+          "params": {}
+        },
+        {
+          "action": "status",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

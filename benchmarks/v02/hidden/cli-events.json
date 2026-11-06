@@ -1,0 +1,22 @@
+{
+  "app": "cli-events",
+  "workflows": [
+    {
+      "name": "publish-process-ack",
+      "steps": [
+        { "action": "subscribe", "params": { "channel": "orders" } },
+        { "action": "publish", "params": { "channel": "orders", "payload": "p1" } },
+        { "action": "process", "params": {} },
+        { "action": "ack", "params": {} }
+      ]
+    },
+    {
+      "name": "publish-without-subscriber",
+      "steps": [
+        { "action": "publish", "params": { "channel": "orders", "payload": "p1" } },
+        { "action": "process", "params": {} },
+        { "action": "purge", "params": {} }
+      ]
+    }
+  ]
+}

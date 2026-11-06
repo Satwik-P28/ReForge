@@ -1,0 +1,22 @@
+{
+  "target_id": "cli-tickets",
+  "target_name": "tickets",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/tickets.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v03-work-tickets",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "create", "argv": ["create", "$title"], "params": { "title": { "kind": "fresh_id", "prefix": "issue" } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] },
+    { "action": "assign", "argv": ["assign", "$ticket_id"], "params": { "ticket_id": { "kind": "last_entity", "pool": "ticket" } } },
+    { "action": "escalate", "argv": ["escalate", "$ticket_id"], "params": { "ticket_id": { "kind": "last_entity", "pool": "ticket" } } },
+    { "action": "comment", "argv": ["comment", "$ticket_id", "$text"], "params": { "ticket_id": { "kind": "last_entity", "pool": "ticket" }, "text": { "kind": "fresh_id", "prefix": "note" } } },
+    { "action": "close", "argv": ["close", "$ticket_id"], "params": { "ticket_id": { "kind": "last_entity", "pool": "ticket" } } },
+    { "action": "reopen", "argv": ["reopen", "$ticket_id"], "params": { "ticket_id": { "kind": "last_entity", "pool": "ticket" } } },
+    { "action": "purge", "argv": ["purge"] }
+  ]
+}

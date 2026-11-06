@@ -1,0 +1,23 @@
+{
+  "app": "cli-contacts",
+  "workflows": [
+    {
+      "name": "tag-and-archive",
+      "steps": [
+        { "action": "create", "params": { "name": "grace" } },
+        { "action": "tag", "params": { "contact_id": "c1", "tag": "vip" } },
+        { "action": "archive", "params": { "contact_id": "c1" } },
+        { "action": "remove", "params": { "contact_id": "c1" } }
+      ]
+    },
+    {
+      "name": "delete-before-archive",
+      "steps": [
+        { "action": "create", "params": { "name": "linus" } },
+        { "action": "remove", "params": { "contact_id": "c1" } },
+        { "action": "search", "params": { "query": "lin" } },
+        { "action": "update", "params": { "contact_id": "c1", "name": "linus2" } }
+      ]
+    }
+  ]
+}

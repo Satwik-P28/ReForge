@@ -73,6 +73,64 @@ Starter project scaffold:
 cargo run -p reforge-cli -- init my-app --dir .
 ```
 
+## v0.2 investigation pipeline (unreleased)
+
+v0.2 adds a deterministic pipeline that investigates a running application,
+reconstructs an executable behavioral twin, extracts a portable capability
+package, and differentially verifies the reconstruction against the live target.
+
+```bash
+# Investigate a real CLI target (budgeted, reset-verified, evidence-logged)
+cargo run -p reforge-cli -- investigate \
+  --spec fixtures/v02/cli-taskboard/target.json \
+  --out /tmp/v02/investigation.json \
+  --dataset /tmp/v02/dataset.jsonl \
+  --budget 40 --seed 3 --policy coverage
+
+# Reconstruct the twin and extract a capability package
+cargo run -p reforge-cli -- reconstruct \
+  --record /tmp/v02/investigation.json --out /tmp/v02/twin.json
+cargo run -p reforge-cli -- extract \
+  --record /tmp/v02/investigation.json --out /tmp/v02/pkg
+
+# Differential verification against the live reference (exit 1 on divergence)
+cargo run -p reforge-cli -- differential \
+  --record /tmp/v02/investigation.json \
+  --spec fixtures/v02/cli-taskboard/target.json --holdout 3
+
+# Real browser target (Playwright driver, versioned JSON-lines protocol)
+cargo run -p reforge-cli -- investigate-web \
+  --spec fixtures/v02/web-board/web.json \
+  --out /tmp/v02/web.json --budget 14 --seed 1
+```
+
+What this pipeline does **not** claim:
+
+- Equality covers outcome, error code, abstract class, emitted events and
+  supported scalar outputs. List/map payloads and allocator/counter artifacts
+  are explicitly excluded; timing is not compared.
+- Unexercised behavior stays unknown. The five-app v0.2 suite evaluated on
+  hidden workflows has 0/15 diverged, but only 61 of 132 steps matched, with 23
+  unverified and 48 excluded. The separately frozen two-app v0.3 suite has 0/6
+  diverged, 16 of 72 matched, 12 unverified and 44 excluded. Neither is a
+  generalization claim.
+- The browser adapter executes, but form input is unverified here: Chromium
+  crashes on `<input>`, and Firefox cannot launch without GTK in this VM.
+- Extracted packages are `partial`. `runner.py` is twin-backed; the generated
+  `implementation.py` runs the observed abstract machine without the twin or the
+  reference, but does not infer unobserved domain CRUD.
+- The optional neural scorer is opt-in. A fresh model found more transitions than
+  coverage on the holdout (52.5 vs 47.5) but fewer classes (16.3 vs 18.8); no
+  superiority is claimed (`--model ml/model.json`).
+- The prerequisite policy is an observed-unlock heuristic, not a semantic
+  precondition learner. It led the deterministic policies on both suites in the
+  latest run (v0.2 holdout 53.3 transitions; v0.3 holdout 56.0), but no
+  significance or generalization claim is made.
+
+See `docs/release/v0.3.0-readiness.md`, `docs/release/v0.3.0-audit.md`,
+`docs/research/v0.2-technical-report.md`, and `docs/adr/0009`–`0012` for the
+measured results and design constraints.
+
 ## What v0.1.0 supports
 
 - Portable Capability Packages with twins, contracts, and evidence
@@ -151,7 +209,9 @@ Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_LICENSES.
 | Export | [docs/guides/export.md](docs/guides/export.md) |
 | Security model | [docs/guides/security.md](docs/guides/security.md) |
 | Troubleshooting | [docs/guides/troubleshooting.md](docs/guides/troubleshooting.md) |
-| Release readiness | [docs/release/v0.1.0-readiness.md](docs/release/v0.1.0-readiness.md) |
+| Latest audit | [docs/release/v0.3.0-audit.md](docs/release/v0.3.0-audit.md) |
+| Latest readiness | [docs/release/v0.3.0-readiness.md](docs/release/v0.3.0-readiness.md) |
+| v0.1 release readiness | [docs/release/v0.1.0-readiness.md](docs/release/v0.1.0-readiness.md) |
 | Roadmap | [docs/release/roadmap.md](docs/release/roadmap.md) |
 
 ## Contributing
