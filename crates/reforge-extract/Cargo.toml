@@ -1,0 +1,25 @@
+[package]
+name = "reforge-extract"
+description = "Evidence-driven capability discovery, contract synthesis, and portable package emission"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+reforge-observe = { workspace = true }
+reforge-investigate = { workspace = true }
+reforge-behavior = { workspace = true }
+reforge-evidence = { workspace = true }
+reforge-capability = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

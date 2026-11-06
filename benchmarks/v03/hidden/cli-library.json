@@ -1,0 +1,26 @@
+{
+  "app": "cli-library",
+  "workflows": [
+    {
+      "name": "borrow-return-archive-purge",
+      "steps": [
+        { "action": "add-book", "params": { "title": "alpha", "copies": 2 } },
+        { "action": "borrow", "params": { "book_id": "b1" } },
+        { "action": "return", "params": { "book_id": "b1" } },
+        { "action": "archive", "params": { "book_id": "b1" } },
+        { "action": "purge", "params": {} }
+      ]
+    },
+    {
+      "name": "over-borrow-then-archive",
+      "steps": [
+        { "action": "add-book", "params": { "title": "beta", "copies": 1 } },
+        { "action": "borrow", "params": { "book_id": "b1" } },
+        { "action": "borrow", "params": { "book_id": "b1" } },
+        { "action": "return", "params": { "book_id": "b1" } },
+        { "action": "archive", "params": { "book_id": "b1" } },
+        { "action": "purge", "params": {} }
+      ]
+    }
+  ]
+}

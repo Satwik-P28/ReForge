@@ -1,0 +1,24 @@
+[package]
+name = "reforge-observe"
+description = "Versioned Observation IR, investigation protocol, and evidence-preserving observation log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# forbid(unsafe) is declared in lib.rs; this crate defines data + protocol only.
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+reforge-evidence = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -18,6 +18,10 @@ members = [
     "crates/reforge-verify",
     "crates/reforge-export",
     "crates/reforge-studio",
+    "crates/reforge-observe",
+    "crates/reforge-investigate",
+    "crates/reforge-extract",
+    "crates/reforge-diff",
 ]
 default-members = ["crates/reforge-cli", "crates/reforge"]
 
@@ -42,6 +46,10 @@ reforge-compose = { path = "crates/reforge-compose" }
 reforge-runtime = { path = "crates/reforge-runtime" }
 reforge-verify = { path = "crates/reforge-verify" }
 reforge-export = { path = "crates/reforge-export" }
+reforge-observe = { path = "crates/reforge-observe" }
+reforge-investigate = { path = "crates/reforge-investigate" }
+reforge-extract = { path = "crates/reforge-extract" }
+reforge-diff = { path = "crates/reforge-diff" }
 reforge = { path = "crates/reforge" }
 
 serde = { version = "1.0", features = ["derive"] }

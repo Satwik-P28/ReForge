@@ -1,0 +1,20 @@
+{
+  "target_id": "cli-forms",
+  "target_name": "onboarding",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/forms.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v02-work-forms",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "start", "argv": ["start"] },
+    { "action": "set-name", "argv": ["set-name", "$name"], "params": { "name": { "kind": "fresh_id", "prefix": "user" } } },
+    { "action": "set-email", "argv": ["set-email", "$email"], "params": { "email": { "kind": "literal", "value": { "kind": "string", "value": "a@b.co" } } } },
+    { "action": "set-plan", "argv": ["set-plan", "$plan"], "params": { "plan": { "kind": "literal", "value": { "kind": "string", "value": "pro" } } } },
+    { "action": "confirm", "argv": ["confirm"] },
+    { "action": "cancel", "argv": ["cancel"] },
+    { "action": "status", "argv": ["status"] }
+  ]
+}

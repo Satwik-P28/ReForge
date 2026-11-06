@@ -1,0 +1,23 @@
+{
+  "target_id": "web-board",
+  "target_name": "board",
+  "authorization": "local_fixture",
+  "app_dir": ".",
+  "entry": "index.html",
+  "actions": [
+    {
+      "action": "add",
+      "kind": "fill_and_click",
+      "role": "textbox",
+      "name": "Task title",
+      "click_role": "button",
+      "click_name": "Add task",
+      "params": { "value": { "kind": "fresh_id", "prefix": "task" } }
+    },
+    { "action": "complete", "kind": "click", "role": "button", "name": "Done" },
+    { "action": "delete", "kind": "click", "role": "button", "name": "Delete" },
+    { "action": "show-open", "kind": "click", "role": "button", "name": "Show open" },
+    { "action": "show-all", "kind": "click", "role": "button", "name": "Show all" },
+    { "action": "clear-done", "kind": "click", "role": "button", "name": "Clear done" }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "target_id": "cli-garden",
+  "target_name": "garden",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/garden.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v04-work-garden",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "add", "argv": ["add", "$name"], "params": { "name": { "kind": "fresh_id", "prefix": "herb" } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "stats", "argv": ["stats"] },
+    { "action": "water", "argv": ["water", "$plot_id"], "params": { "plot_id": { "kind": "last_entity", "pool": "plot" } } },
+    { "action": "harvest", "argv": ["harvest", "$plot_id"], "params": { "plot_id": { "kind": "last_entity", "pool": "plot" } } },
+    { "action": "remove", "argv": ["remove", "$plot_id"], "params": { "plot_id": { "kind": "last_entity", "pool": "plot" } } }
+  ]
+}

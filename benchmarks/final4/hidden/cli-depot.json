@@ -1,0 +1,75 @@
+{
+  "app": "cli-depot",
+  "workflows": [
+    {
+      "name": "create-advance-close-audit",
+      "steps": [
+        {
+          "action": "create",
+          "params": {
+            "name": "acme"
+          }
+        },
+        {
+          "action": "advance",
+          "params": {
+            "shipment_id": "s501"
+          }
+        },
+        {
+          "action": "advance",
+          "params": {
+            "shipment_id": "s501"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "shipment_id": "s501"
+          }
+        },
+        {
+          "action": "audit",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "invalid-then-recover",
+      "steps": [
+        {
+          "action": "advance",
+          "params": {
+            "shipment_id": "s999"
+          }
+        },
+        {
+          "action": "create",
+          "params": {
+            "name": "birch"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "shipment_id": "s501"
+          }
+        },
+        {
+          "action": "advance",
+          "params": {
+            "shipment_id": "s501"
+          }
+        },
+        {
+          "action": "audit",
+          "params": {}
+        },
+        {
+          "action": "show",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

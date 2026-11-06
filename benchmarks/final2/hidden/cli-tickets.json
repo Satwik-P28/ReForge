@@ -1,0 +1,27 @@
+{
+  "app": "cli-tickets",
+  "workflows": [
+    {
+      "name": "escalate-close-purge",
+      "steps": [
+        { "action": "create", "params": { "title": "alpha" } },
+        { "action": "escalate", "params": { "ticket_id": "t1" } },
+        { "action": "close", "params": { "ticket_id": "t1" } },
+        { "action": "purge", "params": {} },
+        { "action": "stats", "params": {} }
+      ]
+    },
+    {
+      "name": "invalid-comment-assign-reopen",
+      "steps": [
+        { "action": "comment", "params": { "ticket_id": "t9", "text": "missing" } },
+        { "action": "create", "params": { "title": "beta" } },
+        { "action": "assign", "params": { "ticket_id": "t1" } },
+        { "action": "comment", "params": { "ticket_id": "t1", "text": "ok" } },
+        { "action": "reopen", "params": { "ticket_id": "t1" } },
+        { "action": "close", "params": { "ticket_id": "t1" } },
+        { "action": "stats", "params": {} }
+      ]
+    }
+  ]
+}

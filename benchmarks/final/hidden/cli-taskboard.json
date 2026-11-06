@@ -1,0 +1,84 @@
+{
+  "app": "cli-taskboard",
+  "workflows": [
+    {
+      "name": "two-task-note-and-delete",
+      "steps": [
+        {
+          "action": "add",
+          "params": {
+            "title": "alpha"
+          }
+        },
+        {
+          "action": "add",
+          "params": {
+            "title": "beta"
+          }
+        },
+        {
+          "action": "note",
+          "params": {
+            "task_id": "t2",
+            "text": "follow-up"
+          }
+        },
+        {
+          "action": "detail",
+          "params": {
+            "task_id": "t2"
+          }
+        },
+        {
+          "action": "done",
+          "params": {
+            "task_id": "t1"
+          }
+        },
+        {
+          "action": "delete",
+          "params": {
+            "task_id": "t2"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "invalid-then-delete-done",
+      "steps": [
+        {
+          "action": "detail",
+          "params": {
+            "task_id": "t9"
+          }
+        },
+        {
+          "action": "add",
+          "params": {
+            "title": "gamma"
+          }
+        },
+        {
+          "action": "done",
+          "params": {
+            "task_id": "t1"
+          }
+        },
+        {
+          "action": "delete",
+          "params": {
+            "task_id": "t1"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

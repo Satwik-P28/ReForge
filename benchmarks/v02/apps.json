@@ -1,0 +1,11 @@
+{
+  "suite": "reforgebench-v02-apps",
+  "description": "Five independent CLI applications. Train apps may contribute neural training rows; holdout apps are used only for evaluation.",
+  "apps": [
+    { "spec": "fixtures/v02/cli-taskboard/target.json", "split": "train" },
+    { "spec": "fixtures/v02/cli-inventory/target.json", "split": "train" },
+    { "spec": "fixtures/v02/cli-forms/target.json", "split": "train" },
+    { "spec": "fixtures/v02/cli-contacts/target.json", "split": "holdout" },
+    { "spec": "fixtures/v02/cli-events/target.json", "split": "holdout" }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "app": "cli-atelier",
+  "workflows": [
+    {
+      "name": "quote-parts-assign-finish",
+      "steps": [
+        {"action": "intake", "params": {"customer": "acme"}},
+        {"action": "quote", "params": {"job_id": "j301"}},
+        {"action": "add-part", "params": {"job_id": "j301", "part": "wheel"}},
+        {"action": "add-part", "params": {"job_id": "j301", "part": "chain"}},
+        {"action": "assign", "params": {"job_id": "j301", "tech": "tina"}},
+        {"action": "finish", "params": {"job_id": "j301"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "invalid-recovery-and-closed-drop",
+      "steps": [
+        {"action": "assign", "params": {"job_id": "j999", "tech": "tina"}},
+        {"action": "intake", "params": {"customer": "birch"}},
+        {"action": "finish", "params": {"job_id": "j301"}},
+        {"action": "quote", "params": {"job_id": "j301"}},
+        {"action": "assign", "params": {"job_id": "j301", "tech": "tina"}},
+        {"action": "finish", "params": {"job_id": "j301"}},
+        {"action": "drop", "params": {"job_id": "j301"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "drop-then-missing",
+      "steps": [
+        {"action": "intake", "params": {"customer": "cedar"}},
+        {"action": "drop", "params": {"job_id": "j301"}},
+        {"action": "status", "params": {}},
+        {"action": "quote", "params": {"job_id": "j301"}}
+      ]
+    }
+  ]
+}
