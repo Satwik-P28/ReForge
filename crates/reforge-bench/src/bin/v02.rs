@@ -492,6 +492,72 @@ fn collect_counterfactual_samples(
         }
     }
 
+    // Reset-backed string boundary probes. Exploration often only supplies one
+    // length for a payload string, so a short-but-present rejection can be
+    // mistaken for an omission guard. Probe a bounded set of lengths while
+    // holding every other parameter source constant. Every reset and action is
+    // counted in `counterfactual_samples`.
+    let mut string_probes = 0usize;
+    'string_probes: for entry in &record.alphabet.entries {
+        if matches!(entry.kind, reforge_observe::ActionKind::Observe) {
+            continue;
+        }
+        if entry
+            .params
+            .values()
+            .any(|source| matches!(source, reforge_observe::ParamSource::LastEntity { .. }))
+        {
+            continue;
+        }
+        let string_params: Vec<&String> = entry
+            .params
+            .iter()
+            .filter(|(_, source)| match source {
+                reforge_observe::ParamSource::Literal { value } => value.as_str().is_some(),
+                reforge_observe::ParamSource::FreshId { .. } => true,
+                reforge_observe::ParamSource::LastEntity { .. } => false,
+            })
+            .map(|(name, _)| name)
+            .collect();
+        if string_params.len() != 1 {
+            continue;
+        }
+        let probe_param = string_params[0];
+        for text in ["", "a", "ab", "abc", "abcd", "abcde"] {
+            let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
+            if !reset.succeeded {
+                break 'string_probes;
+            }
+            let baseline = target.observe().map_err(|e| anyhow::anyhow!(e))?;
+            let before = baseline.state_document.clone().unwrap_or_default();
+            let mut params = IndexMap::new();
+            for (name, source) in &entry.params {
+                let value = match source {
+                    reforge_observe::ParamSource::Literal { value } => value.clone(),
+                    reforge_observe::ParamSource::FreshId { prefix } => {
+                        if name == probe_param {
+                            TypedValue::String(text.to_string())
+                        } else {
+                            TypedValue::String(format!("{prefix}__probe__"))
+                        }
+                    }
+                    reforge_observe::ParamSource::LastEntity { .. } => continue,
+                };
+                params.insert(name.clone(), value);
+            }
+            let action = ActionInstance {
+                action: entry.action.clone(),
+                params,
+            };
+            let observation = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+            samples.push(data_sample(&action, &before, &observation));
+            string_probes += 1;
+            if string_probes >= 24 {
+                break 'string_probes;
+            }
+        }
+    }
+
     if let Some(sample) = setup_sample {
         samples.push(sample);
     }

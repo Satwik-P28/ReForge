@@ -1,0 +1,30 @@
+{
+  "app": "cli-orchard",
+  "workflows": [
+    {
+      "name": "grow-pick-full",
+      "steps": [
+        {"action": "grow", "params": {"label": "oak"}},
+        {"action": "pick", "params": {"crate_id": "c701"}},
+        {"action": "pick", "params": {"crate_id": "c701"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "unknown-and-short",
+      "steps": [
+        {"action": "pick", "params": {"crate_id": "c999"}},
+        {"action": "grow", "params": {"label": "ab"}},
+        {"action": "grow", "params": {"label": "x"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "grow-status",
+      "steps": [
+        {"action": "grow", "params": {"label": "elm"}},
+        {"action": "status", "params": {}}
+      ]
+    }
+  ]
+}

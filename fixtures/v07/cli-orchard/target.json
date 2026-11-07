@@ -1,0 +1,41 @@
+{
+  "target_id": "cli-orchard",
+  "target_name": "orchard",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/orchard.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v07-work-orchard",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "grow",
+      "argv": ["grow", "$label"],
+      "params": {
+        "label": {
+          "kind": "fresh_id",
+          "prefix": "tree"
+        }
+      }
+    },
+    {
+      "action": "pick",
+      "argv": ["pick", "$crate_id"],
+      "params": {
+        "crate_id": {
+          "kind": "last_entity",
+          "pool": "crate"
+        }
+      }
+    },
+    {
+      "action": "status",
+      "argv": ["status"]
+    }
+  ]
+}

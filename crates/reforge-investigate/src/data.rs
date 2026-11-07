@@ -59,6 +59,15 @@ pub struct Collection {
     pub id_field: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StringLengthUnit {
+    /// Unicode scalar count, independent of UTF-8 byte width.
+    UnicodeScalar,
+    /// UTF-8 byte length.
+    Bytes,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Guard {
@@ -86,6 +95,14 @@ pub enum Guard {
     ParamContains {
         param: String,
         needle: String,
+    },
+    /// A length bound on a supplied string. The unit is explicit because byte
+    /// length and Unicode scalar count are different observable constraints.
+    ParamStringLength {
+        param: String,
+        op: CmpOp,
+        length: usize,
+        unit: StringLengthUnit,
     },
     EntityFieldCmp {
         collection: String,
@@ -334,6 +351,12 @@ pub enum FieldUpdate {
         field: String,
         value: ValueExpr,
     },
+    /// Append without deduplicating. Event logs and ordered lists preserve
+    /// repeated values, unlike set-like collections.
+    AppendItem {
+        field: String,
+        value: ValueExpr,
+    },
     /// Set a field only when a predicate over the pre-update record holds.
     /// The predicate is evaluated before any update in the same effect, so
     /// branch-wide evidence cannot be mistaken for an unconditional assignment.
@@ -393,6 +416,13 @@ pub enum Effect {
         field: String,
     },
     AppendScalar {
+        field: String,
+        value: ValueExpr,
+    },
+    /// Append an item to an ordered array even when an equal item is already
+    /// present. This is distinct from `AppendScalar`, whose set semantics
+    /// suppress duplicates.
+    AppendItem {
         field: String,
         value: ValueExpr,
     },
@@ -811,7 +841,7 @@ pub fn synthesize_data_program_with_samples(
         snapshots.push(sample.after.clone());
     }
     let mut state_schema = infer_state_schema(&snapshots);
-    let initial_state = materialize_initial_state(observed_initial, &state_schema, &samples);
+    let mut initial_state = materialize_initial_state(observed_initial, &state_schema, &samples);
     snapshots[0] = initial_state.clone();
     state_schema.record_initial(&initial_state);
     let collections = detect_collections_with_samples(&snapshots, &samples);
@@ -949,6 +979,55 @@ pub fn synthesize_data_program_with_samples(
         }
     }
 
+    // Infer the output envelope once across every successful action. Per-branch
+    // inference can mistake a coincidental field for a semantic aggregate (for
+    // example `parts_total` becoming a count of a particular estimate). A
+    // cross-action expression is installed only when it reproduces every
+    // observation of that rule; unresolved keys keep their local evidence.
+    let all_successes: Vec<Sample> = samples
+        .iter()
+        .filter(|sample| sample.outcome == OutcomeKind::Success)
+        .cloned()
+        .collect();
+    if all_successes.len() > 1 {
+        let global_outputs = infer_outputs(&all_successes, OutputSnapshot::Post, &collections);
+        for rule in rules.iter_mut() {
+            let rule_samples: Vec<&Sample> = samples
+                .iter()
+                .filter(|sample| {
+                    sample.action == rule.action
+                        && match rule.branch {
+                            RuleBranch::Success => sample.outcome == OutcomeKind::Success,
+                            RuleBranch::Error => {
+                                sample.outcome != OutcomeKind::Success && sample.error == rule.error
+                            }
+                        }
+                })
+                .collect();
+            for (key, expression) in &global_outputs {
+                let carriers: Vec<&&Sample> = rule_samples
+                    .iter()
+                    .filter(|sample| sample.outputs.contains_key(key))
+                    .collect();
+                if carriers.is_empty() {
+                    continue;
+                }
+                let matches = carriers.iter().all(|sample| {
+                    eval_value(
+                        expression,
+                        output_source(sample, OutputSnapshot::Post),
+                        &sample.params,
+                        None,
+                        &collections,
+                    ) == sample.outputs.get(key).cloned()
+                });
+                if matches {
+                    rule.outputs.insert(key.clone(), expression.clone());
+                }
+            }
+        }
+    }
+
     // Output envelopes are action-independent. If one success branch identified
     // a structural expression for a key, reuse it for another branch that
     // exposes the same key but lacked enough contrasting evidence. Constants
@@ -981,6 +1060,68 @@ pub fn synthesize_data_program_with_samples(
             }
         }
     }
+    // A collection envelope can be projected differently by different actions
+    // (for example a task detail includes a title while a note rejection omits
+    // it). A branch that has no local projection but exposes the same collection
+    // may reuse another branch's projection only when that projection reproduces
+    // every output observed in this branch.
+    let mut projection_candidates: BTreeMap<String, Vec<ValueExpr>> = BTreeMap::new();
+    for rule in &rules {
+        for (key, expression) in &rule.outputs {
+            if matches!(expression, ValueExpr::CollectionProjection { .. }) {
+                projection_candidates
+                    .entry(key.clone())
+                    .or_default()
+                    .push(expression.clone());
+            }
+        }
+    }
+    for rule in rules.iter_mut() {
+        let rule_samples: Vec<Sample> = samples
+            .iter()
+            .filter(|sample| {
+                sample.action == rule.action
+                    && match rule.branch {
+                        RuleBranch::Success => sample.outcome == OutcomeKind::Success,
+                        RuleBranch::Error => {
+                            sample.outcome != OutcomeKind::Success && sample.error == rule.error
+                        }
+                    }
+            })
+            .cloned()
+            .collect();
+        for (key, candidates) in &projection_candidates {
+            if !matches!(rule.outputs.get(key), Some(ValueExpr::State { .. })) {
+                continue;
+            }
+            let carriers: Vec<&Sample> = rule_samples
+                .iter()
+                .filter(|sample| sample.outputs.contains_key(key))
+                .collect();
+            if carriers.is_empty() {
+                continue;
+            }
+            if let Some(candidate) = candidates.iter().find(|candidate| {
+                carriers.iter().all(|sample| {
+                    eval_value(
+                        candidate,
+                        output_source(sample, OutputSnapshot::Post),
+                        &sample.params,
+                        None,
+                        &collections,
+                    ) == sample.outputs.get(key).cloned()
+                })
+            }) {
+                rule.outputs.insert(key.clone(), candidate.clone());
+            }
+        }
+    }
+
+    // A counter observed at only one positive value can be mistaken for a
+    // configuration constant. If every rule that mentions the field increments
+    // it, the pre-action baseline is one increment lower; a field that is never
+    // mutated (for example a fixed capacity) is left unchanged.
+    repair_counter_baselines(&mut initial_state, &rules, &samples);
 
     // Error rules first: a permissive success rule must not swallow a specific
     // rejection.
@@ -1012,6 +1153,44 @@ pub fn synthesize_data_program_with_samples(
             "Positive-only properties are recorded as candidate necessary conditions, not treated as proof of sufficiency.".into(),
             "Identifiers are replaced by entity references and allocators; literal values remain only when no relationship explains them.".into(),
         ],
+    }
+}
+
+fn repair_counter_baselines(initial: &mut Value, rules: &[DataRule], samples: &[Sample]) {
+    let mut increments: BTreeMap<String, i64> = BTreeMap::new();
+    for effect in rules.iter().flat_map(|rule| rule.effects.iter()) {
+        if let Effect::IncrementState {
+            field,
+            by: ValueExpr::Literal { value },
+        } = effect
+        {
+            if let Some(by) = value.as_i64().filter(|by| *by > 0) {
+                increments
+                    .entry(field.clone())
+                    .and_modify(|existing| *existing = (*existing).min(by))
+                    .or_insert(by);
+            }
+        }
+    }
+    let Some(object) = initial.as_object_mut() else {
+        return;
+    };
+    for (field, by) in increments {
+        let Some(value) = object.get(&field).and_then(Value::as_i64) else {
+            continue;
+        };
+        if value <= 0 || by <= 0 {
+            continue;
+        }
+        let observed: Vec<i64> = samples
+            .iter()
+            .flat_map(|sample| [sample.before.get(&field), sample.after.get(&field)])
+            .flatten()
+            .filter_map(Value::as_i64)
+            .collect();
+        if observed.iter().all(|observed| *observed == value) {
+            object.insert(field, json!(value - by));
+        }
     }
 }
 
@@ -1107,103 +1286,190 @@ fn schema_for_objects(objects: &[&Map<String, Value>]) -> BTreeMap<String, State
 }
 
 fn materialize_initial_state(initial: Value, schema: &StateSchema, samples: &[Sample]) -> Value {
-    let mut initial = if initial.is_object() {
-        initial
-    } else {
-        json!({})
-    };
+    materialize_object(initial, &schema.fields, samples, &mut Vec::new())
+}
+
+/// Materialize observed defaults recursively. A nested object is not replaced
+/// by `{}`: every nested field that is present in all observations is filled
+/// from the same evidence used for top-level fields. Existing nested objects
+/// are completed rather than discarded.
+fn materialize_object(
+    mut initial: Value,
+    fields: &BTreeMap<String, StateFieldSchema>,
+    samples: &[Sample],
+    path: &mut Vec<String>,
+) -> Value {
+    if !initial.is_object() {
+        initial = json!({});
+    }
     let Some(object) = initial.as_object_mut() else {
         return initial;
     };
     if samples.is_empty() {
         return initial;
     }
-    for (field, field_schema) in &schema.fields {
-        if object.contains_key(field) {
+    for (field, field_schema) in fields {
+        path.push(field.clone());
+        if let Some(existing) = object.get_mut(field) {
+            if existing.is_object() && !field_schema.nested.is_empty() {
+                *existing =
+                    materialize_object(existing.clone(), &field_schema.nested, samples, path);
+            }
+            path.pop();
             continue;
         }
-        // Only materialize fields that are present in every observed post
-        // state. A field that appears only after a conditional action remains
-        // optional and is not invented at reset time.
-        // Optional fields with observed null evidence have an explicit
-        // default even when one probe omitted the key. This is not a name
-        // heuristic: the schema must have observed a null value for the field.
+        // An optional field with explicit null evidence is a supported default
+        // even when one probe omitted the key. This is observed evidence, not a
+        // field-name heuristic.
         if field_schema.presence == StatePresence::Optional
             && field_schema.candidate_defaults.iter().any(Value::is_null)
         {
             object.insert(field.clone(), Value::Null);
+            path.pop();
             continue;
         }
+        // Only materialize fields present in every observed post state. A field
+        // that appears only after a conditional action remains optional.
         if !samples
             .iter()
-            .all(|sample| sample.after.get(field).is_some())
+            .all(|sample| value_at(&sample.after, path).is_some())
         {
+            path.pop();
             continue;
         }
-        if let Some(value) = default_state_value(field, field_schema, samples) {
+        if let Some(value) = default_state_value_at(field_schema, samples, path) {
             object.insert(field.clone(), value);
         }
+        path.pop();
     }
     initial
 }
 
-fn default_state_value(
-    field: &str,
+fn value_at<'a>(state: &'a Value, path: &[String]) -> Option<&'a Value> {
+    let mut current = state;
+    for key in path {
+        current = current.get(key)?;
+    }
+    Some(current)
+}
+
+fn default_state_value_at(
     schema: &StateFieldSchema,
     samples: &[Sample],
+    path: &[String],
 ) -> Option<Value> {
+    let values: Vec<&Value> = samples
+        .iter()
+        .filter_map(|sample| value_at(&sample.after, path))
+        .collect();
+    if values.is_empty() {
+        return None;
+    }
+    let first = values[0].clone();
+    let constant = values.iter().all(|value| *value == &first);
     match schema.kind {
         StateValueKind::Absent | StateValueKind::Mixed => None,
         StateValueKind::Null => Some(Value::Null),
-        StateValueKind::Bool => Some(Value::Bool(false)),
-        StateValueKind::String => samples
-            .iter()
-            .find_map(|sample| sample.after.get(field).cloned()),
+        StateValueKind::Bool => Some(Value::Bool(constant && first.as_bool().unwrap_or(false))),
+        StateValueKind::String => Some(if constant {
+            first
+        } else if values.iter().any(|value| value.is_null()) {
+            Value::Null
+        } else {
+            values
+                .iter()
+                .find_map(|value| value.as_str().map(|text| Value::String(text.into())))
+                .unwrap_or(Value::String(String::new()))
+        }),
         StateValueKind::Array => Some(json!([])),
-        StateValueKind::Object => Some(json!({})),
-        StateValueKind::Int => Some(json!(infer_initial_integer(field, samples))),
-        StateValueKind::Float => Some(json!(0.0)),
+        StateValueKind::Object => {
+            let mut object = Map::new();
+            for (child, child_schema) in &schema.nested {
+                // An object whose children are themselves objects is a map of
+                // entities, not a fixed configuration record. Materializing a
+                // key observed in one post-state would invent an entity at
+                // reset, so only scalar/array defaults are created here.
+                if child_schema.kind == StateValueKind::Object {
+                    continue;
+                }
+                let mut child_path = path.to_vec();
+                child_path.push(child.clone());
+                if samples
+                    .iter()
+                    .all(|sample| value_at(&sample.after, &child_path).is_some())
+                {
+                    if let Some(value) = default_state_value_at(child_schema, samples, &child_path)
+                    {
+                        object.insert(child.clone(), value);
+                    }
+                }
+            }
+            Some(Value::Object(object))
+        }
+        StateValueKind::Int => {
+            // Nested configuration values are commonly constants (for example a
+            // capacity). Top-level counters and allocators retain the existing
+            // predecessor/created-identifier inference.
+            if path.len() > 1 && constant {
+                return Some(first);
+            }
+            if path.len() == 1 {
+                if let Some(field) = path.last() {
+                    return Some(json!(infer_initial_integer(field, samples)));
+                }
+            }
+            let integers: Vec<i64> = values.iter().filter_map(|value| value.as_i64()).collect();
+            if let Some(minimum) = integers.iter().copied().min() {
+                if minimum > 0 {
+                    return Some(json!(minimum - 1));
+                }
+            }
+            Some(json!(0))
+        }
+        StateValueKind::Float => Some(if constant { first } else { json!(0.0) }),
     }
 }
 
 fn infer_initial_integer(field: &str, samples: &[Sample]) -> i64 {
-    let mut values: Vec<i64> = samples
+    // An allocator is identified by the created identifiers it produces, not
+    // by the mere fact that its first observed value is positive. After a
+    // creation, the counter is one greater than the numeric suffix.
+    let after_values: Vec<i64> = samples
         .iter()
-        .filter(|sample| sample.created_id.is_some())
         .filter_map(|sample| sample.after.get(field))
         .filter_map(Value::as_i64)
         .collect();
-    if values.is_empty() {
-        values = samples
-            .iter()
-            .filter_map(|sample| sample.after.get(field))
-            .filter_map(Value::as_i64)
-            .collect();
+    if let Some(value) = after_values.iter().copied().find(|value| {
+        *value > 0
+            && samples.iter().any(|sample| {
+                sample
+                    .created_id
+                    .as_deref()
+                    .and_then(trailing_number)
+                    .map(|created| created + 1 == *value)
+                    .unwrap_or(false)
+            })
+    }) {
+        return value - 1;
     }
+
+    // A constant positive field is configuration (for example capacity=3), not
+    // an allocator predecessor. A varying field is a counter; its baseline is
+    // the minimum value observed in either pre- or post-action evidence.
+    let mut values: Vec<i64> = samples
+        .iter()
+        .flat_map(|sample| [sample.before.get(field), sample.after.get(field)])
+        .flatten()
+        .filter_map(Value::as_i64)
+        .collect();
     values.sort_unstable();
     let distinct: BTreeSet<i64> = values.iter().copied().collect();
-    if let Some(minimum) = values.first().copied() {
-        if minimum > 0 {
-            return minimum - 1;
-        }
-    }
     if distinct.len() == 1 {
         if let Some(value) = values.first().copied() {
-            if value > 0
-                && samples.iter().any(|sample| {
-                    sample
-                        .created_id
-                        .as_deref()
-                        .and_then(trailing_number)
-                        .map(|created| created + 1 == value)
-                        .unwrap_or(false)
-                })
-            {
-                return value - 1;
-            }
+            return value;
         }
     }
-    0
+    values.first().copied().unwrap_or(0)
 }
 
 fn trailing_number(value: &str) -> Option<i64> {
@@ -2010,6 +2276,41 @@ fn guard_candidates(all: &[Sample], collections: &[Collection]) -> Vec<Candidate
             },
             &mut guards,
         );
+        // Length constraints are only tried for payload strings, never for a
+        // value that resolves to an entity identity. Both byte and Unicode
+        // scalar units are generated because ASCII evidence cannot distinguish
+        // them; the competing units remain in the ledger.
+        if param_references_entity(param, all, collections) {
+            continue;
+        }
+        let mut scalar_lengths = BTreeSet::new();
+        let mut byte_lengths = BTreeSet::new();
+        for sample in all {
+            if let Some(text) = sample.params.get(param).and_then(Value::as_str) {
+                scalar_lengths.insert(text.chars().count());
+                byte_lengths.insert(text.len());
+            }
+        }
+        for (unit, lengths) in [
+            (StringLengthUnit::UnicodeScalar, scalar_lengths),
+            (StringLengthUnit::Bytes, byte_lengths),
+        ] {
+            for length in lengths {
+                for boundary in [length.saturating_sub(1), length, length.saturating_add(1)] {
+                    for op in [CmpOp::Lt, CmpOp::Le, CmpOp::Ge, CmpOp::Gt] {
+                        add(
+                            Guard::ParamStringLength {
+                                param: param.clone(),
+                                op,
+                                length: boundary,
+                                unit,
+                            },
+                            &mut guards,
+                        );
+                    }
+                }
+            }
+        }
     }
     for param in &numeric_params {
         add(
@@ -2232,6 +2533,11 @@ fn affinity(guard: &Guard, words: &BTreeSet<String>) -> i32 {
             Guard::SetContains { .. } | Guard::EntityListContains { .. } => 3,
             Guard::NoEntityFieldCmp { .. } | Guard::AnyEntityFieldCmp { .. } => 2,
             Guard::ParamContains { .. } => 1,
+            Guard::ParamStringLength { op, .. } => match op {
+                CmpOp::Lt | CmpOp::Le => 4,
+                CmpOp::Ge | CmpOp::Gt => 2,
+                _ => 0,
+            },
             Guard::ParamOneOf { .. } => 1,
             Guard::StateCmp { field, .. } if counter_field(field) => -5,
             Guard::StateCmp { .. } => 1,
@@ -2387,6 +2693,22 @@ fn guard_holds(guard: &Guard, state: &Value, params: &BTreeMap<String, Value>) -
             .get(param)
             .and_then(|value| value.as_str())
             .map(|text| text.contains(needle))
+            .unwrap_or(false),
+        Guard::ParamStringLength {
+            param,
+            op,
+            length,
+            unit,
+        } => params
+            .get(param)
+            .and_then(|value| value.as_str())
+            .map(|text| {
+                let measured = match unit {
+                    StringLengthUnit::UnicodeScalar => text.chars().count(),
+                    StringLengthUnit::Bytes => text.len(),
+                };
+                op.eval(&json!(measured), &json!(length)).unwrap_or(false)
+            })
             .unwrap_or(false),
         Guard::EntityFieldCmp {
             collection,
@@ -2669,20 +2991,33 @@ fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
         if collection.layout == CollectionLayout::Set {
             let before = state_list(&sample.before, &collection.name).unwrap_or_default();
             let after = state_list(&sample.after, &collection.name).unwrap_or_default();
-            for value in &after {
-                if !before.contains(value) {
-                    effects.push(Effect::AppendScalar {
+            // Ordered growth is append evidence, even for a scalar array. This
+            // preserves repeated log entries; true set membership changes that
+            // are not prefix extensions fall back to add/remove semantics.
+            let prefix = after.len() >= before.len() && after[..before.len()] == before[..];
+            if prefix {
+                for value in &after[before.len()..] {
+                    effects.push(Effect::AppendItem {
                         field: collection.name.clone(),
                         value: value_expr(value, sample, created),
                     });
                 }
-            }
-            for value in &before {
-                if !after.contains(value) {
-                    effects.push(Effect::RemoveScalar {
-                        field: collection.name.clone(),
-                        value: value_expr(value, sample, created),
-                    });
+            } else {
+                for value in &after {
+                    if !before.contains(value) {
+                        effects.push(Effect::AppendScalar {
+                            field: collection.name.clone(),
+                            value: value_expr(value, sample, created),
+                        });
+                    }
+                }
+                for value in &before {
+                    if !after.contains(value) {
+                        effects.push(Effect::RemoveScalar {
+                            field: collection.name.clone(),
+                            value: value_expr(value, sample, created),
+                        });
+                    }
                 }
             }
             continue;
@@ -2824,31 +3159,51 @@ fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
                     }
                 }
             }
-            (Value::Array(_), Value::Array(_)) if key == "submissions" => {
-                let previous = before.as_array().cloned().unwrap_or_default();
-                let next = after.as_array().cloned().unwrap_or_default();
-                for item in next.iter().skip(previous.len()) {
-                    effects.push(Effect::AppendSnapshot {
-                        field: key.clone(),
-                        source: "draft".into(),
-                    });
-                    let _ = item;
-                }
-            }
             (Value::Array(_), Value::Array(_)) => {
                 let previous = before.as_array().cloned().unwrap_or_default();
                 let next = after.as_array().cloned().unwrap_or_default();
-                for value in next.iter().filter(|v| !previous.contains(v)) {
-                    effects.push(Effect::AppendScalar {
-                        field: key.clone(),
-                        value: value_expr(value, sample, created),
-                    });
+                let prefix = next.len() >= previous.len() && next[..previous.len()] == previous[..];
+                let appended: Vec<&Value> = if prefix {
+                    next[previous.len()..].iter().collect()
+                } else {
+                    next.iter()
+                        .filter(|value| !previous.contains(value))
+                        .collect()
+                };
+                for value in appended {
+                    // If the appended item is an existing object-valued state
+                    // field, record that provenance instead of freezing the
+                    // observed object as a literal.
+                    let snapshot = value
+                        .is_object()
+                        .then(|| {
+                            sample.before.as_object().and_then(|object| {
+                                object
+                                    .iter()
+                                    .find(|(_, field)| *field == value)
+                                    .map(|(name, _)| name.clone())
+                            })
+                        })
+                        .flatten();
+                    if let Some(source) = snapshot {
+                        effects.push(Effect::AppendSnapshot {
+                            field: key.clone(),
+                            source,
+                        });
+                    } else {
+                        effects.push(Effect::AppendItem {
+                            field: key.clone(),
+                            value: value_expr(value, sample, created),
+                        });
+                    }
                 }
-                for value in previous.iter().filter(|v| !next.contains(v)) {
-                    effects.push(Effect::RemoveScalar {
-                        field: key.clone(),
-                        value: value_expr(value, sample, created),
-                    });
+                if !prefix {
+                    for value in previous.iter().filter(|v| !next.contains(v)) {
+                        effects.push(Effect::RemoveScalar {
+                            field: key.clone(),
+                            value: value_expr(value, sample, created),
+                        });
+                    }
                 }
             }
             _ => {
@@ -2938,6 +3293,18 @@ fn subject_param(sample: &Sample, collection: &Collection) -> Option<String> {
     best.map(|(_, name)| name)
 }
 
+fn param_references_entity(param: &str, all: &[Sample], collections: &[Collection]) -> bool {
+    all.iter().any(|sample| {
+        let Some(value) = sample.params.get(param).and_then(Value::as_str) else {
+            return false;
+        };
+        collections.iter().any(|collection| {
+            record_by_id(&sample.before, collection, value).is_some()
+                || record_by_id(&sample.after, collection, value).is_some()
+        })
+    })
+}
+
 fn singular(name: &str) -> String {
     if let Some(stem) = name.strip_suffix("ies") {
         format!("{stem}y")
@@ -3000,8 +3367,16 @@ fn update_fields(
                 });
             }
             (Some(Value::Array(previous)), Value::Array(next)) => {
-                for value in next.iter().filter(|value| !previous.contains(value)) {
-                    updates.push(FieldUpdate::Append {
+                let prefix = next.len() >= previous.len() && next[..previous.len()] == previous[..];
+                let appended: Vec<&Value> = if prefix {
+                    next[previous.len()..].iter().collect()
+                } else {
+                    next.iter()
+                        .filter(|value| !previous.contains(value))
+                        .collect()
+                };
+                for value in appended {
+                    updates.push(FieldUpdate::AppendItem {
                         field: field.clone(),
                         value: value_expr(value, sample, created),
                     });
@@ -3112,8 +3487,22 @@ fn value_expr(value: &Value, sample: &Sample, created: Option<&str>) -> ValueExp
             return ValueExpr::CreatedId;
         }
     }
-    ValueExpr::Literal {
-        value: value.clone(),
+    match value {
+        Value::Object(fields) => ValueExpr::Object {
+            fields: fields
+                .iter()
+                .map(|(name, value)| (name.clone(), value_expr(value, sample, created)))
+                .collect(),
+        },
+        Value::Array(items) => ValueExpr::Array {
+            items: items
+                .iter()
+                .map(|value| value_expr(value, sample, created))
+                .collect(),
+        },
+        _ => ValueExpr::Literal {
+            value: value.clone(),
+        },
     }
 }
 
@@ -3427,6 +3816,7 @@ fn state_update_claims(effects: &[Effect], branch: &[Sample]) -> Vec<StateUpdate
             | Effect::SetMapField { field, .. }
             | Effect::ClearMap { field }
             | Effect::AppendScalar { field, .. }
+            | Effect::AppendItem { field, .. }
             | Effect::RemoveScalar { field, .. }
             | Effect::AppendSnapshot { field, .. } => {
                 fields.insert(field.clone());
@@ -3599,6 +3989,7 @@ fn guard_parameter_names(guard: &Guard) -> Vec<String> {
         | Guard::ParamPositive { param }
         | Guard::ParamOneOf { param, .. }
         | Guard::ParamContains { param, .. }
+        | Guard::ParamStringLength { param, .. }
         | Guard::ParamPresent { param }
         | Guard::ParamAbsent { param }
         | Guard::ParamCmpEntityField { param, .. }
@@ -3783,6 +4174,7 @@ fn infer_success_guards(
             Guard::Exists { .. } => 5,
             Guard::ParamNonEmpty { .. } => 4,
             Guard::ParamPositive { .. } => 4,
+            Guard::ParamStringLength { op: CmpOp::Ge, .. } => 6,
             _ => continue,
         };
         chosen.push((score, candidate.guard.clone()));
@@ -3805,6 +4197,7 @@ fn infer_success_guards(
             Guard::SetContains { collection, param } => format!("set:{collection}:{param}"),
             Guard::Exists { collection, entity } => format!("exists:{collection}:{entity:?}"),
             Guard::ParamNonEmpty { param } => format!("nonempty:{param}"),
+            Guard::ParamStringLength { param, op, .. } => format!("length:{param}:{op:?}"),
             Guard::ParamPositive { param } => format!("positive:{param}"),
             _ => format!("{guard:?}"),
         };
@@ -3817,6 +4210,7 @@ fn infer_success_guards(
                 Guard::ParamCmpDiff { .. }
                     | Guard::ParamCmpEntityField { .. }
                     | Guard::SetContains { .. }
+                    | Guard::ParamStringLength { .. }
             )
         {
             continue;
@@ -3976,6 +4370,7 @@ fn structural_output(expression: &ValueExpr) -> bool {
             | ValueExpr::Object { .. }
             | ValueExpr::Array { .. }
             | ValueExpr::Conditional { .. }
+            | ValueExpr::Arithmetic { .. }
     )
 }
 
@@ -4116,12 +4511,16 @@ fn infer_outputs(
                 continue;
             }
         }
-        if collections.is_empty() {
-            if let Some(expression) = infer_state_shape_output(&key, successes, snapshot) {
-                if output_matches_all(&key, &expression, successes, snapshot, collections) {
-                    outputs.insert(key.clone(), expression);
-                    continue;
-                }
+        if let Some(expression) = infer_state_shape_output(&key, successes, snapshot) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_arithmetic_output(&key, successes, snapshot, collections) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
             }
         }
         if let Some(expression) = infer_projection(&key, successes, snapshot, collections, &schema)
@@ -4324,6 +4723,123 @@ fn infer_length_sum_output(
             };
             if output_matches_all(key, &expression, successes, snapshot, collections) {
                 return Some(expression);
+            }
+        }
+    }
+    None
+}
+
+/// Search type-correct arithmetic relations over independently varying numeric
+/// state fields and typed aggregates. A relation is accepted only when it
+/// predicts every observed output and takes at least two distinct values; a
+/// single state cannot identify `capacity - used`.
+fn infer_arithmetic_output(
+    key: &str,
+    successes: &[Sample],
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let mut operands: Vec<ValueExpr> = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut add = |expression: ValueExpr, operands: &mut Vec<ValueExpr>| {
+        let encoded = serde_json::to_string(&expression).unwrap_or_default();
+        if seen.insert(encoded) {
+            operands.push(expression);
+        }
+    };
+    for sample in successes {
+        let source = output_source(sample, snapshot);
+        if let Some(object) = source.as_object() {
+            for (field, value) in object {
+                if value.is_number() {
+                    add(
+                        if snapshot == OutputSnapshot::Pre {
+                            ValueExpr::PreState {
+                                field: field.clone(),
+                            }
+                        } else {
+                            ValueExpr::State {
+                                field: field.clone(),
+                            }
+                        },
+                        &mut operands,
+                    );
+                }
+                if value.is_array() || value.is_object() {
+                    add(
+                        ValueExpr::Length {
+                            field: field.clone(),
+                        },
+                        &mut operands,
+                    );
+                }
+            }
+        }
+        for collection in collections {
+            if collection.layout == CollectionLayout::Set {
+                continue;
+            }
+            add(
+                ValueExpr::Count {
+                    collection: collection.name.clone(),
+                },
+                &mut operands,
+            );
+            for (_, record) in records(source, collection) {
+                for (field, value) in &record {
+                    if value.is_number() {
+                        add(
+                            ValueExpr::Sum {
+                                collection: collection.name.clone(),
+                                field: field.clone(),
+                            },
+                            &mut operands,
+                        );
+                    }
+                    if value.is_array() {
+                        add(
+                            ValueExpr::SumLength {
+                                collection: collection.name.clone(),
+                                field: field.clone(),
+                            },
+                            &mut operands,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    for left in &operands {
+        for right in &operands {
+            if left == right {
+                continue;
+            }
+            for op in [NumOp::Sub, NumOp::Add, NumOp::Mul] {
+                let expression = ValueExpr::Arithmetic {
+                    left: Box::new(left.clone()),
+                    op,
+                    right: Box::new(right.clone()),
+                };
+                if !output_matches_all(key, &expression, successes, snapshot, collections) {
+                    continue;
+                }
+                let values: BTreeSet<String> = successes
+                    .iter()
+                    .filter(|sample| sample.outputs.contains_key(key))
+                    .filter_map(|sample| {
+                        eval_value(
+                            &expression,
+                            output_source(sample, snapshot),
+                            &sample.params,
+                            None,
+                            collections,
+                        )
+                    })
+                    .map(|value| value.to_string())
+                    .collect();
+                if values.len() >= 2 {
+                    return Some(expression);
+                }
             }
         }
     }
@@ -5121,6 +5637,16 @@ fn apply_effect(
                 }
             }
         }
+        Effect::AppendItem { field, value } => {
+            if let Some(value) = eval_value(value, state, params, created.as_deref(), collections) {
+                if !state.get(field).map(Value::is_array).unwrap_or(false) {
+                    set_key(state, field, Value::Array(Vec::new()));
+                }
+                if let Some(items) = state.get_mut(field).and_then(Value::as_array_mut) {
+                    items.push(value);
+                }
+            }
+        }
         Effect::RemoveScalar { field, value } => {
             if let Some(value) = eval_value(value, state, params, created.as_deref(), collections) {
                 if let Some(items) = state.get_mut(field).and_then(Value::as_array_mut) {
@@ -5170,6 +5696,10 @@ fn update_record(
                     })
             }
             FieldUpdate::Append { field, value } => {
+                eval_value(value, state, params, created.as_deref(), collections)
+                    .map(|value| (field.clone(), value, true))
+            }
+            FieldUpdate::AppendItem { field, value } => {
                 eval_value(value, state, params, created.as_deref(), collections)
                     .map(|value| (field.clone(), value, true))
             }
@@ -6069,6 +6599,127 @@ mod tests {
         assert_eq!(
             crate::output::eval_expr(&any, &empty_context),
             Some(json!(false))
+        );
+    }
+
+    #[test]
+    fn nested_object_baseline_uses_observed_nested_defaults() {
+        let after = json!({
+            "shop": {"name": "north", "capacity": 3, "open": true},
+            "jobs": {}
+        });
+        let status = sample(
+            "status",
+            &[],
+            json!({}),
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        let schema = infer_state_schema(&[json!({}), after]);
+        let initial = materialize_initial_state(json!({}), &schema, &[status]);
+        assert_eq!(
+            initial["shop"],
+            json!({"name": "north", "capacity": 3, "open": true})
+        );
+        assert_eq!(initial["jobs"], json!({}));
+    }
+
+    #[test]
+    fn event_log_append_preserves_duplicates_and_parameter_provenance() {
+        let tick = json!({"kind": "tick", "by": 1});
+        let before = json!({"log": [tick.clone(), tick.clone()]});
+        let after = json!({"log": [tick.clone(), tick.clone(), tick.clone()]});
+        let s = sample(
+            "tick",
+            &[("by", json!(1))],
+            before,
+            after,
+            OutcomeKind::Success,
+            None,
+        );
+        let effects = infer_effects(&s, &[]);
+        let Some(Effect::AppendItem { value, .. }) = effects
+            .iter()
+            .find(|effect| matches!(effect, Effect::AppendItem { .. }))
+        else {
+            panic!("expected duplicate-preserving append, got {effects:?}");
+        };
+        let ValueExpr::Object { fields } = value else {
+            panic!("expected structural event provenance, got {value:?}");
+        };
+        assert_eq!(fields["by"], ValueExpr::Param { name: "by".into() });
+        assert!(reproduces(&s, &effects, &[], &[]));
+    }
+
+    #[test]
+    fn short_present_string_uses_length_guard_not_optional_parameter() {
+        let before = json!({"items": {}, "selected": null});
+        let rejected = sample(
+            "add",
+            &[("title", json!("ab"))],
+            before.clone(),
+            before.clone(),
+            OutcomeKind::Rejected,
+            Some("title_too_short"),
+        );
+        let success = sample(
+            "add",
+            &[("title", json!("abc"))],
+            before.clone(),
+            before,
+            OutcomeKind::Success,
+            None,
+        );
+        let all = vec![rejected, success];
+        let collections = detect_collections(&[all[0].before.clone()]);
+        let candidates = guard_candidates(&all, &collections);
+        let guards =
+            select_error_guards(&candidates, &all, "title_too_short").expect("length guard");
+        assert!(
+            matches!(
+                guards.as_slice(),
+                [Guard::ParamStringLength { param, op: CmpOp::Lt | CmpOp::Le, .. }]
+                    if param == "title"
+            ),
+            "expected a short-string length guard, got {guards:?}"
+        );
+        assert!(!format!("{guards:?}").contains("OptionalParameter"));
+    }
+
+    #[test]
+    fn arithmetic_output_uses_two_varying_state_fields() {
+        let mut first = sample(
+            "status",
+            &[],
+            json!({"capacity": 5, "used": 2}),
+            json!({"capacity": 5, "used": 2}),
+            OutcomeKind::Success,
+            None,
+        );
+        first.outputs.insert("remaining".into(), json!(3));
+        let mut second = sample(
+            "status",
+            &[],
+            json!({"capacity": 5, "used": 4}),
+            json!({"capacity": 5, "used": 4}),
+            OutcomeKind::Success,
+            None,
+        );
+        second.outputs.insert("remaining".into(), json!(1));
+        let outputs = infer_outputs(&[first, second], OutputSnapshot::Post, &[]);
+        assert!(
+            matches!(
+                outputs.get("remaining"),
+                Some(ValueExpr::Arithmetic {
+                    left,
+                    op: NumOp::Sub,
+                    right
+                }) if matches!(left.as_ref(), ValueExpr::State { field } if field == "capacity")
+                    && matches!(right.as_ref(), ValueExpr::State { field } if field == "used")
+            ),
+            "expected capacity - used, got {:?}",
+            outputs.get("remaining")
         );
     }
 
