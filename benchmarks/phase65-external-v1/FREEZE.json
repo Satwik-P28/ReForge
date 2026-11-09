@@ -1,0 +1,74 @@
+{
+  "access_boundary": {
+    "action_schema": "manually specified in target.json",
+    "adapter_role": "benchmark harness; target source is not inspected or imported",
+    "hidden_workflows_visible_to_investigator": false,
+    "investigator_source_access": "none"
+  },
+  "created_utc": "2026-11-09T18:30:20.376512+00:00",
+  "evaluation": {
+    "apps": [
+      "cli-notecli"
+    ],
+    "budget": 100,
+    "experiment_budget": 100,
+    "policy": "coverage",
+    "seed": 1,
+    "strategy": "hybrid"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "55e683b9b426512531ea0022271217a3d51db580bac68e6e1b71f0c2d647d4cc"
+    },
+    {
+      "path": "apps.json",
+      "sha256": "fdaab86fee7952d0906622f17607af704d7366f6f4a647ba0c4f52cbef14dce8"
+    },
+    {
+      "path": "fixtures/notecli/adapter.py",
+      "sha256": "5692c5ff58ee0b9f575beb766018b8071d5972356ecc04b0e4047a1073021d6b"
+    },
+    {
+      "path": "fixtures/notecli/notecli.py",
+      "sha256": "6b32fc46e22c73688836f8db8e1c35580cada178afc7988855a92af4915ba770"
+    },
+    {
+      "path": "fixtures/notecli/state.json",
+      "sha256": "a28da668bad6026258abdd5c81dc9995d53f7901d24ca0d8c0f80c83be08a7c9"
+    },
+    {
+      "path": "fixtures/notecli/target.json",
+      "sha256": "6e601a75e0c34eac1ed706c097478b60a4e3cd36037c4ffee9a1b3309053d230"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "ca0eb6995f73df6ada545894996e214439280fbae4b2befd7b0da908a9c62ce9"
+    },
+    {
+      "path": "hidden/cli-notecli.json",
+      "sha256": "4d8722b4ea27f0db1ae22a47bb8c3595ea2305d54e8af4d9e9fc2164920ad881"
+    },
+    {
+      "path": "preflight-smoke.json",
+      "sha256": "9eed2c111d3e89f1e3401ad0830f33fe7330690fe31749a6e513be6e3152c426"
+    },
+    {
+      "path": "preflight.py",
+      "sha256": "d774e20b3ddcd0fc72b1e043d3704b453accfb5081dd1fe252f617adc2298ac9"
+    },
+    {
+      "path": "targets.lock.json",
+      "sha256": "828f0ca03480aded91c6d2d4c74b24cde5a6565c8eab788126683128bca63136"
+    }
+  ],
+  "frozen_before_first_evaluation": true,
+  "notes": [
+    "This independently authored target was not used to tune Phase 6.5 synthesis before this freeze.",
+    "Any fixture, hidden-workflow or normalization change after this freeze requires a new suite version.",
+    "The evaluation is run exactly once after freeze."
+  ],
+  "source_commit": "76e787b12248a80a47dd6065aae3d0207ca130d6",
+  "source_tree": "0ff4113d97c0388ddc9308529fe8e97feaf7f1c1",
+  "suite": "reforgebench-phase65-external"
+}

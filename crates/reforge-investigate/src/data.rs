@@ -1271,7 +1271,15 @@ pub fn synthesize_data_program_with_samples(
             .cloned()
             .collect();
         for (key, candidates) in &projection_candidates {
-            if !matches!(rule.outputs.get(key), Some(ValueExpr::State { .. })) {
+            // A missing expression is the normal case when local projection
+            // inference could not explain every observation. A verified
+            // cross-branch projection is still preferable to dropping the
+            // output key entirely. State references are also candidates for
+            // replacement; concrete expressions are not overwritten.
+            if matches!(
+                rule.outputs.get(key),
+                Some(expression) if !matches!(expression, ValueExpr::State { .. })
+            ) {
                 continue;
             }
             let carriers: Vec<&Sample> = rule_samples
@@ -2217,7 +2225,9 @@ fn list_identity_score(
         let distinct: BTreeSet<&String> = values.iter().collect();
         if values.len() == items.len() && distinct.len() == values.len() {
             unique_occurrences += 1;
-            if values.iter().all(|value| value.parse::<i64>().is_ok()) {
+            if identity_field_prior(field) > 0
+                && values.iter().all(|value| value.parse::<i64>().is_ok())
+            {
                 score += 80;
             }
         }
@@ -8284,5 +8294,44 @@ mod tests {
             let decoded: Derived = serde_json::from_str(&encoded).expect("deserialize derived");
             assert_eq!(value, decoded);
         }
+    }
+
+    #[test]
+    fn string_identity_projection_is_inferred() {
+        let state = json!({
+            "tasks": [
+                {"id": "t1", "title": "alpha", "status": "open", "notes": []},
+                {"id": "t2", "title": "beta", "status": "open", "notes": []}
+            ],
+            "next_id": 3, "selected": null, "view": "list",
+            "task_count": 2, "done_count": 0, "note_count": 0, "archived_count": 0
+        });
+        let mut s = sample(
+            "list",
+            &[],
+            state.clone(),
+            state,
+            OutcomeKind::Success,
+            None,
+        );
+        s.outputs.insert(
+            "tasks".into(),
+            json!([
+                {"id": "t1", "status": "open", "notes": []},
+                {"id": "t2", "status": "open", "notes": []}
+            ]),
+        );
+        s.outputs.insert("task_count".into(), json!(2));
+        s.outputs.insert("done_count".into(), json!(0));
+        s.outputs.insert("note_count".into(), json!(0));
+        s.outputs.insert("archived_count".into(), json!(0));
+        s.outputs.insert("selected".into(), Value::Null);
+        s.outputs.insert("view".into(), json!("list"));
+        let collections = detect_collections(&[s.before.clone(), s.after.clone()]);
+        let outputs = infer_outputs(&[s], OutputSnapshot::Post, &collections);
+        assert!(
+            outputs.contains_key("tasks"),
+            "outputs={outputs:?} collections={collections:?}"
+        );
     }
 }
