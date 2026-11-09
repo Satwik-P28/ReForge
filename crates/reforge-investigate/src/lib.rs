@@ -17,6 +17,7 @@
 
 pub mod abstraction;
 pub mod adapters;
+pub mod causal;
 pub mod data;
 pub mod engine;
 pub mod evidence;
@@ -38,6 +39,11 @@ pub use adapters::cli::{
     FileTree,
 };
 pub use adapters::web::{WebActionSpec, WebTarget, WebTargetSpec};
+pub use causal::{
+    candidate_effects, field_deltas, select_baseline, CandidateExpression, DeltaKind,
+    EffectCandidate, EvidenceKind, EvidenceSource, FieldDelta, ObservationProvenance,
+    TransitionDelta,
+};
 pub use data::{
     synthesize_data_program, synthesize_data_program_with_samples, CollectionLayout, DataOutcome,
     DataProgram, DataRule, DataSample, DataStatus, Derived, Effect, ExecutionResult, Guard,

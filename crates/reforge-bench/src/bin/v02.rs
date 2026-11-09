@@ -16,8 +16,9 @@ use indexmap::IndexMap;
 use reforge_diff::{data_campaign, differential_campaign, CampaignConfig, DataCampaignConfig};
 use reforge_investigate::{
     instantiate_actions, investigate, synthesize_data_program_with_samples, synthesize_twin,
-    CliTargetSpec, DataProgram, DataSample, EntityPool, InvestigationConfig, InvestigationRecord,
-    OutcomeKind, PolicyKind, PrerequisiteSummary, TwinSynthConfig,
+    CliTargetSpec, DataProgram, DataSample, EntityPool, EvidenceKind, EvidenceSource,
+    InvestigationConfig, InvestigationRecord, ObservationProvenance, OutcomeKind, PolicyKind,
+    PrerequisiteSummary, TwinSynthConfig,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_types::{BehavioralTwin, TypedValue};
@@ -165,6 +166,7 @@ struct AppRun {
     twin: BehavioralTwin,
     data: DataProgram,
     counterfactual_samples: usize,
+    counterfactual_interactions: u64,
     hidden_programs: Vec<Vec<ActionInstance>>,
     hidden_workflows: Vec<String>,
 }
@@ -228,7 +230,11 @@ fn data_sample(
         .iter()
         .map(|(key, value)| (key.clone(), output_value(value)))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let events = match observation.outputs.get("events") {
+    let events = match observation
+        .outputs
+        .get("events_emitted")
+        .or_else(|| observation.outputs.get("events"))
+    {
         Some(TypedValue::List(items)) => items
             .iter()
             .filter_map(|item| item.as_str().map(str::to_string))
@@ -267,7 +273,80 @@ fn data_sample(
         outputs,
         step: 0,
         origin: "counterfactual".into(),
+        evidence: EvidenceKind::Transition,
+        provenance: ObservationProvenance {
+            observation_id: format!("{:?}", observation.id),
+            experiment_id: format!("counterfactual:{}", action.action),
+            reset_epoch: 0,
+            sequence_index: 0,
+            sequence_length: 1,
+            pre_state_observed: observation.state_document.is_some(),
+            reset_verified: observation.reset.succeeded,
+            document_present: observation.state_document.is_some(),
+            source: EvidenceSource::Counterfactual,
+        },
     }
+}
+
+/// Capture a reset baseline without inventing an action. The caller is
+/// responsible for supplying a verified reset and, for a materialized baseline,
+/// for checking that the no-op probe did not change the observable envelope.
+fn baseline_sample(
+    observation: &Observation,
+    experiment_id: &str,
+    epoch: u64,
+    source: EvidenceSource,
+    document_present: bool,
+) -> Option<DataSample> {
+    let state = observation.state_document.clone()?;
+    let outputs = observation
+        .outputs
+        .iter()
+        .map(|(key, value)| (key.clone(), output_value(value)))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    Some(DataSample {
+        action: String::new(),
+        params: std::collections::BTreeMap::new(),
+        before: state.clone(),
+        after: state,
+        outcome: OutcomeKind::Success,
+        error: None,
+        events: Vec::new(),
+        created_id: None,
+        created_pool: None,
+        outputs,
+        step: epoch,
+        origin: "reset-baseline".into(),
+        evidence: EvidenceKind::InitialState,
+        provenance: ObservationProvenance {
+            observation_id: format!("{:?}", observation.id),
+            experiment_id: experiment_id.to_string(),
+            reset_epoch: epoch,
+            sequence_index: 0,
+            sequence_length: 1,
+            pre_state_observed: document_present,
+            reset_verified: observation.reset.succeeded,
+            document_present,
+            source,
+        },
+    })
+}
+
+fn observable_envelope_equal(a: &Observation, b: &Observation) -> bool {
+    let normalize = |observation: &Observation| {
+        observation
+            .outputs
+            .iter()
+            .filter(|(name, _)| {
+                !matches!(
+                    name.as_str(),
+                    "outcome" | "events" | "available_actions" | "error"
+                )
+            })
+            .map(|(name, value)| (name.clone(), output_value(value)))
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    normalize(a) == normalize(b)
 }
 
 /// Execute short, reset-backed action pairs. Each pair holds the target action
@@ -278,7 +357,7 @@ fn collect_counterfactual_samples(
     root: &Path,
     spec_path: &str,
     record: &InvestigationRecord,
-) -> Result<Vec<DataSample>> {
+) -> Result<(Vec<DataSample>, u64)> {
     let spec = CliTargetSpec::load(&root.join(spec_path)).map_err(|e| anyhow::anyhow!(e))?;
     let workdir = std::env::temp_dir().join(format!(
         "reforge-counterfactual-{}-{}",
@@ -299,12 +378,21 @@ fn collect_counterfactual_samples(
     let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
     if !reset.succeeded {
         let _ = std::fs::remove_dir_all(&workdir);
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     }
     let baseline = target.observe().map_err(|e| anyhow::anyhow!(e))?;
-    let _initial = baseline.state_document.clone().unwrap_or_default();
+    let mut interactions = 2u64;
     let mut pool = EntityPool::default();
     let mut samples: Vec<DataSample> = Vec::new();
+    if let Some(sample) = baseline_sample(
+        &baseline,
+        "reset-capture",
+        1,
+        EvidenceSource::ResetCapture,
+        false,
+    ) {
+        samples.push(sample);
+    }
 
     let mut setup_sample: Option<DataSample> = None;
     let action_names: Vec<String> = record
@@ -315,15 +403,79 @@ fn collect_counterfactual_samples(
         .map(|entry| entry.action.clone())
         .collect();
 
+    // A no-op action after a verified reset forces lazy-load defaults to be
+    // persisted. It is accepted as a materialized baseline only when its
+    // observable envelope is identical to the reset capture. This remains a
+    // separate evidence class and is counted as a reference interaction.
+    let mut materialized = false;
+    // A direct persisted reset capture is authoritative. A materialized fixed
+    // point is only needed when lazy initialization leaves the reset document
+    // absent.
+    let direct_baseline = baseline.state_document.is_some();
+    for entry in &record.alphabet.entries {
+        if direct_baseline
+            || materialized
+            || matches!(entry.kind, reforge_observe::ActionKind::Observe)
+        {
+            continue;
+        }
+        if !entry.params.is_empty() {
+            continue;
+        }
+        let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
+        if !reset.succeeded {
+            continue;
+        }
+        let _before_probe = target.observe().map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
+        let action = ActionInstance::new(entry.action.clone());
+        let first_probe = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
+        let second_probe = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
+        // A successful, event-free zero-parameter action that is a fixed point
+        // is evidence about the lazily materialized baseline. It is not direct
+        // baseline evidence; the separate source label preserves that fact.
+        let event_free = |observation: &Observation| match observation.outputs.get("events") {
+            None => true,
+            Some(TypedValue::List(items)) => items.is_empty(),
+            _ => false,
+        };
+        let is_observation_like = OutcomeKind::from_observation(&first_probe)
+            == OutcomeKind::Success
+            && OutcomeKind::from_observation(&second_probe) == OutcomeKind::Success
+            && event_free(&first_probe)
+            && event_free(&second_probe)
+            && !first_probe.outputs.contains_key("created_id")
+            && first_probe.state_document.is_some()
+            && first_probe.state_document == second_probe.state_document
+            && observable_envelope_equal(&first_probe, &second_probe);
+        if is_observation_like {
+            if let Some(sample) = baseline_sample(
+                &first_probe,
+                &format!("materialized-baseline:{}", entry.action),
+                2,
+                EvidenceSource::MaterializedBaseline,
+                true,
+            ) {
+                samples.push(sample);
+                materialized = true;
+            }
+        }
+    }
+
     let mut run_sequence = |contexts: &[&str],
                             target_action: &str,
                             pool: &mut EntityPool|
      -> Result<(Option<DataSample>, Vec<DataSample>)> {
         let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
         if !reset.succeeded {
             return Ok((None, Vec::new()));
         }
         let baseline = target.observe().map_err(|e| anyhow::anyhow!(e))?;
+        interactions += 1;
         let mut current = baseline.state_document.clone().unwrap_or_default();
         *pool = EntityPool::default();
         let mut actions = instantiate_actions(&record.alphabet, pool);
@@ -336,6 +488,7 @@ fn collect_counterfactual_samples(
                 return Ok((None, Vec::new()));
             };
             let observation = target.perform(&setup).map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             let sample = data_sample(&setup, &current, &observation);
             current = observation.state_document.clone().unwrap_or(current);
             pool.observe_outputs(&observation.outputs);
@@ -356,12 +509,26 @@ fn collect_counterfactual_samples(
             };
             let before = current.clone();
             let observation = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             current = observation.state_document.clone().unwrap_or(current);
             pool.observe_outputs(&observation.outputs);
             out.push(data_sample(&action, &before, &observation));
         }
         Ok((setup_sample, out))
     };
+
+    // Target-only contrasts are necessary to distinguish preservation from an
+    // assignment when a context action happens to leave the field at the same
+    // value the target would assign.
+    if setup_name.is_some() {
+        for target_action in &action_names {
+            let (setup, sample) = run_sequence(&[], target_action, &mut pool)?;
+            if setup_sample.is_none() {
+                setup_sample = setup;
+            }
+            samples.extend(sample);
+        }
+    }
 
     let mut pairs = 0usize;
     'outer: for context in &action_names {
@@ -478,16 +645,19 @@ fn collect_counterfactual_samples(
                 continue;
             }
             let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             if !reset.succeeded {
                 continue;
             }
             let baseline = target.observe().map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             let before = baseline.state_document.clone().unwrap_or_default();
             let action = ActionInstance {
                 action: entry.action.clone(),
                 params,
             };
             let observation = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             samples.push(data_sample(&action, &before, &observation));
         }
     }
@@ -525,10 +695,12 @@ fn collect_counterfactual_samples(
         let probe_param = string_params[0];
         for text in ["", "a", "ab", "abc", "abcd", "abcde"] {
             let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             if !reset.succeeded {
                 break 'string_probes;
             }
             let baseline = target.observe().map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             let before = baseline.state_document.clone().unwrap_or_default();
             let mut params = IndexMap::new();
             for (name, source) in &entry.params {
@@ -550,6 +722,7 @@ fn collect_counterfactual_samples(
                 params,
             };
             let observation = target.perform(&action).map_err(|e| anyhow::anyhow!(e))?;
+            interactions += 1;
             samples.push(data_sample(&action, &before, &observation));
             string_probes += 1;
             if string_probes >= 24 {
@@ -574,7 +747,7 @@ fn collect_counterfactual_samples(
         ))
     });
     let _ = std::fs::remove_dir_all(&workdir);
-    Ok(samples)
+    Ok((samples, interactions))
 }
 
 fn json_contains_string(value: &serde_json::Value, needle: &str) -> bool {
@@ -759,7 +932,7 @@ fn main() -> Result<()> {
                                     &record.initial_class,
                                     &TwinSynthConfig::default(),
                                 );
-                                let probes =
+                                let (probes, counterfactual_interactions) =
                                     collect_counterfactual_samples(&root, &app.spec, &record)
                                         .unwrap_or_default();
                                 let data = synthesize_data_program_with_samples(&record, &probes);
@@ -771,6 +944,7 @@ fn main() -> Result<()> {
                                     twin,
                                     data,
                                     counterfactual_samples: probes.len(),
+                                    counterfactual_interactions,
                                     hidden_programs: programs,
                                     hidden_workflows: workflows,
                                 });
@@ -899,6 +1073,7 @@ fn main() -> Result<()> {
                 "ledger": data_report.ledger,
                 "notes": data_report.notes,
                 "counterfactual_samples": run.counterfactual_samples,
+                "counterfactual_interactions": run.counterfactual_interactions,
                 "program": run.data,
             },
         }));

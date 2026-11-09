@@ -1,0 +1,10 @@
+{
+  "suite": "reforgebench-causal-holdout",
+  "description": "Frozen one-shot holdout for lazy initialization, preservation across rejection after mutation, quota errors and selection side effects.",
+  "apps": [
+    {
+      "spec": "fixtures/v08/cli-kiln/target.json",
+      "split": "holdout"
+    }
+  ]
+}

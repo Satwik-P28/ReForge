@@ -178,7 +178,22 @@ fn observable_outputs(observation: &Observation) -> BTreeMap<String, Value> {
 }
 
 fn events(observation: &Observation) -> Vec<String> {
-    match observation.outputs.get("events") {
+    // `events_emitted` is the explicit action-event channel. When the persisted
+    // state itself has an `events` field, an envelope `events` key is a state
+    // log and must not be compared as an emission.
+    let value = observation.outputs.get("events_emitted").or_else(|| {
+        let state_events = observation
+            .state_document
+            .as_ref()
+            .and_then(|state| state.get("events"))
+            .is_some();
+        if state_events {
+            None
+        } else {
+            observation.outputs.get("events")
+        }
+    });
+    match value {
         Some(TypedValue::List(items)) => items
             .iter()
             .filter_map(|item| item.as_str().map(str::to_string))

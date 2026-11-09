@@ -1,0 +1,17 @@
+{
+  "target_id": "cli-kiln",
+  "target_name": "kiln",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/kiln.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v08-work-kiln",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "make", "argv": ["make", "$name"], "params": { "name": { "kind": "fresh_id", "prefix": "piece" } } },
+    { "action": "fire", "argv": ["fire", "$piece_id"], "params": { "piece_id": { "kind": "last_entity", "pool": "piece" } } },
+    { "action": "remove", "argv": ["remove", "$piece_id"], "params": { "piece_id": { "kind": "last_entity", "pool": "piece" } } },
+    { "action": "status", "argv": ["status"] }
+  ]
+}

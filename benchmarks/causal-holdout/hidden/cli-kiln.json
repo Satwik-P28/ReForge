@@ -1,0 +1,38 @@
+{
+  "app": "cli-kiln",
+  "workflows": [
+    {
+      "name": "fire-already-fired-remove",
+      "steps": [
+        { "action": "make", "params": { "name": "oak" } },
+        { "action": "fire", "params": { "piece_id": "k41" } },
+        { "action": "fire", "params": { "piece_id": "k41" } },
+        { "action": "remove", "params": { "piece_id": "k41" } },
+        { "action": "status", "params": {} }
+      ]
+    },
+    {
+      "name": "missing-then-progress",
+      "steps": [
+        { "action": "fire", "params": { "piece_id": "k99" } },
+        { "action": "make", "params": { "name": "pine" } },
+        { "action": "fire", "params": { "piece_id": "k41" } },
+        { "action": "fire", "params": { "piece_id": "k41" } },
+        { "action": "status", "params": {} }
+      ]
+    },
+    {
+      "name": "initial-status-and-quota",
+      "steps": [
+        { "action": "status", "params": {} },
+        { "action": "make", "params": { "name": "ash" } },
+        { "action": "make", "params": { "name": "birch" } },
+        { "action": "fire", "params": { "piece_id": "k41" } },
+        { "action": "fire", "params": { "piece_id": "k42" } },
+        { "action": "make", "params": { "name": "cedar" } },
+        { "action": "fire", "params": { "piece_id": "k43" } },
+        { "action": "status", "params": {} }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,7 @@
 //! If no guard separates a rejection from successful observations, no error
 //! rule is emitted: the condition stays explicitly unknown.
 
+use crate::causal::{EvidenceKind, EvidenceSource, ObservationProvenance};
 use crate::relational::{
     classify_parameter, infer_output_semantics, CmpOp, ExecutionSemantics, ExecutionTrace,
     OutputObservation, OutputSnapshot, ParameterStateKind, Stage, StageRecord, TypedPredicate,
@@ -631,6 +632,12 @@ pub struct DataSample {
     /// `observed` or `counterfactual`.
     #[serde(default = "observed_origin")]
     pub origin: String,
+    /// Whether this record is baseline or transition evidence.
+    #[serde(default)]
+    pub evidence: EvidenceKind,
+    /// Typed observation identity, reset epoch and reset verification.
+    #[serde(default)]
+    pub provenance: ObservationProvenance,
 }
 
 fn observed_origin() -> String {
@@ -651,6 +658,17 @@ struct Sample {
     outputs: BTreeMap<String, Value>,
     step: u64,
     origin: String,
+    evidence: EvidenceKind,
+    provenance: ObservationProvenance,
+    /// Logical pre-state substituted only for a verified reset whose persisted
+    /// document was absent. Raw `before` remains the adapter-observed value.
+    inference_before: Option<Value>,
+}
+
+impl Sample {
+    fn evidence_before(&self) -> &Value {
+        self.inference_before.as_ref().unwrap_or(&self.before)
+    }
 }
 
 impl From<DataSample> for Sample {
@@ -668,6 +686,9 @@ impl From<DataSample> for Sample {
             outputs: sample.outputs,
             step: sample.step,
             origin: sample.origin,
+            evidence: sample.evidence,
+            provenance: sample.provenance,
+            inference_before: None,
         }
     }
 }
@@ -821,7 +842,7 @@ pub fn synthesize_data_program_with_samples(
             samples.push(sample);
         }
     }
-    let observed_initial = record
+    let fallback_initial = record
         .steps
         .first()
         .and_then(|step| step.state_before.clone())
@@ -835,13 +856,59 @@ pub fn synthesize_data_program_with_samples(
         })
         .unwrap_or_else(|| json!({}));
 
+    // Baseline evidence is kept separate from transition evidence. A post-reset
+    // capture with no persisted document is not an empty logical state, and a
+    // post-action snapshot is never promoted to a baseline by this selection.
+    let baseline_inputs: Vec<(Value, ObservationProvenance)> = samples
+        .iter()
+        .filter(|sample| sample.evidence == EvidenceKind::InitialState)
+        .map(|sample| (sample.after.clone(), sample.provenance.clone()))
+        .collect();
+    let selected_baseline = crate::causal::select_baseline(&baseline_inputs);
+    let (observed_initial, baseline_note) = match &selected_baseline {
+        Some((state, provenance, resets)) => (
+            state.clone(),
+            format!(
+                "initial state selected from {:?} evidence across {} independent reset(s); reset_verified={}",
+                provenance.source, resets, provenance.reset_verified
+            ),
+        ),
+        None => (
+            fallback_initial,
+            "no verified baseline capture was available; initial state remains a constrained fallback"
+                .into(),
+        ),
+    };
+
+    if let Some((baseline, _, _)) = &selected_baseline {
+        for sample in samples.iter_mut() {
+            if sample.evidence == EvidenceKind::Transition
+                && sample.provenance.reset_verified
+                && sample
+                    .before
+                    .as_object()
+                    .map(|object| object.is_empty())
+                    .unwrap_or(true)
+            {
+                sample.inference_before = Some(baseline.clone());
+            }
+        }
+    }
+
     let mut snapshots: Vec<Value> = vec![observed_initial.clone()];
     for sample in &samples {
-        snapshots.push(sample.before.clone());
+        snapshots.push(sample.evidence_before().clone());
         snapshots.push(sample.after.clone());
     }
     let mut state_schema = infer_state_schema(&snapshots);
-    let mut initial_state = materialize_initial_state(observed_initial, &state_schema, &samples);
+    let mut initial_state =
+        materialize_initial_state(observed_initial.clone(), &state_schema, &samples);
+    if selected_baseline.is_some() {
+        // A verified capture is authoritative for presence, null, zero, false,
+        // empty collections, nested configuration and allocator state. Do not
+        // fill fields from unrelated post-action observations.
+        initial_state = observed_initial;
+    }
     snapshots[0] = initial_state.clone();
     state_schema.record_initial(&initial_state);
     let collections = detect_collections_with_samples(&snapshots, &samples);
@@ -849,7 +916,11 @@ pub fn synthesize_data_program_with_samples(
 
     let mut rules: Vec<DataRule> = Vec::new();
     let mut unsupported = Vec::new();
-    let actions: BTreeSet<String> = samples.iter().map(|sample| sample.action.clone()).collect();
+    let actions: BTreeSet<String> = samples
+        .iter()
+        .filter(|sample| sample.evidence == EvidenceKind::Transition)
+        .map(|sample| sample.action.clone())
+        .collect();
 
     for action in actions {
         let all: Vec<Sample> = samples
@@ -948,8 +1019,24 @@ pub fn synthesize_data_program_with_samples(
             // permissive candidate inferred from the action's spelling.
             let (tentative_effects, _, _) = select_effects(&successes, &[], &derived, &collections);
             let success_guards = implicit_effect_guards(&tentative_effects);
-            let (effects, reproduced, effect_alternatives) =
+            let (mut effects, mut reproduced, effect_alternatives) =
                 select_effects(&successes, &success_guards, &derived, &collections);
+            let reconciled = reconcile_constant_postconditions(&successes, &effects, &collections);
+            if reconciled != effects {
+                let reconciled_matches: Vec<bool> = successes
+                    .iter()
+                    .map(|sample| {
+                        guards_match(&success_guards, sample)
+                            && reproduces(sample, &reconciled, &derived, &collections)
+                    })
+                    .collect();
+                if reconciled_matches.iter().filter(|value| **value).count()
+                    >= reproduced.iter().filter(|value| **value).count()
+                {
+                    effects = reconciled;
+                    reproduced = reconciled_matches;
+                }
+            }
             let provenance = rule_provenance(RuleProvenanceInput {
                 branch: &successes,
                 guards: &success_guards,
@@ -986,7 +1073,9 @@ pub fn synthesize_data_program_with_samples(
     // observation of that rule; unresolved keys keep their local evidence.
     let all_successes: Vec<Sample> = samples
         .iter()
-        .filter(|sample| sample.outcome == OutcomeKind::Success)
+        .filter(|sample| {
+            sample.evidence == EvidenceKind::Transition && sample.outcome == OutcomeKind::Success
+        })
         .cloned()
         .collect();
     if all_successes.len() > 1 {
@@ -1148,6 +1237,7 @@ pub fn synthesize_data_program_with_samples(
         rules,
         unsupported,
         notes: vec![
+            baseline_note,
             "Guards and effects are selected from observations and checked against every observation of the same branch; insufficient evidence leaves conditions unknown.".into(),
             "Every rule carries provenance: supporting and contradictory observations, competing guard/effect hypotheses, and state-update identifiability claims.".into(),
             "Positive-only properties are recorded as candidate necessary conditions, not treated as proof of sufficiency.".into(),
@@ -1709,6 +1799,20 @@ fn samples(record: &InvestigationRecord) -> Vec<Sample> {
             .get("created_pool")
             .and_then(|value| value.as_str())
             .map(str::to_string);
+        // An explicit `events_emitted` channel is action-event evidence. When
+        // the persisted state itself contains an `events` field, the envelope's
+        // `events` key is a state log, not this action's emission list.
+        let events = if let Some(Value::Array(items)) = outputs.get("events_emitted") {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        } else if after.get("events").is_some() {
+            Vec::new()
+        } else {
+            step.events.clone()
+        };
         out.push(Sample {
             action: step.action.clone(),
             params,
@@ -1716,12 +1820,69 @@ fn samples(record: &InvestigationRecord) -> Vec<Sample> {
             after: after.clone(),
             outcome: step.outcome,
             error: step.error_code.clone(),
-            events: step.events.clone(),
+            events,
             created_id,
             created_pool,
             outputs,
             step: step.index,
             origin: "observed".into(),
+            evidence: EvidenceKind::Transition,
+            provenance: ObservationProvenance {
+                observation_id: observation.id.to_string(),
+                experiment_id: format!("investigation:{}", record.seed),
+                reset_epoch: step.episode,
+                sequence_index: step.index as u32,
+                sequence_length: 1,
+                pre_state_observed: step.state_before.is_some(),
+                reset_verified: record.reset.verified,
+                document_present: step.state_before.is_some(),
+                source: EvidenceSource::Observed,
+            },
+            inference_before: None,
+        });
+    }
+
+    // A baseline capture is evidence only for the initial state. It is appended
+    // separately from action observations so it can never acquire an action rule
+    // or be counted as an independent transition.
+    for observation in record
+        .log
+        .observations
+        .iter()
+        .filter(|observation| observation.baseline)
+    {
+        let Some(state) = observation.state_document.clone() else {
+            continue;
+        };
+        if !state.is_object() {
+            continue;
+        }
+        out.push(Sample {
+            action: String::new(),
+            params: BTreeMap::new(),
+            before: state.clone(),
+            after: state,
+            outcome: OutcomeKind::Success,
+            error: None,
+            events: Vec::new(),
+            created_id: None,
+            created_pool: None,
+            outputs: BTreeMap::new(),
+            step: observation.step_index,
+            origin: "observed".into(),
+            evidence: EvidenceKind::InitialState,
+            provenance: ObservationProvenance {
+                observation_id: observation.id.to_string(),
+                experiment_id: "recorded-baseline".into(),
+                reset_epoch: observation.step_index,
+                sequence_index: 0,
+                sequence_length: 1,
+                pre_state_observed: true,
+                reset_verified: observation.reset.succeeded,
+                document_present: true,
+                source: EvidenceSource::ResetCapture,
+            },
+            inference_before: None,
         });
     }
     out
@@ -2571,7 +2732,12 @@ fn select_error_guard_hypotheses(
     all: &[Sample],
     code: &str,
 ) -> Vec<Vec<Guard>> {
-    let separates = |indices: &[usize]| -> bool {
+    // A guard that separates this rejection from successes but also matches a
+    // different rejection is not a discriminator between error rules; whichever
+    // rule happens to be sorted first would steal the branch. Prefer guard sets
+    // that exclude other rejection codes, and fall back to the weaker property
+    // only when the evidence cannot distinguish them.
+    let separates = |indices: &[usize], exclusive: bool| -> bool {
         let mut branch_count = 0usize;
         for (index, sample) in all.iter().enumerate() {
             let truth = indices
@@ -2580,6 +2746,8 @@ fn select_error_guard_hypotheses(
             let in_branch =
                 sample.outcome != OutcomeKind::Success && sample.error.as_deref() == Some(code);
             let success = sample.outcome == OutcomeKind::Success;
+            let other_rejection =
+                sample.outcome != OutcomeKind::Success && sample.error.as_deref() != Some(code);
             if in_branch {
                 branch_count += 1;
                 if !truth {
@@ -2589,28 +2757,78 @@ fn select_error_guard_hypotheses(
             if success && truth {
                 return false;
             }
+            if exclusive && other_rejection && truth {
+                return false;
+            }
         }
         branch_count > 0
     };
 
-    let mut singles: Vec<usize> = (0..candidates.len())
-        .filter(|index| separates(&[*index]))
-        .collect();
-    singles.sort_by(|a, b| {
-        candidates[*b]
-            .affinity
-            .cmp(&candidates[*a].affinity)
-            .then_with(|| {
-                let a_true = candidates[*a].truth.iter().filter(|v| **v).count();
-                let b_true = candidates[*b].truth.iter().filter(|v| **v).count();
-                a_true.cmp(&b_true)
-            })
-            .then_with(|| a.cmp(b))
-    });
+    let ranked = |indices: Vec<usize>| -> Vec<usize> {
+        let mut indices = indices;
+        indices.sort_by(|a, b| {
+            candidates[*b]
+                .affinity
+                .cmp(&candidates[*a].affinity)
+                .then_with(|| {
+                    let a_true = candidates[*a].truth.iter().filter(|v| **v).count();
+                    let b_true = candidates[*b].truth.iter().filter(|v| **v).count();
+                    a_true.cmp(&b_true)
+                })
+                .then_with(|| a.cmp(b))
+        });
+        indices
+    };
 
+    let singles = ranked(
+        (0..candidates.len())
+            .filter(|index| separates(&[*index], true))
+            .collect(),
+    );
     let mut hypotheses: Vec<Vec<Guard>> = Vec::new();
     for index in singles.iter().take(4) {
         hypotheses.push(vec![candidates[*index].guard.clone()]);
+    }
+
+    let mut exclusive_pairs = Vec::new();
+    if hypotheses.is_empty() {
+        let mut useful: Vec<usize> = (0..candidates.len())
+            .filter(|index| candidates[*index].truth.iter().any(|value| *value))
+            .collect();
+        useful.sort_by(|a, b| {
+            candidates[*b]
+                .affinity
+                .cmp(&candidates[*a].affinity)
+                .then_with(|| a.cmp(b))
+        });
+        useful.truncate(80);
+        'exclusive_pairs: for (position, left) in useful.iter().enumerate() {
+            for right in useful.iter().skip(position + 1) {
+                if separates(&[*left, *right], true) {
+                    exclusive_pairs.push(vec![
+                        candidates[*left].guard.clone(),
+                        candidates[*right].guard.clone(),
+                    ]);
+                    if exclusive_pairs.len() >= 4 {
+                        break 'exclusive_pairs;
+                    }
+                }
+            }
+        }
+    }
+    if !exclusive_pairs.is_empty() {
+        hypotheses = exclusive_pairs;
+    }
+
+    if hypotheses.is_empty() {
+        let singles = ranked(
+            (0..candidates.len())
+                .filter(|index| separates(&[*index], false))
+                .collect(),
+        );
+        for index in singles.iter().take(4) {
+            hypotheses.push(vec![candidates[*index].guard.clone()]);
+        }
     }
 
     if hypotheses.is_empty() {
@@ -2626,7 +2844,7 @@ fn select_error_guard_hypotheses(
         useful.truncate(80);
         'pairs: for (position, left) in useful.iter().enumerate() {
             for right in useful.iter().skip(position + 1) {
-                if separates(&[*left, *right]) {
+                if separates(&[*left, *right], false) {
                     hypotheses.push(vec![
                         candidates[*left].guard.clone(),
                         candidates[*right].guard.clone(),
@@ -2949,6 +3167,19 @@ fn records(state: &Value, collection: &Collection) -> Vec<(String, Map<String, V
 }
 
 fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
+    // Only verified reset samples receive an inference-time logical baseline.
+    // The raw `before` document remains untouched and is still used by output
+    // checks and provenance reports.
+    let effective;
+    let sample = if sample.inference_before.is_some() {
+        effective = Sample {
+            before: sample.evidence_before().clone(),
+            ..sample.clone()
+        };
+        &effective
+    } else {
+        sample
+    };
     let mut effects = Vec::new();
     let mut handled: BTreeSet<String> = BTreeSet::new();
     let created = sample.created_id.as_deref();
@@ -3527,7 +3758,7 @@ fn prune_untested_state_effects(effects: Vec<Effect>, branch: &[Sample]) -> Vec<
         .filter(|effect| match effect {
             Effect::SetState { field, .. } | Effect::IncrementState { field, .. } => branch
                 .iter()
-                .any(|sample| sample.before.get(field) != sample.after.get(field)),
+                .any(|sample| sample.evidence_before().get(field) != sample.after.get(field)),
             _ => true,
         })
         .collect()
@@ -3590,6 +3821,70 @@ fn select_effects(
 /// transition template. This adds such a condition only when one predicate over
 /// the pre-update record explains every changed sample and every preserved
 /// sample in the branch.
+/// A rule template is selected from one observation, so a global field that is
+/// assigned on every successful transition can be missing when that template
+/// happened to start with the target value. Add a field update only when the
+/// entire successful branch has the same post-value and at least one observed
+/// effective pre-value differs. This is assignment evidence, not preservation:
+/// the branch-level contrast is what identifies it.
+fn reconcile_constant_postconditions(
+    branch: &[Sample],
+    effects: &[Effect],
+    collections: &[Collection],
+) -> Vec<Effect> {
+    let mut out = effects.to_vec();
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+    for sample in branch {
+        if let Some(object) = sample.after.as_object() {
+            keys.extend(object.keys().cloned());
+        }
+    }
+    for key in keys {
+        if collections.iter().any(|collection| collection.name == key) || looks_derived(&key) {
+            continue;
+        }
+        if out.iter().any(|effect| {
+            matches!(
+                effect,
+                Effect::SetState { field, .. }
+                    | Effect::IncrementState { field, .. }
+                    | Effect::SetMapField { field, .. }
+                    | Effect::ClearMap { field }
+                    | Effect::AppendScalar { field, .. }
+                    | Effect::AppendItem { field, .. }
+                    | Effect::RemoveScalar { field, .. }
+                    | Effect::AppendSnapshot { field, .. }
+                    if field == &key
+            )
+        }) {
+            continue;
+        }
+        let Some(first) = branch
+            .iter()
+            .find_map(|sample| sample.after.get(&key).cloned())
+        else {
+            continue;
+        };
+        if !branch
+            .iter()
+            .all(|sample| sample.after.get(&key) == Some(&first))
+        {
+            continue;
+        }
+        if !branch
+            .iter()
+            .any(|sample| sample.evidence_before().get(&key) != Some(&first))
+        {
+            continue;
+        }
+        out.push(Effect::SetState {
+            field: key,
+            value: value_expr(&first, &branch[0], branch[0].created_id.as_deref()),
+        });
+    }
+    out
+}
+
 fn refine_conditional_updates(
     branch: &[Sample],
     effects: &[Effect],
@@ -3834,7 +4129,11 @@ fn state_update_claims(effects: &[Effect], branch: &[Sample]) -> Vec<StateUpdate
         let mut before = Vec::new();
         let mut after = Vec::new();
         for sample in branch {
-            let previous = sample.before.get(&field).cloned().unwrap_or(Value::Null);
+            let previous = sample
+                .evidence_before()
+                .get(&field)
+                .cloned()
+                .unwrap_or(Value::Null);
             let next = sample.after.get(&field).cloned().unwrap_or(Value::Null);
             if !before.contains(&previous) {
                 before.push(previous);
@@ -3845,7 +4144,7 @@ fn state_update_claims(effects: &[Effect], branch: &[Sample]) -> Vec<StateUpdate
         }
         let changed = branch
             .iter()
-            .any(|sample| sample.before.get(&field) != sample.after.get(&field));
+            .any(|sample| sample.evidence_before().get(&field) != sample.after.get(&field));
         let after_constant = after.len() <= 1;
         let status = if before.is_empty() {
             "unobserved"
@@ -5446,6 +5745,16 @@ fn reproduces(
     derived: &[Derived],
     collections: &[Collection],
 ) -> bool {
+    let effective;
+    let sample = if sample.inference_before.is_some() {
+        effective = Sample {
+            before: sample.evidence_before().clone(),
+            ..sample.clone()
+        };
+        &effective
+    } else {
+        sample
+    };
     let mut state = sample.before.clone();
     let mut created = None;
     for effect in effects {
@@ -5981,6 +6290,9 @@ mod tests {
             outputs: BTreeMap::new(),
             step: 0,
             origin: "counterfactual".into(),
+            evidence: EvidenceKind::Transition,
+            provenance: ObservationProvenance::counterfactual("test", 0),
+            inference_before: None,
         }
     }
 
@@ -6721,6 +7033,170 @@ mod tests {
             "expected capacity - used, got {:?}",
             outputs.get("remaining")
         );
+    }
+
+    #[test]
+    fn reset_rejection_uses_baseline_delta_not_absolute_post_state() {
+        let baseline = json!({
+            "view": "list", "plots": {}, "next_id": 1, "selected": null,
+            "rejects": 0, "waterings": 0, "harvests": 0
+        });
+        let after = json!({
+            "view": "list", "plots": {}, "next_id": 1, "selected": null,
+            "rejects": 1, "waterings": 0, "harvests": 0
+        });
+        let mut rejected = sample(
+            "water",
+            &[("plot_id", json!("missing"))],
+            json!({}),
+            after,
+            OutcomeKind::Rejected,
+            Some("no_such_plot"),
+        );
+        rejected.inference_before = Some(baseline);
+        rejected.provenance.reset_verified = true;
+        let effects = infer_effects(&rejected, &[]);
+        assert_eq!(effects.len(), 1, "unexpected effects: {effects:?}");
+        assert!(matches!(
+            &effects[0],
+            Effect::IncrementState { field, by: ValueExpr::Literal { value } }
+                if field == "rejects" && value == &json!(1)
+        ));
+        assert!(!effects.iter().any(|effect| matches!(
+            effect,
+            Effect::SetState { field, .. } if field == "view" || field == "next_id"
+        )));
+    }
+
+    #[test]
+    fn rejection_with_no_state_change_has_no_state_effect() {
+        let state =
+            json!({"accounts": {"a1": {"status": "closed", "balance": 0}}, "view": "detail"});
+        let rejected = sample(
+            "deposit",
+            &[("account_id", json!("a1"))],
+            state.clone(),
+            state,
+            OutcomeKind::Rejected,
+            Some("account_closed"),
+        );
+        let collections = detect_collections(std::slice::from_ref(&rejected.before));
+        let effects = infer_effects(&rejected, &collections);
+        assert!(effects.is_empty(), "unexpected effects: {effects:?}");
+    }
+
+    #[test]
+    fn guard_selection_excludes_a_different_rejection_code() {
+        let closed = json!({
+            "accounts": {"a1": {"status": "closed", "balance": 0}},
+            "view": "list"
+        });
+        let open_zero = json!({
+            "accounts": {"a1": {"status": "open", "balance": 0}},
+            "view": "list"
+        });
+        let open_funds = json!({
+            "accounts": {"a1": {"status": "open", "balance": 10}},
+            "view": "list"
+        });
+        let closed_reject = sample(
+            "withdraw",
+            &[("account_id", json!("a1"))],
+            closed,
+            open_zero.clone(),
+            OutcomeKind::Rejected,
+            Some("account_closed"),
+        );
+        let funds_reject = sample(
+            "withdraw",
+            &[("account_id", json!("a1"))],
+            open_zero.clone(),
+            open_zero,
+            OutcomeKind::Rejected,
+            Some("insufficient_funds"),
+        );
+        let success = sample(
+            "withdraw",
+            &[("account_id", json!("a1"))],
+            open_funds.clone(),
+            open_funds,
+            OutcomeKind::Success,
+            None,
+        );
+        let all = vec![closed_reject, funds_reject, success];
+        let collections = detect_collections(&[all[0].before.clone()]);
+        let candidates = guard_candidates(&all, &collections);
+        let guards = select_error_guards(&candidates, &all, "insufficient_funds")
+            .expect("insufficient-funds guard");
+        assert!(
+            guards.iter().any(|guard| matches!(
+                guard,
+                Guard::EntityFieldCmp { field, op: CmpOp::Eq, value, .. }
+                    if field == "status" && value == &json!("open")
+            ) || matches!(
+                guard,
+                Guard::EntityFieldCmp { field, op: CmpOp::Ne, value, .. }
+                    if field == "status" && value == &json!("closed")
+            )),
+            "expected an open-status discriminator, got {guards:?}"
+        );
+    }
+
+    #[test]
+    fn success_branch_reconciles_constant_selected_and_view() {
+        let collections = vec![Collection {
+            name: "accounts".into(),
+            layout: CollectionLayout::Map,
+            id_field: String::new(),
+        }];
+        let first_before = json!({
+            "accounts": {"a1": {"status": "open", "balance": 2}},
+            "selected": null, "view": "list"
+        });
+        let second_before = json!({
+            "accounts": {"a1": {"status": "open", "balance": 2}},
+            "selected": "a1", "view": "detail"
+        });
+        let after = json!({
+            "accounts": {"a1": {"status": "open", "balance": 1}},
+            "selected": "a1", "view": "detail"
+        });
+        let first = sample(
+            "withdraw",
+            &[("account_id", json!("a1"))],
+            first_before,
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        let second = sample(
+            "withdraw",
+            &[("account_id", json!("a1"))],
+            second_before,
+            after,
+            OutcomeKind::Success,
+            None,
+        );
+        let effects = vec![Effect::UpdateEntity {
+            collection: "accounts".into(),
+            entity: EntityRef::Param("account_id".into()),
+            fields: vec![FieldUpdate::Increment {
+                field: "balance".into(),
+                by: ValueExpr::Literal { value: json!(-1) },
+            }],
+        }];
+        let reconciled =
+            reconcile_constant_postconditions(&[first, second], &effects, &collections);
+        assert!(reconciled.iter().any(|effect| matches!(
+            effect,
+            Effect::SetState { field, value: ValueExpr::Param { name } }
+                if field == "selected" && name == "account_id"
+        )));
+        assert!(reconciled.iter().any(|effect| matches!(
+            effect,
+            Effect::SetState { field, value: ValueExpr::Literal { value } }
+                if field == "view" && value == &json!("detail")
+        )));
     }
 
     #[test]
