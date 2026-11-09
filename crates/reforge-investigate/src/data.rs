@@ -519,6 +519,27 @@ pub enum Derived {
         collection: String,
         source: String,
     },
+    /// Grouped sum of a numeric field in a nested object list. The observable
+    /// field is an object keyed by the grouping field, with one sum per key.
+    NestedGroupSum {
+        field: String,
+        collection: String,
+        list_field: String,
+        key_field: String,
+        value_field: String,
+        scale: i64,
+    },
+    /// Sum of a numeric field in a nested object list, restricted by a string
+    /// prefix and optionally negated.
+    NestedSum {
+        field: String,
+        collection: String,
+        list_field: String,
+        value_field: String,
+        filter_field: String,
+        filter_prefix: String,
+        scale: i64,
+    },
     Sum {
         field: String,
         collection: String,
@@ -1213,12 +1234,9 @@ pub fn synthesize_data_program_with_samples(
         });
     for rule in rules.iter_mut() {
         for (key, expression) in &schema {
-            match rule.outputs.get(key) {
-                Some(existing) => {
-                    let merged = merge_output_expression(existing, expression);
-                    rule.outputs.insert(key.clone(), merged);
-                }
-                None => {}
+            if let Some(existing) = rule.outputs.get(key) {
+                let merged = merge_output_expression(existing, expression);
+                rule.outputs.insert(key.clone(), merged);
             }
         }
     }
@@ -2199,6 +2217,9 @@ fn list_identity_score(
         let distinct: BTreeSet<&String> = values.iter().collect();
         if values.len() == items.len() && distinct.len() == values.len() {
             unique_occurrences += 1;
+            if values.iter().all(|value| value.parse::<i64>().is_ok()) {
+                score += 80;
+            }
         }
     }
     score += unique_occurrences.min(20);
@@ -5835,7 +5856,10 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
     for state in snapshots {
         if let Some(object) = state.as_object() {
             for (field, value) in object {
-                if value.is_i64() && !field.starts_with("next_") && field != "selected" {
+                if (value.is_i64() || value.is_f64())
+                    && !field.starts_with("next_")
+                    && field != "selected"
+                {
                     numeric_fields.insert(field.clone());
                 }
             }
@@ -5846,17 +5870,19 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
         if out.iter().any(|derived| match derived {
             Derived::Count { field: name, .. }
             | Derived::CountPresent { field: name, .. }
+            | Derived::NestedSum { field: name, .. }
+            | Derived::NestedGroupSum { field: name, .. }
             | Derived::Sum { field: name, .. }
             | Derived::CountWhere { field: name, .. } => name == &field,
         }) {
             continue;
         }
-        let observations: Vec<(&Value, i64)> = snapshots
+        let observations: Vec<(&Value, f64)> = snapshots
             .iter()
             .filter_map(|state| {
                 state
                     .get(&field)
-                    .and_then(Value::as_i64)
+                    .and_then(Value::as_f64)
                     .map(|value| (state, value))
             })
             .collect();
@@ -5867,12 +5893,11 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
         let mut best: Option<(i32, Derived)> = None;
 
         for collection in collections {
-            if observations
+            if observations.iter().all(|(state, value)| {
+                (*value - collection_size(state, collection) as f64).abs() < 1e-9
+            }) && observations
                 .iter()
-                .all(|(state, value)| *value as usize == collection_size(state, collection))
-                && observations
-                    .iter()
-                    .any(|(state, _)| collection_size(state, collection) > 0)
+                .any(|(state, _)| collection_size(state, collection) > 0)
             {
                 let score = if lower.contains("count") { 3 } else { 1 };
                 if best
@@ -5902,13 +5927,15 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             }
             for source in present_sources {
                 if observations.iter().all(|(state, value)| {
-                    *value
-                        == records(state, collection)
+                    (*value
+                        - records(state, collection)
                             .iter()
                             .filter(|(_, record)| {
                                 record.get(&source).is_some_and(|value| !value.is_null())
                             })
-                            .count() as i64
+                            .count() as f64)
+                        .abs()
+                        < 1e-9
                 }) && observations.iter().any(|(state, _)| {
                     records(state, collection).iter().any(|(_, record)| {
                         record.get(&source).is_some_and(|value| !value.is_null())
@@ -5951,11 +5978,13 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             }
             for source in numeric_sources {
                 if observations.iter().all(|(state, value)| {
-                    *value
-                        == records(state, collection)
+                    (*value
+                        - records(state, collection)
                             .iter()
                             .filter_map(|(_, record)| record.get(&source).and_then(Value::as_i64))
-                            .sum::<i64>()
+                            .sum::<i64>() as f64)
+                        .abs()
+                        < 1e-9
                 }) && observations.iter().any(|(state, _)| {
                     records(state, collection)
                         .iter()
@@ -5983,6 +6012,113 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
                 }
             }
 
+            let mut nested_candidates: BTreeSet<(String, String, String)> = BTreeSet::new();
+            for (state, _) in &observations {
+                for (_, record) in records(state, collection) {
+                    for (list_field, value) in &record {
+                        let Some(items) = value.as_array() else {
+                            continue;
+                        };
+                        for item in items.iter().filter_map(Value::as_object) {
+                            let mut numeric = BTreeSet::new();
+                            let mut textual = BTreeSet::new();
+                            for (name, value) in item {
+                                if value.as_i64().is_some() || value.as_f64().is_some() {
+                                    numeric.insert(name.clone());
+                                } else if value.is_string() {
+                                    textual.insert(name.clone());
+                                }
+                            }
+                            for value_field in &numeric {
+                                for filter_field in &textual {
+                                    nested_candidates.insert((
+                                        list_field.clone(),
+                                        value_field.clone(),
+                                        filter_field.clone(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (list_field, value_field, filter_field) in nested_candidates {
+                let mut prefixes: BTreeSet<String> = BTreeSet::new();
+                for (state, _) in &observations {
+                    for (_, record) in records(state, collection) {
+                        let Some(items) = record.get(&list_field).and_then(Value::as_array) else {
+                            continue;
+                        };
+                        for item in items.iter().filter_map(Value::as_object) {
+                            if let Some(text) = item.get(&filter_field).and_then(Value::as_str) {
+                                if let Some((prefix, _)) = text.split_once(':') {
+                                    prefixes.insert(format!("{prefix}:"));
+                                }
+                            }
+                        }
+                    }
+                }
+                for prefix in prefixes {
+                    for scale in [1i64, -1i64] {
+                        let matches = observations.iter().all(|(state, target)| {
+                            let total: f64 = records(state, collection)
+                                .iter()
+                                .filter_map(|(_, record)| record.get(&list_field))
+                                .filter_map(Value::as_array)
+                                .flatten()
+                                .filter_map(Value::as_object)
+                                .filter(|item| {
+                                    item.get(&filter_field)
+                                        .and_then(Value::as_str)
+                                        .is_some_and(|text| text.starts_with(&prefix))
+                                })
+                                .filter_map(|item| item.get(&value_field))
+                                .filter_map(|value| {
+                                    value.as_f64().or_else(|| value.as_i64().map(|v| v as f64))
+                                })
+                                .sum();
+                            (*target - total * scale as f64).abs() < 1e-9
+                        });
+                        if matches
+                            && observations.iter().any(|(state, _)| {
+                                records(state, collection).iter().any(|(_, record)| {
+                                    record
+                                        .get(&list_field)
+                                        .and_then(Value::as_array)
+                                        .is_some_and(|items| !items.is_empty())
+                                })
+                            })
+                        {
+                            let score = if lower.contains("total") {
+                                5
+                            } else if lower.contains(&prefix.to_ascii_lowercase()) {
+                                4
+                            } else {
+                                2
+                            };
+                            if best
+                                .as_ref()
+                                .map(|(current, _)| score > *current)
+                                .unwrap_or(true)
+                            {
+                                best = Some((
+                                    score,
+                                    Derived::NestedSum {
+                                        field: field.clone(),
+                                        collection: collection.name.clone(),
+                                        list_field: list_field.clone(),
+                                        value_field: value_field.clone(),
+                                        filter_field: filter_field.clone(),
+                                        filter_prefix: prefix.clone(),
+                                        scale,
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
             let mut filter_values: BTreeSet<String> = BTreeSet::new();
             for (state, _) in &observations {
                 for (_, record) in records(state, collection) {
@@ -5994,11 +6130,13 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             for value in filter_values {
                 let target = Value::String(value);
                 if observations.iter().all(|(state, count)| {
-                    *count as usize
-                        == records(state, collection)
+                    (*count
+                        - records(state, collection)
                             .iter()
                             .filter(|(_, record)| record.get("status") == Some(&target))
-                            .count()
+                            .count() as f64)
+                        .abs()
+                        < 1e-9
                 }) && observations.iter().any(|(state, _)| {
                     records(state, collection)
                         .iter()
@@ -6024,6 +6162,149 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             }
         }
 
+        if let Some((_, derived)) = best {
+            out.push(derived);
+        }
+    }
+
+    // Grouped aggregates over nested object lists: an observable object whose
+    // keys are values of a nested grouping field and whose values are sums of
+    // another nested numeric field. This is representation-independent and is
+    // inferred only when the complete observed map agrees in every snapshot.
+    let mut object_fields: BTreeSet<String> = BTreeSet::new();
+    for state in snapshots {
+        if let Some(object) = state.as_object() {
+            for (field, value) in object {
+                if value
+                    .as_object()
+                    .is_some_and(|map| !map.is_empty() && map.values().all(Value::is_number))
+                {
+                    object_fields.insert(field.clone());
+                }
+            }
+        }
+    }
+    for field in object_fields {
+        if out
+            .iter()
+            .any(|derived| matches!(derived, Derived::NestedGroupSum { field: name, .. } if name == &field))
+        {
+            continue;
+        }
+        let lower = field.to_ascii_lowercase();
+        let observations: Vec<(&Value, &Map<String, Value>)> = snapshots
+            .iter()
+            .filter_map(|state| {
+                state
+                    .get(&field)
+                    .and_then(Value::as_object)
+                    .map(|map| (state, map))
+            })
+            .collect();
+        if observations.is_empty() {
+            continue;
+        }
+        let mut best: Option<(i32, Derived)> = None;
+        for collection in collections {
+            let mut candidates: BTreeSet<(String, String, String)> = BTreeSet::new();
+            for (state, _) in &observations {
+                for (_, record) in records(state, collection) {
+                    for (list_field, value) in &record {
+                        let Some(items) = value.as_array() else {
+                            continue;
+                        };
+                        for item in items.iter().filter_map(Value::as_object) {
+                            let mut numeric = BTreeSet::new();
+                            let mut textual = BTreeSet::new();
+                            for (name, value) in item {
+                                if value.is_number() {
+                                    numeric.insert(name.clone());
+                                } else if value.is_string() {
+                                    textual.insert(name.clone());
+                                }
+                            }
+                            for value_field in &numeric {
+                                for key_field in &textual {
+                                    candidates.insert((
+                                        list_field.clone(),
+                                        key_field.clone(),
+                                        value_field.clone(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (list_field, key_field, value_field) in candidates {
+                for scale in [1i64, -1i64] {
+                    let matches = observations.iter().all(|(state, target)| {
+                        let mut groups: BTreeMap<String, f64> = BTreeMap::new();
+                        for (_, record) in records(state, collection) {
+                            let Some(items) = record.get(&list_field).and_then(Value::as_array)
+                            else {
+                                continue;
+                            };
+                            for item in items.iter().filter_map(Value::as_object) {
+                                let Some(key) = item.get(&key_field).and_then(Value::as_str) else {
+                                    continue;
+                                };
+                                let Some(value) = item.get(&value_field).and_then(|value| {
+                                    value.as_f64().or_else(|| value.as_i64().map(|v| v as f64))
+                                }) else {
+                                    continue;
+                                };
+                                *groups.entry(key.to_string()).or_default() += value;
+                            }
+                        }
+                        let target_keys: BTreeSet<&String> = target.keys().collect();
+                        let group_keys: BTreeSet<String> = groups
+                            .iter()
+                            .filter(|(_, value)| (**value * scale as f64).abs() > 1e-9)
+                            .map(|(key, _)| key.clone())
+                            .collect();
+                        if target_keys.len() != group_keys.len()
+                            || !target_keys.iter().all(|key| group_keys.contains(*key))
+                        {
+                            return false;
+                        }
+                        target.iter().all(|(key, value)| {
+                            let Some(actual) = groups.get(key) else {
+                                return false;
+                            };
+                            (value.as_f64().unwrap_or(f64::NAN) - actual * scale as f64).abs()
+                                < 1e-9
+                        })
+                    });
+                    if matches
+                        && observations.iter().any(|(_, target)| {
+                            target
+                                .values()
+                                .any(|value| value.as_f64().is_some_and(|v| v.abs() > 1e-9))
+                        })
+                    {
+                        let score = if lower.contains("balance") { 6 } else { 3 };
+                        if best
+                            .as_ref()
+                            .map(|(current, _)| score > *current)
+                            .unwrap_or(true)
+                        {
+                            best = Some((
+                                score,
+                                Derived::NestedGroupSum {
+                                    field: field.clone(),
+                                    collection: collection.name.clone(),
+                                    list_field: list_field.clone(),
+                                    key_field: key_field.clone(),
+                                    value_field: value_field.clone(),
+                                    scale,
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         if let Some((_, derived)) = best {
             out.push(derived);
         }
@@ -6431,7 +6712,7 @@ fn delete_record(state: &mut Value, collection: &Collection, id: &str) {
             {
                 items.retain(|item| {
                     item.get(&collection.id_field)
-                        .is_none_or(|value| !identity_matches(value, id))
+                        .map_or(true, |value| !identity_matches(value, id))
                 });
             }
         }
@@ -6552,6 +6833,73 @@ fn apply_derived(derived: &Derived, state: &mut Value, collections: &[Collection
         Derived::Count { field, collection } => {
             if let Some(definition) = collections.iter().find(|c| &c.name == collection) {
                 set_key(state, field, json!(collection_size(state, definition)));
+            }
+        }
+        Derived::NestedSum {
+            field,
+            collection,
+            list_field,
+            value_field,
+            filter_field,
+            filter_prefix,
+            scale,
+        } => {
+            if let Some(definition) = collections.iter().find(|c| &c.name == collection) {
+                let total: f64 = records(state, definition)
+                    .iter()
+                    .filter_map(|(_, record)| record.get(list_field))
+                    .filter_map(Value::as_array)
+                    .flatten()
+                    .filter_map(Value::as_object)
+                    .filter(|item| {
+                        item.get(filter_field)
+                            .and_then(Value::as_str)
+                            .is_some_and(|text| text.starts_with(filter_prefix))
+                    })
+                    .filter_map(|item| item.get(value_field))
+                    .filter_map(|value| value.as_f64().or_else(|| value.as_i64().map(|v| v as f64)))
+                    .sum();
+                let mut value = total * *scale as f64;
+                if value == 0.0 {
+                    value = 0.0;
+                }
+                set_key(state, field, json!(value));
+            }
+        }
+        Derived::NestedGroupSum {
+            field,
+            collection,
+            list_field,
+            key_field,
+            value_field,
+            scale,
+        } => {
+            if let Some(definition) = collections.iter().find(|c| &c.name == collection) {
+                let mut groups: BTreeMap<String, f64> = BTreeMap::new();
+                for (_, record) in records(state, definition) {
+                    let Some(items) = record.get(list_field).and_then(Value::as_array) else {
+                        continue;
+                    };
+                    for item in items.iter().filter_map(Value::as_object) {
+                        let Some(key) = item.get(key_field).and_then(Value::as_str) else {
+                            continue;
+                        };
+                        let Some(value) = item.get(value_field).and_then(|value| {
+                            value.as_f64().or_else(|| value.as_i64().map(|v| v as f64))
+                        }) else {
+                            continue;
+                        };
+                        *groups.entry(key.to_string()).or_default() += value;
+                    }
+                }
+                let object = groups
+                    .into_iter()
+                    .filter_map(|(key, value)| {
+                        let value = value * *scale as f64;
+                        (value.abs() > 1e-9).then(|| (key, json!(value)))
+                    })
+                    .collect::<Map<_, _>>();
+                set_key(state, field, Value::Object(object));
             }
         }
         Derived::CountPresent {
@@ -7844,5 +8192,97 @@ mod tests {
             effect,
             Effect::DeleteEntity { collection, .. } if collection == "tasks"
         )));
+    }
+
+    #[test]
+    fn nested_sum_and_group_sum_are_inferred_from_complete_observations() {
+        let before = json!({
+            "transactions": [{
+                "id": 1,
+                "description": "opening",
+                "postings": [
+                    {"account": "Assets:Cash", "amount": 100.0},
+                    {"account": "Equity:Opening", "amount": -100.0}
+                ]
+            }],
+            "balances": {"Assets:Cash": 100.0, "Equity:Opening": -100.0},
+            "expense_total": 0.0,
+            "income_total": 0.0
+        });
+        let after = json!({
+            "transactions": [
+                {
+                    "id": 1,
+                    "description": "opening",
+                    "postings": [
+                        {"account": "Assets:Cash", "amount": 100.0},
+                        {"account": "Equity:Opening", "amount": -100.0}
+                    ]
+                },
+                {
+                    "id": 2,
+                    "description": "lunch",
+                    "postings": [
+                        {"account": "Expenses:Food", "amount": 12.5},
+                        {"account": "Assets:Cash", "amount": -12.5}
+                    ]
+                }
+            ],
+            "balances": {"Assets:Cash": 87.5, "Equity:Opening": -100.0, "Expenses:Food": 12.5},
+            "expense_total": 12.5,
+            "income_total": 0.0
+        });
+        let collections = detect_collections(&[before.clone(), after.clone()]);
+        let derived = infer_derived(&[before, after], &collections);
+        assert!(derived.iter().any(|item| matches!(
+            item,
+            Derived::NestedSum { field, list_field, value_field, filter_field, filter_prefix, scale, .. }
+                if field == "expense_total"
+                    && list_field == "postings"
+                    && value_field == "amount"
+                    && filter_field == "account"
+                    && filter_prefix == "Expenses:"
+                    && *scale == 1
+        )), "missing nested sum: {derived:?}");
+        assert!(
+            derived.iter().any(|item| matches!(
+                item,
+                Derived::NestedGroupSum { field, list_field, key_field, value_field, scale, .. }
+                    if field == "balances"
+                        && list_field == "postings"
+                        && key_field == "account"
+                        && value_field == "amount"
+                        && *scale == 1
+            )),
+            "missing grouped nested sum: {derived:?}"
+        );
+    }
+
+    #[test]
+    fn derived_variants_round_trip_through_serialization() {
+        let values = [
+            Derived::NestedSum {
+                field: "expense_total".into(),
+                collection: "transactions".into(),
+                list_field: "postings".into(),
+                value_field: "amount".into(),
+                filter_field: "account".into(),
+                filter_prefix: "Expenses:".into(),
+                scale: 1,
+            },
+            Derived::NestedGroupSum {
+                field: "balances".into(),
+                collection: "transactions".into(),
+                list_field: "postings".into(),
+                key_field: "account".into(),
+                value_field: "amount".into(),
+                scale: 1,
+            },
+        ];
+        for value in values {
+            let encoded = serde_json::to_string(&value).expect("serialize derived");
+            let decoded: Derived = serde_json::from_str(&encoded).expect("deserialize derived");
+            assert_eq!(value, decoded);
+        }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "target_id": "cli-notecli",
+  "target_name": "notecli",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase65-work-notecli-v1",
+  "state_file": "state.json",
+  "timeout_ms": 15000,
+  "actions": [
+    {"action": "add", "argv": ["add", "$title"], "params": {"title": {"kind": "fresh_id", "prefix": "note"}}},
+    {"action": "pin", "argv": ["pin", "$note_id"], "params": {"note_id": {"kind": "last_entity", "pool": "note"}}},
+    {"action": "tag", "argv": ["tag", "$note_id", "$tag"], "params": {"note_id": {"kind": "last_entity", "pool": "note"}, "tag": {"kind": "fresh_id", "prefix": "tag"}}},
+    {"action": "rename", "argv": ["rename", "$note_id", "$title"], "params": {"note_id": {"kind": "last_entity", "pool": "note"}, "title": {"kind": "fresh_id", "prefix": "renamed"}}},
+    {"action": "delete", "argv": ["delete", "$note_id"], "params": {"note_id": {"kind": "last_entity", "pool": "note"}}},
+    {"action": "list", "argv": ["list"]},
+    {"action": "stats", "argv": ["stats"]}
+  ]
+}
