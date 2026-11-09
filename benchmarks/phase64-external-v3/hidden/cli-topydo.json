@@ -1,0 +1,42 @@
+{
+  "app": "cli-topydo",
+  "workflows": [
+    {
+      "name": "two-adds-complete-last",
+      "steps": [
+        {"action": "add", "params": {"text": "draft external report"}},
+        {"action": "add", "params": {"text": "run preflight"}},
+        {"action": "complete", "params": {"task_id": "2"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "priority-delete-list",
+      "steps": [
+        {"action": "add", "params": {"text": "review"}},
+        {"action": "priority", "params": {"task_id": "1", "priority": "A"}},
+        {"action": "delete", "params": {"task_id": "1"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "reject-then-recover",
+      "steps": [
+        {"action": "complete", "params": {"task_id": "1"}},
+        {"action": "add", "params": {"text": "recover"}},
+        {"action": "complete", "params": {"task_id": "1"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "delete-last-then-add",
+      "steps": [
+        {"action": "add", "params": {"text": "alpha"}},
+        {"action": "add", "params": {"text": "beta"}},
+        {"action": "delete", "params": {"task_id": "2"}},
+        {"action": "add", "params": {"text": "gamma"}},
+        {"action": "list", "params": {}}
+      ]
+    }
+  ]
+}

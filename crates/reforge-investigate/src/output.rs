@@ -341,6 +341,17 @@ fn check_expr_in_record(
                 }
             })
         }
+        ValueExpr::EntityField {
+            collection, field, ..
+        } => {
+            ensure_collection(collection, collections)?;
+            schema.record_type(collection, field).ok_or_else(|| {
+                OutputTypeError::UnknownRecordField {
+                    collection: collection.to_string(),
+                    field: field.clone(),
+                }
+            })
+        }
         ValueExpr::RecordLength { field } => {
             let collection =
                 record.ok_or_else(|| OutputTypeError::RecordExpressionOutsideProjection {
@@ -715,6 +726,18 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
             .record
             .as_ref()
             .and_then(|record| record.fields.get(field).cloned()),
+        ValueExpr::EntityField {
+            collection,
+            entity,
+            field,
+        } => crate::data::entity_field_value(
+            context.state,
+            context.params,
+            context.collections,
+            collection,
+            entity,
+            field,
+        ),
         ValueExpr::RecordLength { field } => context
             .record
             .as_ref()
@@ -930,7 +953,9 @@ fn records(state: &Value, collection: &Collection) -> Vec<(String, Map<String, V
                     .iter()
                     .filter_map(|item| {
                         let record = item.as_object()?;
-                        let id = record.get(&collection.id_field)?.as_str()?;
+                        let id = record
+                            .get(&collection.id_field)
+                            .and_then(crate::data::identity_string)?;
                         Some((id.to_string(), record.clone()))
                     })
                     .collect()
