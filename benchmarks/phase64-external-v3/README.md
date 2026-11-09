@@ -32,7 +32,7 @@ packages or service state are changed.
 ./install.sh
 python3 preflight.py
 python3 freeze.py
-REFORGE_BENCH_SUITE_DIR="$PWD/benchmarks/phase64-external-v2" \
+REFORGE_BENCH_SUITE_DIR="$PWD/benchmarks/phase64-external-v3" \
 REFORGE_BENCH_OUT=phase64-external.json \
 REFORGE_BENCH_DATASET=phase64-external-dataset.jsonl \
 REFORGE_BENCH_BUDGETS=100 REFORGE_BENCH_SEEDS=1 \
