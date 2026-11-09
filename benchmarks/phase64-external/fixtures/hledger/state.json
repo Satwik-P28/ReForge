@@ -1,0 +1,1 @@
+{"balances":{"Assets:Cash":100.0,"Equity:Opening":-100.0},"expense_total":0.0,"income_total":0.0,"transaction_count":1,"transactions":[{"description":"Opening balance","id":1,"postings":[{"account":"Assets:Cash","amount":100.0},{"account":"Equity:Opening","amount":-100.0}]}]}

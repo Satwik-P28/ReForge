@@ -1,0 +1,9 @@
+{
+  "suite": "reforgebench-phase64-external",
+  "description": "External, independently developed CLI applications under a manual black-box action schema.",
+  "apps": [
+    {"spec": "benchmarks/phase64-external/fixtures/hledger/target.json", "split": "holdout"},
+    {"spec": "benchmarks/phase64-external/fixtures/topydo/target.json", "split": "holdout"},
+    {"spec": "benchmarks/phase64-external/fixtures/sqlite/target.json", "split": "holdout"}
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "hledger": {
+    "version": "1.32.3",
+    "repository": "https://github.com/simonmichael/hledger",
+    "distribution": "https://github.com/simonmichael/hledger/releases/download/1.32.3/hledger-linux-x64.zip",
+    "archive_sha256": "13f851833344fc0f0458aa42d1bab35911c7c0c1fa071dab1ba078a466080b5c",
+    "executable": "target/phase64-tools/hledger/hledger",
+    "executable_sha256": "9eb0b8eeabb5c92ad0f4cae4d2c7a11d7eaf56027f5290faf9a3f2cc0b998e38",
+    "license": "GPL-3.0-or-later",
+    "runtime": "static x86_64 Linux binary; glibc host",
+    "reset": "copy fixture directory; no user config or external data directory"
+  },
+  "topydo": {
+    "version": "0.16",
+    "repository": "https://github.com/topydo/topydo",
+    "distribution": "https://pypi.org/project/topydo/0.16/",
+    "wheel_sha256": "8d70eec6210f41a857d387d79cf9a8f157b9628ffc145ac6239e3ab0ced5a0bc",
+    "executable": "target/phase64-tools/topydo/venv/bin/topydo",
+    "executable_sha256": "f76f7b8c3a3dfedd1bd4e9029f5871ec30e6d671c80b640e42a00f7b083a4048",
+    "license": "GPL-3.0-or-later",
+    "runtime": "Python 3.12 venv; arrow 1.4.0 and python-dateutil 4.0.0",
+    "reset": "copy todo.txt, done.txt and state.json; HOME is isolated per run"
+  },
+  "sqlite": {
+    "version": "3.50.4",
+    "repository": "https://www.sqlite.org/",
+    "distribution": "https://www.sqlite.org/2025/sqlite-tools-linux-x64-3500400.zip",
+    "archive_sha256": "2c61fe3f6bfcf4ab0cad6c4edf1fa1cae93bbb816b744bef52a4bdde5bf7bf38",
+    "executable": "target/phase64-tools/sqlite/sqlite3",
+    "executable_sha256": "6aea93eb9110639f48816fc5d518874521e74adc8a4f3da4c757a9a9fc17a8d4",
+    "license": "Public Domain",
+    "runtime": "x86_64 Linux CLI binary; no server",
+    "reset": "copy fixture directory; database file lives inside the workdir"
+  }
+}
