@@ -1,0 +1,56 @@
+{
+  "suite": "reforgebench-phase63-holdout",
+  "frozen_before_first_run": true,
+  "authored_by": "same development process; not third-party independent",
+  "files": [
+    {
+      "path": "apps.json",
+      "sha256": "0da86b90c1ed25e1eb4b2903056c25ed383af3b779a96f52dcaf32dfcebc24e7"
+    },
+    {
+      "path": "fixtures/bakery/bakery.py",
+      "sha256": "b542e387a532cc8b55d5ba5ea8838ce52add3765e899f45ec456dbb2611ee7db"
+    },
+    {
+      "path": "fixtures/bakery/state.json",
+      "sha256": "25cbf2f0448f4d7b400c83ede17b97d439e999c5050bf0161473379bd2127141"
+    },
+    {
+      "path": "fixtures/bakery/target.json",
+      "sha256": "b4ca9be684240db14c31ef29d4187ea268aa5b496f72ff556b4c0310a2944bcf"
+    },
+    {
+      "path": "fixtures/desk/desk.py",
+      "sha256": "41d819e6dfd50bfd293a3873c132211569f3a9a441e653a819ffc708f7f3f404"
+    },
+    {
+      "path": "fixtures/desk/state.json",
+      "sha256": "3fbd8e7d55e9f5a6f142e714d68e8aa7dc8879c9f4c2590200fdd93acdcc2432"
+    },
+    {
+      "path": "fixtures/desk/target.json",
+      "sha256": "9a976e744d482b1ea45b1503224808f56d83fbbc7710d1a13470c48162186d38"
+    },
+    {
+      "path": "fixtures/notes/notes.py",
+      "sha256": "f0bf2f35cbe1aa7516063291552bf78770e2350d036d614e86185975c8ab69fe"
+    },
+    {
+      "path": "fixtures/notes/target.json",
+      "sha256": "25b96833b0202592820347e2c4844947776f4cb6c166c53b50ce61c36e2ad8a1"
+    },
+    {
+      "path": "hidden/cli-bakery.json",
+      "sha256": "920c7b4ff32a4628c7c2f718edaa87c07bec351077ec218e6da650436b6cfe29"
+    },
+    {
+      "path": "hidden/cli-desk.json",
+      "sha256": "f37d8f587a579ecb88dfe2d00f63e37d8ec78802b4ac6e190d90786aff409387"
+    },
+    {
+      "path": "hidden/cli-notes.json",
+      "sha256": "84f4448382b4eea8a62b4660494c8093191d99849f3cf1bdd687c9e96944ac18"
+    }
+  ],
+  "run_note": "First semantic run after correcting launch-path, literal-encoding and desk initial-state fixture errors; no inference or workflow changes."
+}

@@ -393,3 +393,355 @@ pub fn data_campaign(
     }
     Ok(report)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+    use reforge_investigate::data::StateSchema;
+    use reforge_investigate::{
+        CmpOp, DataProgram, DataRule, DataStatus, Effect, ExecutionSemantics, Guard, RuleBranch,
+        RuleProvenance, ValueExpr,
+    };
+    use reforge_observe::{
+        ActionAlphabet, EnvironmentInfo, FingerprintKind, InvestigationTarget, PlatformKind,
+        Reproducibility, ResetOutcome, ResetPolicy, ResetProvenance, StateFingerprint,
+        TargetIdentity, TimingInfo,
+    };
+    use reforge_types::Id;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+
+    struct MockTarget {
+        state: Value,
+        initial: Value,
+        identity: TargetIdentity,
+        alphabet: ActionAlphabet,
+        environment: EnvironmentInfo,
+    }
+
+    fn fingerprint(state: &Value) -> StateFingerprint {
+        let mut features = BTreeMap::new();
+        features.insert("state".to_string(), state.to_string());
+        StateFingerprint::from_features(FingerprintKind::Process, features)
+    }
+
+    fn observation(
+        state: &Value,
+        before: &Value,
+        action: Option<&ActionInstance>,
+        outputs: IndexMap<String, TypedValue>,
+    ) -> Observation {
+        Observation {
+            schema_version: reforge_observe::IrVersion::current(),
+            id: Id::new("obs-verifier").unwrap(),
+            session_id: Id::new("session-verifier").unwrap(),
+            step_index: 0,
+            target: Id::new("target-verifier").unwrap(),
+            baseline: action.is_none(),
+            action: action.cloned(),
+            before: fingerprint(before),
+            after: Some(fingerprint(state)),
+            outputs,
+            state_document: Some(state.clone()),
+            visible_text: None,
+            side_effects: Vec::new(),
+            errors: Vec::new(),
+            timing: TimingInfo::default(),
+            environment: EnvironmentInfo {
+                platform: PlatformKind::Synthetic,
+                os: "test".into(),
+                tool: "mock".into(),
+                tool_version: "1".into(),
+                viewport: None,
+                fixture_digest: None,
+                clock: "deterministic".into(),
+            },
+            payloads: Vec::new(),
+            evidence_refs: Vec::new(),
+            completeness: reforge_observe::Completeness::Complete,
+            uncertainty: Vec::new(),
+            reproducibility: Reproducibility::Deterministic,
+            inferred_hidden_state: Vec::new(),
+            reset: ResetProvenance {
+                policy: ResetPolicy::ProcessRestart,
+                succeeded: true,
+                attempts: 1,
+                state_after_reset: None,
+                detail: None,
+            },
+        }
+    }
+
+    impl MockTarget {
+        fn new() -> Self {
+            Self {
+                state: json!({"count": 0, "rejects": 0}),
+                initial: json!({"count": 0, "rejects": 0}),
+                identity: TargetIdentity {
+                    id: Id::new("target-verifier").unwrap(),
+                    name: "mock".into(),
+                    platform: PlatformKind::Synthetic,
+                    version: "test".into(),
+                    authorization: reforge_observe::Authorization::LocalFixture,
+                },
+                alphabet: ActionAlphabet::default(),
+                environment: EnvironmentInfo {
+                    platform: PlatformKind::Synthetic,
+                    os: "test".into(),
+                    tool: "mock".into(),
+                    tool_version: "1".into(),
+                    viewport: None,
+                    fixture_digest: None,
+                    clock: "deterministic".into(),
+                },
+            }
+        }
+    }
+
+    impl InvestigationTarget for MockTarget {
+        fn identity(&self) -> &TargetIdentity {
+            &self.identity
+        }
+        fn alphabet(&self) -> &ActionAlphabet {
+            &self.alphabet
+        }
+        fn environment(&self) -> EnvironmentInfo {
+            self.environment.clone()
+        }
+        fn reset_policy(&self) -> ResetPolicy {
+            ResetPolicy::ProcessRestart
+        }
+        fn reset(&mut self) -> Result<ResetOutcome, reforge_observe::InvestigationError> {
+            self.state = self.initial.clone();
+            Ok(ResetOutcome {
+                policy: ResetPolicy::ProcessRestart,
+                succeeded: true,
+                attempts: 1,
+                state_digest: None,
+                detail: None,
+            })
+        }
+        fn observe(&mut self) -> Result<Observation, reforge_observe::InvestigationError> {
+            Ok(observation(&self.state, &self.state, None, IndexMap::new()))
+        }
+        fn perform(
+            &mut self,
+            action: &ActionInstance,
+        ) -> Result<Observation, reforge_observe::InvestigationError> {
+            let before = self.state.clone();
+            let mut outputs = IndexMap::new();
+            let mut events = Vec::new();
+            match action.action.as_str() {
+                "inc" => {
+                    let count = before["count"].as_i64().unwrap_or(0) + 1;
+                    self.state["count"] = json!(count);
+                    outputs.insert("outcome".into(), TypedValue::String("success".into()));
+                    outputs.insert("count".into(), TypedValue::Int(count));
+                    events.push(TypedValue::String("incremented".into()));
+                }
+                "reject" => {
+                    let rejects = before["rejects"].as_i64().unwrap_or(0) + 1;
+                    self.state["rejects"] = json!(rejects);
+                    outputs.insert("outcome".into(), TypedValue::String("rejected".into()));
+                    outputs.insert("error".into(), TypedValue::String("bad".into()));
+                    outputs.insert(
+                        "count".into(),
+                        TypedValue::Int(before["count"].as_i64().unwrap_or(0)),
+                    );
+                    events.push(TypedValue::String("rejected".into()));
+                }
+                _ => {
+                    outputs.insert("outcome".into(), TypedValue::String("success".into()));
+                    outputs.insert(
+                        "count".into(),
+                        TypedValue::Int(before["count"].as_i64().unwrap_or(0)),
+                    );
+                }
+            }
+            outputs.insert("events_emitted".into(), TypedValue::List(events));
+            Ok(observation(&self.state, &before, Some(action), outputs))
+        }
+    }
+
+    fn program() -> DataProgram {
+        DataProgram {
+            schema_version: "1.0.0".into(),
+            target_id: "mock".into(),
+            initial_state: json!({"count": 0, "rejects": 0}),
+            state_schema: StateSchema::default(),
+            collections: Vec::new(),
+            derived: Vec::new(),
+            rules: vec![
+                DataRule {
+                    id: "rule.inc.success".into(),
+                    action: "inc".into(),
+                    branch: RuleBranch::Success,
+                    error: None,
+                    guards: Vec::new(),
+                    effects: vec![Effect::IncrementState {
+                        field: "count".into(),
+                        by: ValueExpr::Literal { value: json!(1) },
+                    }],
+                    events: vec!["incremented".into()],
+                    outputs: [
+                        (
+                            "count".to_string(),
+                            ValueExpr::State {
+                                field: "count".into(),
+                            },
+                        ),
+                        (
+                            "events_emitted".to_string(),
+                            ValueExpr::Literal {
+                                value: json!(["incremented"]),
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    execution: ExecutionSemantics::default(),
+                    support: 1,
+                    reproduced: 1,
+                    provenance: RuleProvenance::default(),
+                },
+                DataRule {
+                    id: "rule.reject.error.bad".into(),
+                    action: "reject".into(),
+                    branch: RuleBranch::Error,
+                    error: Some("bad".into()),
+                    guards: Vec::new(),
+                    effects: vec![Effect::IncrementState {
+                        field: "rejects".into(),
+                        by: ValueExpr::Literal { value: json!(1) },
+                    }],
+                    events: vec!["rejected".into()],
+                    outputs: [
+                        (
+                            "count".to_string(),
+                            ValueExpr::State {
+                                field: "count".into(),
+                            },
+                        ),
+                        (
+                            "events_emitted".to_string(),
+                            ValueExpr::Literal {
+                                value: json!(["rejected"]),
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    execution: ExecutionSemantics::default(),
+                    support: 1,
+                    reproduced: 1,
+                    provenance: RuleProvenance::default(),
+                },
+            ],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    fn campaign(program: &DataProgram) -> DataCampaignReport {
+        let mut target = MockTarget::new();
+        let workflows = vec![
+            vec![ActionInstance::new("inc")],
+            vec![ActionInstance::new("reject")],
+        ];
+        data_campaign(
+            &mut target,
+            program,
+            &workflows,
+            &DataCampaignConfig::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn verifier_detects_all_deliberate_mutations() {
+        let base = campaign(&program());
+        assert!(
+            !base.diverged(),
+            "unmutated program must pass: {:?}",
+            base.divergences
+        );
+        assert_eq!(base.matching_steps, 2);
+
+        let mut wrong_counter = program();
+        if let Effect::IncrementState { by, .. } = &mut wrong_counter.rules[0].effects[0] {
+            *by = ValueExpr::Literal { value: json!(2) };
+        }
+        assert!(campaign(&wrong_counter).diverged(), "wrong counter update");
+
+        let mut wrong_preservation = program();
+        wrong_preservation.rules[0].effects[0] = Effect::SetState {
+            field: "count".into(),
+            value: ValueExpr::Literal { value: json!(0) },
+        };
+        assert!(
+            campaign(&wrong_preservation).diverged(),
+            "wrong preservation"
+        );
+
+        let mut wrong_guard = program();
+        wrong_guard.rules.insert(
+            0,
+            DataRule {
+                id: "rule.inc.error.overbroad".into(),
+                action: "inc".into(),
+                branch: RuleBranch::Error,
+                error: Some("bad".into()),
+                guards: vec![Guard::StateCmp {
+                    field: "count".into(),
+                    op: CmpOp::Ge,
+                    value: json!(0),
+                }],
+                effects: Vec::new(),
+                events: Vec::new(),
+                outputs: BTreeMap::new(),
+                execution: ExecutionSemantics::default(),
+                support: 1,
+                reproduced: 1,
+                provenance: RuleProvenance::default(),
+            },
+        );
+        assert!(
+            campaign(&wrong_guard).diverged(),
+            "overbroad guard ordering"
+        );
+
+        let mut wrong_initial = program();
+        wrong_initial.initial_state = json!({"count": 5, "rejects": 0});
+        let report = campaign(&wrong_initial);
+        assert!(!report.initial_state_matches);
+        assert!(report.diverged(), "wrong initial state");
+
+        let mut missing_event = program();
+        missing_event.rules[0].events.clear();
+        assert!(campaign(&missing_event).diverged(), "missing event");
+
+        let mut wrong_output = program();
+        wrong_output.rules[0]
+            .outputs
+            .insert("count".into(), ValueExpr::Literal { value: json!(99) });
+        assert!(campaign(&wrong_output).diverged(), "wrong derived output");
+
+        let mut wrong_rejection = program();
+        wrong_rejection.rules[1].branch = RuleBranch::Success;
+        wrong_rejection.rules[1].error = None;
+        wrong_rejection.rules[1].events.clear();
+        assert!(campaign(&wrong_rejection).diverged(), "wrong rejection");
+    }
+
+    #[test]
+    fn unverified_steps_are_not_counted_as_matches() {
+        let mut missing_rule = program();
+        missing_rule.rules.retain(|rule| rule.action != "inc");
+        let report = campaign(&missing_rule);
+        assert_eq!(report.unverified_steps, 1);
+        assert_eq!(report.matching_steps, 1);
+        assert!(report.step_accounting_complete());
+        assert_eq!(DataStatus::Unknown, DataStatus::Unknown);
+    }
+}

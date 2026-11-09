@@ -1,0 +1,81 @@
+{
+  "target_id": "cli-bakery",
+  "target_name": "bakery",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/bakery.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase63-work-bakery",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "bake",
+      "argv": [
+        "bake",
+        "$item"
+      ],
+      "params": {
+        "item": {
+          "kind": "fresh_id",
+          "prefix": "sour"
+        }
+      }
+    },
+    {
+      "action": "reserve",
+      "argv": [
+        "reserve",
+        "$batch_id"
+      ],
+      "params": {
+        "batch_id": {
+          "kind": "last_entity",
+          "pool": "batch"
+        }
+      }
+    },
+    {
+      "action": "release",
+      "argv": [
+        "release",
+        "$batch_id"
+      ],
+      "params": {
+        "batch_id": {
+          "kind": "last_entity",
+          "pool": "batch"
+        }
+      }
+    },
+    {
+      "action": "ship",
+      "argv": [
+        "ship",
+        "$batch_id"
+      ],
+      "params": {
+        "batch_id": {
+          "kind": "last_entity",
+          "pool": "batch"
+        }
+      }
+    },
+    {
+      "action": "list",
+      "argv": [
+        "list"
+      ]
+    },
+    {
+      "action": "stats",
+      "argv": [
+        "stats"
+      ]
+    }
+  ]
+}

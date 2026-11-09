@@ -1594,6 +1594,32 @@ impl StateSchema {
     }
 }
 
+fn guard_specificity(guard: &Guard) -> u16 {
+    match guard {
+        Guard::NotExists { .. } | Guard::Exists { .. } => 8,
+        Guard::EntityFieldCmp { .. }
+        | Guard::EntityFieldCmpField { .. }
+        | Guard::EntityListContains { .. }
+        | Guard::EntityFieldListEmpty { .. }
+        | Guard::EntityFieldListNonEmpty { .. }
+        | Guard::ParamCmpEntityField { .. }
+        | Guard::ParamCmpDiff { .. }
+        | Guard::AnyEntityFieldCmp { .. }
+        | Guard::NoEntityFieldCmp { .. }
+        | Guard::SetContains { .. } => 7,
+        Guard::ParamNonEmpty { .. }
+        | Guard::ParamNonNegative { .. }
+        | Guard::ParamPositive { .. }
+        | Guard::ParamOneOf { .. }
+        | Guard::ParamContains { .. }
+        | Guard::ParamStringLength { .. }
+        | Guard::ParamPresent { .. }
+        | Guard::ParamAbsent { .. } => 4,
+        Guard::Predicate { .. } => 3,
+        Guard::StateCmp { .. } => 1,
+    }
+}
+
 impl DataProgram {
     /// Execute the synthesized program for one action. The returned state is
     /// not committed unless the caller chooses to do so.
@@ -1616,15 +1642,39 @@ impl DataProgram {
         action: &str,
         params: &BTreeMap<String, Value>,
     ) -> ExecutionResult {
-        let rule = self
+        // Several branches can match a coarse state projection. Prefer an
+        // error branch over a success branch, and within errors prefer the rule
+        // with the most specific entity/parameter evidence. Otherwise a generic
+        // `view != detail` rejection can steal a missing-entity or closed-
+        // account rejection.
+        let matching: Vec<&DataRule> = self
             .rules
             .iter()
             .filter(|rule| rule.action == action)
-            .find(|rule| {
+            .filter(|rule| {
                 rule.guards
                     .iter()
                     .all(|guard| guard_holds(guard, state, params))
-            });
+            })
+            .collect();
+        let mut best_error: Option<(&DataRule, u16)> = None;
+        for rule in matching
+            .iter()
+            .copied()
+            .filter(|rule| rule.branch == RuleBranch::Error)
+        {
+            let score = rule.guards.iter().map(guard_specificity).sum::<u16>();
+            if best_error
+                .as_ref()
+                .map(|(_, current)| score > *current)
+                .unwrap_or(true)
+            {
+                best_error = Some((rule, score));
+            }
+        }
+        let rule = best_error
+            .map(|(rule, _)| rule)
+            .or_else(|| matching.first().copied());
         let Some(rule) = rule else {
             return ExecutionResult {
                 state: state.clone(),
@@ -2617,7 +2667,11 @@ fn guard_identifiable_in_context(
             value,
             ..
         } => value.is_number() || field_cardinality(collection, field, all) <= 4,
-        Guard::StateCmp { field, .. } => state_cardinality(field, all) <= 4,
+        // Workflow/status fields legitimately have more than four stages (for
+        // example idle -> name -> email -> plan -> review -> done). Treat a
+        // bounded categorical state as identifiable; the branch-separation
+        // check still rejects a guard that merely matches one observed value.
+        Guard::StateCmp { field, .. } => state_cardinality(field, all) <= 8,
         Guard::Predicate { predicate } => all.iter().any(|sample| {
             predicate
                 .check(&sample.before, &sample.params, &collection_names)
@@ -6601,6 +6655,119 @@ mod tests {
         assert_eq!(state, json!({}));
         assert_eq!(outcome.status, DataStatus::Unknown);
     }
+    #[test]
+    fn specific_entity_rejection_preempts_generic_state_rejection() {
+        let rule = |id: &str, error: &str, guards: Vec<Guard>| DataRule {
+            id: id.into(),
+            action: "withdraw".into(),
+            branch: RuleBranch::Error,
+            error: Some(error.into()),
+            guards,
+            effects: vec![Effect::IncrementState {
+                field: "rejects".into(),
+                by: ValueExpr::Literal { value: json!(1) },
+            }],
+            events: Vec::new(),
+            outputs: BTreeMap::new(),
+            execution: ExecutionSemantics::default(),
+            support: 1,
+            reproduced: 1,
+            provenance: RuleProvenance::default(),
+        };
+        let program = DataProgram {
+            schema_version: DATA_PROGRAM_VERSION.into(),
+            target_id: "test-ledger".into(),
+            initial_state: json!({"view": "list", "accounts": {}, "rejects": 0}),
+            state_schema: StateSchema::default(),
+            collections: Vec::new(),
+            derived: Vec::new(),
+            rules: vec![
+                rule(
+                    "rule.withdraw.error.insufficient_funds",
+                    "insufficient_funds",
+                    vec![Guard::StateCmp {
+                        field: "view".into(),
+                        op: CmpOp::Ne,
+                        value: json!("detail"),
+                    }],
+                ),
+                rule(
+                    "rule.withdraw.error.no_such_account",
+                    "no_such_account",
+                    vec![Guard::NotExists {
+                        collection: "accounts".into(),
+                        entity: EntityRef::Param("account_id".into()),
+                    }],
+                ),
+            ],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        };
+        let params = [("account_id".to_string(), json!("a9"))]
+            .into_iter()
+            .collect();
+        let (state, outcome) = program.execute(
+            &json!({"view": "list", "accounts": {}, "rejects": 0}),
+            "withdraw",
+            &params,
+        );
+        assert_eq!(outcome.error.as_deref(), Some("no_such_account"));
+        assert_eq!(state["rejects"], json!(1));
+    }
+
+    #[test]
+    fn serialized_program_executes_without_reference_target() {
+        let program = DataProgram {
+            schema_version: DATA_PROGRAM_VERSION.into(),
+            target_id: "standalone".into(),
+            initial_state: json!({"count": 0}),
+            state_schema: StateSchema::default(),
+            collections: Vec::new(),
+            derived: Vec::new(),
+            rules: vec![DataRule {
+                id: "rule.inc.success".into(),
+                action: "inc".into(),
+                branch: RuleBranch::Success,
+                error: None,
+                guards: Vec::new(),
+                effects: vec![Effect::IncrementState {
+                    field: "count".into(),
+                    by: ValueExpr::Literal { value: json!(1) },
+                }],
+                events: vec!["incremented".into()],
+                outputs: [(
+                    "count".to_string(),
+                    ValueExpr::State {
+                        field: "count".into(),
+                    },
+                )]
+                .into_iter()
+                .collect(),
+                execution: ExecutionSemantics::default(),
+                support: 1,
+                reproduced: 1,
+                provenance: RuleProvenance::default(),
+            }],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        };
+        let encoded = serde_json::to_string(&program).unwrap();
+        let decoded: DataProgram = serde_json::from_str(&encoded).unwrap();
+        let mut state = decoded.initial_state.clone();
+        for expected in [1, 2, 3] {
+            let (next, outcome) = decoded.execute(&state, "inc", &BTreeMap::new());
+            assert_eq!(outcome.status, DataStatus::Success);
+            assert_eq!(next["count"], json!(expected));
+            assert_eq!(outcome.outputs.get("count"), Some(&json!(expected)));
+            assert_eq!(outcome.events, vec!["incremented".to_string()]);
+            state = next;
+        }
+        let before = state.clone();
+        let (unchanged, outcome) = decoded.execute(&state, "missing", &BTreeMap::new());
+        assert_eq!(outcome.status, DataStatus::Unknown);
+        assert_eq!(unchanged, before);
+    }
+
     fn output_rule(expression: ValueExpr, execution: ExecutionSemantics) -> DataProgram {
         DataProgram {
             schema_version: DATA_PROGRAM_VERSION.into(),
@@ -7032,6 +7199,50 @@ mod tests {
             ),
             "expected capacity - used, got {:?}",
             outputs.get("remaining")
+        );
+    }
+
+    #[test]
+    fn multi_stage_view_guard_is_identifiable() {
+        let all = [
+            sample(
+                "set-plan",
+                &[],
+                json!({"view":"idle"}),
+                json!({"view":"idle"}),
+                OutcomeKind::Rejected,
+                Some("wrong_step"),
+            ),
+            sample(
+                "set-plan",
+                &[],
+                json!({"view":"name"}),
+                json!({"view":"name"}),
+                OutcomeKind::Rejected,
+                Some("wrong_step"),
+            ),
+            sample(
+                "set-plan",
+                &[],
+                json!({"view":"email"}),
+                json!({"view":"email"}),
+                OutcomeKind::Rejected,
+                Some("wrong_step"),
+            ),
+            sample(
+                "set-plan",
+                &[],
+                json!({"view":"plan"}),
+                json!({"view":"review"}),
+                OutcomeKind::Success,
+                None,
+            ),
+        ];
+        let candidates = guard_candidates(&all, &[]);
+        let hypotheses = select_error_guard_hypotheses(&candidates, &all, "wrong_step");
+        assert!(
+            !hypotheses.is_empty(),
+            "multi-stage view guard was filtered out"
         );
     }
 

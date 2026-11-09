@@ -17,14 +17,17 @@ use reforge_diff::{data_campaign, differential_campaign, CampaignConfig, DataCam
 use reforge_investigate::{
     instantiate_actions, investigate, synthesize_data_program_with_samples, synthesize_twin,
     CliTargetSpec, DataProgram, DataSample, EntityPool, EvidenceKind, EvidenceSource,
-    InvestigationConfig, InvestigationRecord, ObservationProvenance, OutcomeKind, PolicyKind,
-    PrerequisiteSummary, TwinSynthConfig,
+    ExperimentAccounting, InvestigationConfig, InvestigationRecord, ObservationProvenance,
+    OutcomeKind, PolicyKind, PrerequisiteSummary, SelectionStrategy, TwinSynthConfig,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_types::{BehavioralTwin, TypedValue};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+
+#[path = "../v02_experiments.rs"]
+mod v02_experiments;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -167,6 +170,8 @@ struct AppRun {
     data: DataProgram,
     counterfactual_samples: usize,
     counterfactual_interactions: u64,
+    experiment_strategy: String,
+    experiment_accounting: Option<ExperimentAccounting>,
     hidden_programs: Vec<Vec<ActionInstance>>,
     hidden_workflows: Vec<String>,
 }
@@ -822,6 +827,18 @@ fn main() -> Result<()> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(3);
     let seeds: Vec<u64> = (1..=seed_count.max(1)).collect();
+    let experiment_strategy = match std::env::var("REFORGE_BENCH_EXPERIMENT_STRATEGY")
+        .ok()
+        .as_deref()
+    {
+        Some("phase62") => None,
+        Some(value) => SelectionStrategy::parse(value).or(Some(SelectionStrategy::Hybrid)),
+        None => Some(SelectionStrategy::Hybrid),
+    };
+    let experiment_budget: u64 = std::env::var("REFORGE_BENCH_EXPERIMENT_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(500);
 
     let apps_text = std::fs::read_to_string(root.join(&suite_dir).join("apps.json"))?;
     let mut suite: AppsFile = serde_json::from_str(&apps_text)?;
@@ -932,9 +949,37 @@ fn main() -> Result<()> {
                                     &record.initial_class,
                                     &TwinSynthConfig::default(),
                                 );
-                                let (probes, counterfactual_interactions) =
-                                    collect_counterfactual_samples(&root, &app.spec, &record)
-                                        .unwrap_or_default();
+                                let (probes, counterfactual_interactions, experiment_accounting) =
+                                    if let Some(strategy) = experiment_strategy {
+                                        match v02_experiments::collect_counterfactual_samples_scheduled(
+                                            &root,
+                                            &app.spec,
+                                            &record,
+                                            strategy,
+                                            experiment_budget,
+                                            seed,
+                                        ) {
+                                            Ok((probes, accounting)) => (
+                                                probes,
+                                                accounting.reference_interactions,
+                                                Some(accounting),
+                                            ),
+                                            Err(error) => {
+                                                eprintln!(
+                                                    "scheduled experiment collection failed for {}: {error:#}",
+                                                    app.spec
+                                                );
+                                                (Vec::new(), 0, None)
+                                            }
+                                        }
+                                    } else {
+                                        let (probes, interactions) =
+                                            collect_counterfactual_samples(
+                                                &root, &app.spec, &record,
+                                            )
+                                            .unwrap_or_default();
+                                        (probes, interactions, None)
+                                    };
                                 let data = synthesize_data_program_with_samples(&record, &probes);
                                 let (programs, workflows) =
                                     load_hidden(&root, &suite_dir, &target_id);
@@ -945,6 +990,10 @@ fn main() -> Result<()> {
                                     data,
                                     counterfactual_samples: probes.len(),
                                     counterfactual_interactions,
+                                    experiment_strategy: experiment_strategy
+                                        .map(|strategy| strategy.as_str().to_string())
+                                        .unwrap_or_else(|| "phase62".into()),
+                                    experiment_accounting,
                                     hidden_programs: programs,
                                     hidden_workflows: workflows,
                                 });
@@ -1074,6 +1123,8 @@ fn main() -> Result<()> {
                 "notes": data_report.notes,
                 "counterfactual_samples": run.counterfactual_samples,
                 "counterfactual_interactions": run.counterfactual_interactions,
+                "experiment_strategy": run.experiment_strategy,
+                "experiment_accounting": &run.experiment_accounting,
                 "program": run.data,
             },
         }));
@@ -1142,6 +1193,10 @@ fn main() -> Result<()> {
         "apps": suite.apps,
         "budgets": budgets,
         "seeds": seeds,
+        "experiment_strategy": experiment_strategy
+            .map(SelectionStrategy::as_str)
+            .unwrap_or("phase62"),
+        "experiment_budget": experiment_strategy.map(|_| experiment_budget),
         "policies": summaries,
         "reconstruction": reconstruction,
         "reconstruction_totals": reconstruction_totals,

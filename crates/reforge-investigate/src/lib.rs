@@ -21,6 +21,7 @@ pub mod causal;
 pub mod data;
 pub mod engine;
 pub mod evidence;
+pub mod experiments;
 pub mod feature;
 pub mod model;
 pub mod neural;
@@ -61,6 +62,10 @@ pub use engine::{
     UnknownBehaviorRecord,
 };
 pub use evidence::build_evidence;
+pub use experiments::{
+    ExperimentAccounting, ExperimentAction, ExperimentProposal, ExperimentScheduler,
+    ExperimentStage, InteractionLedger, InteractionRecord, InteractionStage, SelectionStrategy,
+};
 pub use feature::{feature_layout, FEATURE_DIM};
 pub use model::{BehaviorModel, OutcomeKind, PairStats, TransitionRecord};
 pub use neural::{ActionScorer, ModelArtifact, ModelMetrics};

@@ -1,0 +1,77 @@
+{
+  "app": "cli-bakery",
+  "workflows": [
+    {
+      "name": "bake-reserve-reject-ship",
+      "steps": [
+        {
+          "action": "bake",
+          "params": {
+            "item": "sour"
+          }
+        },
+        {
+          "action": "reserve",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "reserve",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "ship",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "ship-before-reserve-then-release",
+      "steps": [
+        {
+          "action": "bake",
+          "params": {
+            "item": "rye"
+          }
+        },
+        {
+          "action": "ship",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "reserve",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "release",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "ship",
+          "params": {
+            "batch_id": "b101"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}
