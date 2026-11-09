@@ -20,7 +20,7 @@ Phase 6.2 was preserved before Phase 6.3 work:
 
 - Commit: `4f6de1bc8d516f2eefefe05bff854934a516ad23`
 - Tree: `ceb6e48fd79c8727f679c0ea8f01a492db917cd6`
-- Branch: `main`
+- Branch: `develop/neural-symbolic`
 - Checkpoint ref: `phase6.2-checkpoint`
 
 The worktree was clean immediately after that commit. Phase 6.3 was not pushed
