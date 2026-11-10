@@ -1,9 +1,11 @@
 {
   "target_id": "json-server-0.17.4",
   "target_name": "json-server",
-  "authorization": "authorized_open_source_evaluation",
+  "authorization": "authorized_test_target",
   "program": "python3",
-  "program_args": ["{spec_dir}/adapter.py"],
+  "program_args": [
+    "{spec_dir}/adapter.py"
+  ],
   "pristine_dir": "pristine",
   "workdir": "../../../target/reforge-phase71-json-server",
   "state_file": "state.json",
@@ -11,46 +13,125 @@
   "actions": [
     {
       "action": "create_post",
-      "argv": ["create_post", "$title"],
-      "params": {"title": {"kind": "fresh_id", "prefix": "post"}},
-      "parameters": {"title": {"kind": "string"}}
+      "argv": [
+        "create_post",
+        "$title"
+      ],
+      "params": {
+        "title": {
+          "kind": "fresh_id",
+          "prefix": "post"
+        }
+      },
+      "parameters": {
+        "title": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "read_post",
-      "argv": ["read_post", "$id"],
-      "params": {"id": {"kind": "last_entity", "pool": "post"}},
-      "parameters": {"id": {"kind": "string"}}
+      "argv": [
+        "read_post",
+        "$id"
+      ],
+      "params": {
+        "id": {
+          "kind": "last_entity",
+          "pool": "post"
+        }
+      },
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "publish_post",
-      "argv": ["publish_post", "$id"],
-      "params": {"id": {"kind": "last_entity", "pool": "post"}},
-      "parameters": {"id": {"kind": "string"}}
+      "argv": [
+        "publish_post",
+        "$id"
+      ],
+      "params": {
+        "id": {
+          "kind": "last_entity",
+          "pool": "post"
+        }
+      },
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "delete_post",
-      "argv": ["delete_post", "$id"],
-      "params": {"id": {"kind": "last_entity", "pool": "post"}},
-      "parameters": {"id": {"kind": "string"}}
+      "argv": [
+        "delete_post",
+        "$id"
+      ],
+      "params": {
+        "id": {
+          "kind": "last_entity",
+          "pool": "post"
+        }
+      },
+      "parameters": {
+        "id": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "add_comment",
-      "argv": ["add_comment", "$post_id", "$body"],
+      "argv": [
+        "add_comment",
+        "$post_id",
+        "$body"
+      ],
       "params": {
-        "post_id": {"kind": "last_entity", "pool": "post"},
-        "body": {"kind": "fresh_id", "prefix": "comment"}
+        "post_id": {
+          "kind": "last_entity",
+          "pool": "post"
+        },
+        "body": {
+          "kind": "fresh_id",
+          "prefix": "comment"
+        }
       },
-      "parameters": {"post_id": {"kind": "string"}, "body": {"kind": "string"}}
+      "parameters": {
+        "post_id": {
+          "kind": "string"
+        },
+        "body": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "list_comments",
-      "argv": ["list_comments", "$post_id"],
-      "params": {"post_id": {"kind": "last_entity", "pool": "post"}},
-      "parameters": {"post_id": {"kind": "string"}}
+      "argv": [
+        "list_comments",
+        "$post_id"
+      ],
+      "params": {
+        "post_id": {
+          "kind": "last_entity",
+          "pool": "post"
+        }
+      },
+      "parameters": {
+        "post_id": {
+          "kind": "string"
+        }
+      }
     },
     {
       "action": "post_count",
-      "argv": ["post_count"]
+      "argv": [
+        "post_count"
+      ]
     }
   ]
 }

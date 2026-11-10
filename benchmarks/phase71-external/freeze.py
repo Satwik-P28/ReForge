@@ -42,7 +42,17 @@ def main() -> None:
     lock = load(SUITE / "targets.lock.json")
     manifest = {
         "suite": "reforgebench-phase71-external",
+        "suite_version": 2,
         "frozen_before_first_evaluation": True,
+        "invalidated_previous": {
+            "freeze": "bench-results/phase71-invalidated/FREEZE.v1.json",
+            "reason": "target authorization enum rejected before any action; no behavioral result was produced",
+            "preserved_runs": [
+                "/tmp/phase71-blackbox-json.failed.v1.json",
+                "/tmp/phase71-blackbox-topydo.failed.v1.json",
+                "/tmp/phase71-rea-guided-json.failed.v1.json"
+            ]
+        },
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "source_commit": head,
         "source_tree": tree,
