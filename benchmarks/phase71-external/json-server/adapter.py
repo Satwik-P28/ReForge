@@ -95,6 +95,22 @@ def load_db() -> dict:
     }
 
 
+def wait_for(predicate, description: str) -> None:
+    """Wait for the server's asynchronous file write to become observable.
+
+    json-server applies a mutation in memory before its persistence callback
+    rewrites db.json. Reading the file immediately after the HTTP response can
+    therefore capture the pre-mutation document. The state observation is only
+    valid once the requested mutation is visible in the persisted document.
+    """
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if predicate(load_db()):
+            return
+        time.sleep(0.02)
+    raise RuntimeError(f"persisted state did not reflect {description}")
+
+
 def save_state() -> dict:
     db = load_db()
     state = {
@@ -144,6 +160,10 @@ def main(argv: list[str]) -> int:
                     },
                 )
                 if status in (200, 201):
+                    wait_for(
+                        lambda db: any(post.get("id") == body["id"] for post in db["posts"]),
+                        "created post",
+                    )
                     emit(
                         "success",
                         created_id=body["id"],
@@ -170,12 +190,23 @@ def main(argv: list[str]) -> int:
                 if status == 200:
                     status, body = request(port, "PATCH", f"/posts/{ident}", {"published": True})
                     if status == 200:
+                        wait_for(
+                            lambda db: any(
+                                post.get("id") == body["id"] and post.get("published") is True
+                                for post in db["posts"]
+                            ),
+                            "published post",
+                        )
                         emit("success", id=body["id"], published=body.get("published"), events=["post_published"])
                         return 0
             elif action == "delete_post":
                 ident = args[0] if args else ""
                 status, body = request(port, "DELETE", f"/posts/{ident}")
                 if status == 200:
+                    wait_for(
+                        lambda db: not any(post.get("id") == int(ident) for post in db["posts"]),
+                        "deleted post",
+                    )
                     emit("success", deleted=True, deleted_id=int(ident), deleted_pool="post", events=["post_deleted"])
                     return 0
             elif action == "add_comment":
@@ -189,6 +220,10 @@ def main(argv: list[str]) -> int:
                         {"postId": int(post_id), "body": args[1] if len(args) > 1 else ""},
                     )
                     if status == 201:
+                        wait_for(
+                            lambda db: any(comment.get("id") == body["id"] for comment in db["comments"]),
+                            "created comment",
+                        )
                         emit(
                             "success",
                             created_id=body["id"],

@@ -577,6 +577,13 @@ pub enum Derived {
         collection: String,
         source: String,
     },
+    /// A state field that is an arithmetic projection of other state fields.
+    /// This covers aggregates such as `total = open + done` without forcing a
+    /// derived value into a synthesized mutation.
+    Expression {
+        field: String,
+        expression: ValueExpr,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -5278,11 +5285,17 @@ fn infer_entity_id_output(
                 let Some(id) = sample.params.get(name).and_then(identity_string) else {
                     break;
                 };
-                let Some(_record) =
+                // The output can name the entity the action just removed
+                // (deleted_id) or a related entity that is not guaranteed to
+                // exist after the mutation. Identity evidence is valid when
+                // either the pre- or post-state contains that entity.
+                let exists =
                     record_by_id_auto(output_source(sample, snapshot), &collection.name, &id)
-                else {
+                        .or_else(|| record_by_id_auto(&sample.before, &collection.name, &id))
+                        .is_some();
+                if !exists {
                     break;
-                };
+                }
                 if sample.outputs.get(key).and_then(identity_string).as_deref() != Some(id.as_str())
                 {
                     break;
@@ -6354,7 +6367,8 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
         }
     }
 
-    for field in numeric_fields {
+    for field in &numeric_fields {
+        let field = field.clone();
         if out.iter().any(|derived| match derived {
             Derived::Count { field: name, .. }
             | Derived::CountPresent { field: name, .. }
@@ -6362,7 +6376,8 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             | Derived::NestedGroupSum { field: name, .. }
             | Derived::Sum { field: name, .. }
             | Derived::CountWhere { field: name, .. }
-            | Derived::SumLength { field: name, .. } => name == &field,
+            | Derived::SumLength { field: name, .. }
+            | Derived::Expression { field: name, .. } => name == &field,
         }) {
             continue;
         }
@@ -6762,6 +6777,13 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
 
         if let Some((_, derived)) = best {
             out.push(derived);
+            continue;
+        }
+        if let Some(expression) = infer_derived_expression(&field, &numeric_fields, snapshots) {
+            out.push(Derived::Expression {
+                field: field.clone(),
+                expression,
+            });
         }
     }
 
@@ -7436,6 +7458,65 @@ fn eval_value_legacy(
     }
 }
 
+fn infer_derived_expression(
+    field: &str,
+    fields: &BTreeSet<String>,
+    snapshots: &[Value],
+) -> Option<ValueExpr> {
+    let target: Vec<Option<i64>> = snapshots
+        .iter()
+        .map(|state| state.get(field).and_then(Value::as_i64))
+        .collect();
+    if target.iter().filter(|value| value.is_some()).count() < 2 {
+        return None;
+    }
+    let mut candidates = Vec::new();
+    for left in fields.iter().filter(|name| name.as_str() != field) {
+        for right in fields
+            .iter()
+            .filter(|name| name.as_str() != field && *name != left)
+        {
+            if left >= right {
+                continue;
+            }
+            let mut observed = 0usize;
+            let mut varied = false;
+            let mut previous: Option<i64> = None;
+            let mut valid = true;
+            for (state, expected) in snapshots.iter().zip(&target) {
+                let (Some(expected), Some(a), Some(b)) = (
+                    expected,
+                    state.get(left).and_then(Value::as_i64),
+                    state.get(right).and_then(Value::as_i64),
+                ) else {
+                    continue;
+                };
+                if a.checked_add(b) != Some(*expected) {
+                    valid = false;
+                    break;
+                }
+                observed += 1;
+                if previous.is_some_and(|value| value != *expected) {
+                    varied = true;
+                }
+                previous = Some(*expected);
+            }
+            if valid && observed >= 2 && varied {
+                candidates.push(ValueExpr::Arithmetic {
+                    left: Box::new(ValueExpr::State {
+                        field: left.clone(),
+                    }),
+                    op: NumOp::Add,
+                    right: Box::new(ValueExpr::State {
+                        field: right.clone(),
+                    }),
+                });
+            }
+        }
+    }
+    (candidates.len() == 1).then(|| candidates.remove(0))
+}
+
 fn apply_derived(derived: &Derived, state: &mut Value, collections: &[Collection]) {
     match derived {
         Derived::Count { field, collection } => {
@@ -7508,6 +7589,14 @@ fn apply_derived(derived: &Derived, state: &mut Value, collections: &[Collection
                     })
                     .collect::<Map<_, _>>();
                 set_key(state, field, Value::Object(object));
+            }
+        }
+        Derived::Expression { field, expression } => {
+            if let Some(value) = eval_value(expression, state, &BTreeMap::new(), None, collections)
+            {
+                if let Some(object) = state.as_object_mut() {
+                    object.insert(field.clone(), value);
+                }
             }
         }
         Derived::CountPresent {
@@ -9296,5 +9385,37 @@ mod tests {
                 name: "channel".into()
             })
         );
+    }
+    #[test]
+    fn derived_expression_recomputes_arithmetic_total() {
+        let before = json!({"tasks": [], "open": 0, "done": 0, "total": 0});
+        let after = json!({
+            "tasks": [{"id": 1, "title": "one", "priority": null, "done": false}],
+            "open": 1, "done": 0, "total": 1
+        });
+        let completed = json!({"tasks": [], "open": 0, "done": 1, "total": 1});
+        let collection = collection_def_from_state("tasks", &after).expect("tasks collection");
+        let derived = infer_derived(
+            &[before, after.clone(), completed],
+            std::slice::from_ref(&collection),
+        );
+        let expression = derived
+            .iter()
+            .find_map(|item| match item {
+                Derived::Expression { field, expression } if field == "total" => Some(expression),
+                _ => None,
+            })
+            .expect("arithmetic total expression");
+        let encoded = serde_json::to_string(expression).expect("serialize expression");
+        let decoded: ValueExpr = serde_json::from_str(&encoded).expect("deserialize expression");
+        let mut state = after;
+        state["tasks"] = json!([]);
+        state["open"] = json!(0);
+        state["done"] = json!(1);
+        for item in &derived {
+            apply_derived(item, &mut state, std::slice::from_ref(&collection));
+        }
+        assert_eq!(state["total"], json!(1));
+        assert_eq!(decoded, *expression);
     }
 }
