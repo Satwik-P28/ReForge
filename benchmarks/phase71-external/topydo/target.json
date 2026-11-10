@@ -1,0 +1,54 @@
+{
+  "target_id": "topydo-0.14",
+  "target_name": "topydo",
+  "authorization": "authorized_open_source_evaluation",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py"],
+  "pristine_dir": "pristine",
+  "workdir": "../../../target/reforge-phase71-topydo",
+  "state_file": "state.json",
+  "timeout_ms": 30000,
+  "actions": [
+    {
+      "action": "add_task",
+      "argv": ["add_task", "$title"],
+      "params": {"title": {"kind": "fresh_id", "prefix": "task"}},
+      "parameters": {"title": {"kind": "string"}}
+    },
+    {
+      "action": "read_task",
+      "argv": ["read_task", "$id"],
+      "params": {"id": {"kind": "last_entity", "pool": "task"}},
+      "parameters": {"id": {"kind": "string"}}
+    },
+    {
+      "action": "complete_task",
+      "argv": ["complete_task", "$id"],
+      "params": {"id": {"kind": "last_entity", "pool": "task"}},
+      "parameters": {"id": {"kind": "string"}}
+    },
+    {
+      "action": "delete_task",
+      "argv": ["delete_task", "$id"],
+      "params": {"id": {"kind": "last_entity", "pool": "task"}},
+      "parameters": {"id": {"kind": "string"}}
+    },
+    {
+      "action": "set_priority",
+      "argv": ["set_priority", "$id", "$priority"],
+      "params": {
+        "id": {"kind": "last_entity", "pool": "task"},
+        "priority": {"kind": "literal", "value": "A"}
+      },
+      "parameters": {"id": {"kind": "string"}, "priority": {"kind": "string"}}
+    },
+    {
+      "action": "list_tasks",
+      "argv": ["list_tasks"]
+    },
+    {
+      "action": "stats",
+      "argv": ["stats"]
+    }
+  ]
+}

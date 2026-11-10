@@ -1,0 +1,36 @@
+{
+  "app": "json-server-0.17.4",
+  "workflows": [
+    {
+      "name": "create-publish-comment",
+      "steps": [
+        {"action": "create_post", "params": {"title": "release notes"}},
+        {"action": "read_post", "params": {"id": "2"}},
+        {"action": "publish_post", "params": {"id": "2"}},
+        {"action": "read_post", "params": {"id": "2"}},
+        {"action": "add_comment", "params": {"post_id": "2", "body": "ship it"}},
+        {"action": "list_comments", "params": {"post_id": "2"}},
+        {"action": "post_count", "params": {}}
+      ]
+    },
+    {
+      "name": "delete-read-recreate",
+      "steps": [
+        {"action": "delete_post", "params": {"id": "1"}},
+        {"action": "read_post", "params": {"id": "1"}},
+        {"action": "create_post", "params": {"title": "replacement"}},
+        {"action": "read_post", "params": {"id": "1"}},
+        {"action": "post_count", "params": {}}
+      ]
+    },
+    {
+      "name": "missing-guards",
+      "steps": [
+        {"action": "add_comment", "params": {"post_id": "999", "body": "orphan"}},
+        {"action": "list_comments", "params": {"post_id": "999"}},
+        {"action": "create_post", "params": {"title": "after guard"}},
+        {"action": "post_count", "params": {}}
+      ]
+    }
+  ]
+}

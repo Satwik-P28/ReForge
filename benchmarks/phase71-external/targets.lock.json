@@ -1,0 +1,16 @@
+{
+  "json-server": {
+    "command": "json-server/runtime/node_modules/json-server",
+    "entrypoint_sha256": "b1877255051e967e6fe749dc8d6420e31a4b4f4f26aae99e3c2ca40b20341536",
+    "license": "MIT",
+    "package_json_sha256": "db4a533c15355cc9d5b18b5712713561e581b280b72ca7fc4a6a95f83aaf1940",
+    "version": "0.17.4"
+  },
+  "topydo": {
+    "command": "topydo/runtime/venv/bin/topydo",
+    "entrypoint_sha256": "7f54e04dd422127ed8b75ecadd4f337dbd86f349c13284e4201258afa6c030eb",
+    "license": "GPL-3.0-or-later",
+    "package_sha256": "e154071d533e1cb6fc231276daf5e907fa4d4ecd2348cdf8ea70d3198fa1df14",
+    "version": "0.14"
+  }
+}

@@ -26,6 +26,7 @@ harness = false
 reforge = { workspace = true }
 reforge-investigate = { workspace = true }
 reforge-observe = { workspace = true }
+reforge-rea = { workspace = true }
 reforge-diff = { workspace = true }
 reforge-types = { workspace = true }
 serde = { workspace = true }

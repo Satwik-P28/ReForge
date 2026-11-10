@@ -16,11 +16,13 @@ use indexmap::IndexMap;
 use reforge_diff::{data_campaign, differential_campaign, CampaignConfig, DataCampaignConfig};
 use reforge_investigate::{
     instantiate_actions, investigate, synthesize_data_program_with_samples, synthesize_twin,
-    CliTargetSpec, DataProgram, DataSample, EntityPool, EvidenceKind, EvidenceSource,
-    ExperimentAccounting, InvestigationConfig, InvestigationRecord, ObservationProvenance,
-    OutcomeKind, PolicyKind, PrerequisiteSummary, SelectionStrategy, TwinSynthConfig,
+    CliTargetSpec, DataProgram, DataSample, EntityPool, EvidenceGuidance, EvidenceKind,
+    EvidenceSource, ExperimentAccounting, InvestigationConfig, InvestigationRecord,
+    ObservationProvenance, OutcomeKind, PolicyKind, PrerequisiteSummary, SelectionStrategy,
+    TwinSynthConfig,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
+use reforge_rea::{ReaConfig, ReaProvider};
 use reforge_types::{BehavioralTwin, TypedValue};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -184,6 +186,7 @@ fn run_investigation(
     seed: u64,
     model: Option<&Path>,
     record_data: bool,
+    evidence_guidance: Option<&EvidenceGuidance>,
 ) -> Result<InvestigationRecord> {
     let spec_path = root.join(&app.spec);
     let spec = CliTargetSpec::load(&spec_path).map_err(|e| anyhow::anyhow!(e))?;
@@ -201,6 +204,7 @@ fn run_investigation(
         .with_seed(seed);
     config.record_dataset = record_data;
     config.neural_model = model.map(Path::to_path_buf);
+    config.evidence_guidance = evidence_guidance.cloned();
     let result = investigate(&mut target, &config);
     let _ = std::fs::remove_dir_all(&workdir);
     result.map_err(|e| anyhow::anyhow!(e))
@@ -851,6 +855,53 @@ fn main() -> Result<()> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(500);
 
+    let rea_started = Instant::now();
+    let mut rea_guidance: Option<EvidenceGuidance> = None;
+    let rea_metadata = match (
+        std::env::var("REFORGE_BENCH_REA_BIN").ok(),
+        std::env::var("REFORGE_BENCH_REA_SOURCE").ok(),
+    ) {
+        (Some(bin), Some(source)) => {
+            let config = ReaConfig {
+                command: Some(PathBuf::from(bin)),
+                ..ReaConfig::default()
+            };
+            let provider = ReaProvider::detect(&config)
+                .map_err(|error| anyhow::anyhow!("REA detection failed: {error}"))?;
+            let analysis_dir = std::env::temp_dir().join(format!(
+                "reforge-bench-rea-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or_default()
+            ));
+            let analysis = provider
+                .analyze_javascript(Path::new(&source), &analysis_dir, &config)
+                .map_err(|error| anyhow::anyhow!("REA analysis failed: {error}"))?;
+            let guidance = analysis.projection.guidance();
+            let metadata = serde_json::json!({
+                "enabled": true,
+                "source": source,
+                "version": provider.version().version,
+                "evidence_id": analysis.evidence_id,
+                "evidence_ids": guidance.evidence_ids,
+                "hint_count": guidance.hints.len(),
+                "hint_categories": guidance.hints.iter().map(|hint| hint.category.clone()).collect::<Vec<_>>(),
+                "analysis_ms": rea_started.elapsed().as_millis(),
+            });
+            rea_guidance = Some(guidance);
+            metadata
+        }
+        (None, None) => serde_json::json!({
+            "enabled": false,
+            "reason": "no REA source configured"
+        }),
+        _ => {
+            anyhow::bail!("REFORGE_BENCH_REA_BIN and REFORGE_BENCH_REA_SOURCE must be set together")
+        }
+    };
+
     let apps_text = std::fs::read_to_string(root.join(&suite_dir).join("apps.json"))?;
     let mut suite: AppsFile = serde_json::from_str(&apps_text)?;
     if let Ok(filter) = std::env::var("REFORGE_BENCH_APPS") {
@@ -913,6 +964,7 @@ fn main() -> Result<()> {
                         seed,
                         model,
                         policy != PolicyKind::Neural,
+                        rea_guidance.as_ref(),
                     );
                     let duration_ms = started.elapsed().as_millis();
                     match outcome {
@@ -1208,6 +1260,7 @@ fn main() -> Result<()> {
             .map(SelectionStrategy::as_str)
             .unwrap_or("phase62"),
         "experiment_budget": experiment_strategy.map(|_| experiment_budget),
+        "rea": rea_metadata,
         "policies": summaries,
         "reconstruction": reconstruction,
         "reconstruction_totals": reconstruction_totals,

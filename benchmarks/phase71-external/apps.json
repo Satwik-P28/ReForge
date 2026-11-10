@@ -1,0 +1,8 @@
+{
+  "suite": "reforgebench-phase71-external",
+  "description": "Two independently developed applications not used in Phases 6.2-7: json-server 0.17.4 (multi-module JavaScript REST state) and topydo 0.14 (pinned Python todo.txt CLI).",
+  "apps": [
+    {"spec": "benchmarks/phase71-external/json-server/target.json", "split": "holdout"},
+    {"spec": "benchmarks/phase71-external/topydo/target.json", "split": "holdout"}
+  ]
+}

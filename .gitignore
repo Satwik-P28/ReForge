@@ -20,3 +20,6 @@ Cargo.lock.bak
 # Phase 7 disposable audit workspace and installed target runtimes
 /.phase7-audit/
 **/node_modules/
+/benchmarks/phase71-external/*/runtime/
+/benchmarks/phase71-external/preflight-report.json
+/benchmarks/phase71-external/*/work/

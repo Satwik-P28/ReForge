@@ -1101,6 +1101,7 @@ dependencies = [
  "reforge-diff",
  "reforge-investigate",
  "reforge-observe",
+ "reforge-rea",
  "reforge-types",
  "serde",
  "serde_json",
