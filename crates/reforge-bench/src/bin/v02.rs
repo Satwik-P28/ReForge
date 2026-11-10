@@ -185,7 +185,6 @@ fn run_investigation(
     budget: u32,
     seed: u64,
     model: Option<&Path>,
-    record_data: bool,
     evidence_guidance: Option<&EvidenceGuidance>,
 ) -> Result<InvestigationRecord> {
     let spec_path = root.join(&app.spec);
@@ -202,7 +201,7 @@ fn run_investigation(
         .with_policy(policy)
         .with_budget(budget)
         .with_seed(seed);
-    config.record_dataset = record_data;
+    config.record_dataset = policy != PolicyKind::Neural;
     config.neural_model = model.map(Path::to_path_buf);
     config.evidence_guidance = evidence_guidance.cloned();
     let result = investigate(&mut target, &config);
@@ -963,7 +962,6 @@ fn main() -> Result<()> {
                         budget,
                         seed,
                         model,
-                        policy != PolicyKind::Neural,
                         rea_guidance.as_ref(),
                     );
                     let duration_ms = started.elapsed().as_millis();
