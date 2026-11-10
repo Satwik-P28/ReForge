@@ -10,11 +10,11 @@
     "json-server": "external OSS maintained project",
     "topydo": "external OSS pinned release"
   },
-  "created_utc": "2026-11-10T20:36:32.454882+00:00",
+  "created_utc": "2026-11-10T20:43:00.454189+00:00",
   "evaluation": {
     "app_specs": [
       "benchmarks/phase71-external/json-server/target.json",
-      "benchmarks/phase71-external/topydo/target.json"
+      "benchmarks/phase71-external/todotxt-cli/target.json"
     ],
     "blackbox_artifact": "bench-results/phase71-blackbox.json",
     "budgets": [
@@ -33,23 +33,23 @@
   "files": [
     {
       "path": "apps.json",
-      "sha256": "28f79ab46d4955edf7047f4d916287d01f78b54594a48b313e833f596074f494"
+      "sha256": "b6b67b3eae3f8cdb2777308c1c5036c0a05755eef1c12ec60cd46f4bb9bb46d8"
     },
     {
       "path": "freeze.py",
-      "sha256": "5a4e6cf781898626a903f3d87baa4882f29fb595092f73764c257d7b0cfe4759"
+      "sha256": "da4667e2777ba821e1dfd368a764a0ea4ad88830927fe20f89557e22144166e6"
     },
     {
       "path": "hidden/json-server-0.17.4.json",
       "sha256": "f24407b317b4f578076fd633f74301b0bec1632c9ddb3d157acdfd1e8954767f"
     },
     {
-      "path": "hidden/topydo-0.14.json",
-      "sha256": "9d15e5ed70b09a729eb3fcf4bd66999683b615ab48ec192d467ce081cc318926"
+      "path": "hidden/todo.txt-cli-2.12.0.json",
+      "sha256": "67873cc68c902fe1f518fe0122cae4200ebbeb0432816c2037abfa43f5d73f98"
     },
     {
       "path": "install.sh",
-      "sha256": "03eb0c43a33f75e06bac40b70d6f4bdb626c83c32a110ebf10d3b80f9e71042b"
+      "sha256": "c7c52d0e3d4bb590eec3810a2496c21645a66614070348f7d84a12df70dbe71e"
     },
     {
       "path": "json-server/adapter.py",
@@ -69,35 +69,35 @@
     },
     {
       "path": "preflight-smoke.json",
-      "sha256": "74b1d777b222f7fbebe6c5be434f684f86dbcb70b88b9df36aaccd37628d7797"
+      "sha256": "a299fb80e33b4f27e61e60631f0f654ac124e573e1e0c05b1c0becbfa4007098"
     },
     {
       "path": "preflight.py",
-      "sha256": "30570389dd1d3e3c690294271e5de01d57e19648c54f7256862b374c855d29e0"
+      "sha256": "e7af8c21d4a86649b973794a55a5dd2958648122c6d8cf5aaf60d9f55c406a80"
     },
     {
       "path": "sources.lock.json",
-      "sha256": "95e3e0c4ac03e6acaeab6a454043c5ffaef1f9b9bdbbb0628a78d9fb6e12dfa1"
+      "sha256": "e9886a25dda08bceb1500089775cfa15169863d1b0844da33c58daf5d7617c7e"
     },
     {
-      "path": "topydo/adapter.py",
-      "sha256": "ccd3a089fc04d05bc9c9aba40753e5e641f82566cf8c89bcc84c37550c2fa6da"
+      "path": "todotxt-cli/adapter.py",
+      "sha256": "487f314ac94a6b05cd98d3d918235c104dbdf59f5a73e78e74f625c436069d2d"
     },
     {
-      "path": "topydo/pristine/done.txt",
+      "path": "todotxt-cli/pristine/done.txt",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "topydo/pristine/state.json",
+      "path": "todotxt-cli/pristine/state.json",
       "sha256": "3fa277e64ddee8b5bf5a28f1847bda9e4340b61d6eb65b7d547bc6a530bdb636"
     },
     {
-      "path": "topydo/pristine/todo.txt",
+      "path": "todotxt-cli/pristine/todo.txt",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "topydo/target.json",
-      "sha256": "60747dd74953e12b75c3a554916c26f2e885a85d8fdfb2ef576b4f52c3fd04d9"
+      "path": "todotxt-cli/target.json",
+      "sha256": "cdb78ff70772213fcfc48ef96cf55b87e62ca8c6eab573788808ba40bc34358c"
     }
   ],
   "frozen_before_first_evaluation": true,
@@ -110,16 +110,21 @@
     ],
     "reason": "target authorization enum rejected before any action; no behavioral result was produced"
   },
+  "invalidated_v2": {
+    "preserved_blackbox": "bench-results/phase71-blackbox.frozen-v2.json",
+    "preserved_freeze": "bench-results/phase71-invalidated/FREEZE.v1.json",
+    "reason": "topydo was already evaluated in Phase 6.4/6.5 and is not an independent target; its literal encoding also failed before any action"
+  },
   "notes": [
     "Target installation is reproduced by install.sh from pinned versions.",
     "Preflight executed hidden workflows for harness validation only; they are never supplied to reconstruction.",
     "Any change to targets, hidden workflows, normalization, scoring, or budgets after this freeze invalidates the result."
   ],
-  "package_sha256": "7ce6cbb45b81e33f74c7b9c30a0250bef1f2c56dd22d22240c165ab123d347b6",
-  "source_commit": "b7ad2c91d20571296d09bf04c63151c5ab7082f3",
-  "source_tree": "850354d4337c14964cbf88acebae1bc6797780e1",
+  "package_sha256": "47689bc95a3937f2cfe21b6ff4cf35c34f65095ab71134c9ad3d7b78d61a0daf",
+  "source_commit": "67e6e7bc776beac7ecbe53f658d53ffa2779750c",
+  "source_tree": "598819424d1ec331c28b817efe6383c544f5cb65",
   "suite": "reforgebench-phase71-external",
-  "suite_version": 2,
+  "suite_version": 3,
   "target_sources": {
     "json-server": {
       "license": "MIT",
@@ -128,12 +133,12 @@
       "upstream": "https://github.com/typicode/json-server",
       "version": "0.17.4"
     },
-    "topydo": {
+    "todo.txt-cli": {
       "license": "GPL-3.0-or-later",
       "rea_analysis": "not supported; black-box-only",
-      "runtime": "benchmarks/phase71-external/topydo/runtime",
-      "upstream": "https://github.com/topydo/topydo",
-      "version": "0.14"
+      "runtime": "benchmarks/phase71-external/todotxt-cli/runtime",
+      "upstream": "https://github.com/todotxt/todo.txt-cli",
+      "version": "2.12.0"
     }
   },
   "targets": {
@@ -144,12 +149,12 @@
       "package_json_sha256": "db4a533c15355cc9d5b18b5712713561e581b280b72ca7fc4a6a95f83aaf1940",
       "version": "0.17.4"
     },
-    "topydo": {
-      "command": "topydo/runtime/venv/bin/topydo",
-      "entrypoint_sha256": "7f54e04dd422127ed8b75ecadd4f337dbd86f349c13284e4201258afa6c030eb",
+    "todo.txt-cli": {
+      "command": "todotxt-cli/runtime/todo.txt_cli-2.12.0/todo.sh",
+      "entrypoint_sha256": "507ea0069f8cadcd513cc080f49cc3dcbbf1b98cf021498386d75c04ae4a5fad",
       "license": "GPL-3.0-or-later",
-      "package_sha256": "e154071d533e1cb6fc231276daf5e907fa4d4ecd2348cdf8ea70d3198fa1df14",
-      "version": "0.14"
+      "tarball_sha256": "e6da9b2c8022658c514a0b1613b3eae52f6240bf2b3494a83dae713ea445d13e",
+      "version": "2.12.0"
     }
   }
 }
