@@ -1,0 +1,101 @@
+{
+  "access_boundary": {
+    "action_schema": "manually specified in target.json",
+    "adapter_role": "benchmark harness; target source is not inspected or imported",
+    "hidden_workflows_visible_to_investigator": false,
+    "investigator_source_access": "none"
+  },
+  "authorship": {
+    "classification": "internally-authored",
+    "note": "Both targets were authored for this suite. Results are not claimed as third-party evidence.",
+    "third_party_independent": false
+  },
+  "created_utc": "2026-11-10T00:11:27.029034+00:00",
+  "evaluation": {
+    "apps": [
+      "cli-parcel",
+      "cli-vault"
+    ],
+    "artifact": "bench-results/phase66-external-v1-untouched-100.json",
+    "budget": 100,
+    "experiment_budget": 100,
+    "policy": "coverage",
+    "seed": 1,
+    "strategy": "hybrid"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "5dfa5526c6505ff314fb8a1ac5276d8de1dab0926568172e189995ea4fa42d52"
+    },
+    {
+      "path": "apps.json",
+      "sha256": "eded8bc3448f485a08c9685d7b2370d941d844b4682d68a752fd250eaa1d5833"
+    },
+    {
+      "path": "fixtures/parcel/adapter.py",
+      "sha256": "f3d3e1c94be459d17ac2ed4fe41e372670a0063f80bab8e60e85290ba7cf8e29"
+    },
+    {
+      "path": "fixtures/parcel/parcel.py",
+      "sha256": "95623aefe7f37464ea77fc3c31fad8218c1cc5c489d207bdb089843f416d8830"
+    },
+    {
+      "path": "fixtures/parcel/state.json",
+      "sha256": "d1ae4897ed918d13a274e999621d703095085b8ca8167e0a17cdce09d108f129"
+    },
+    {
+      "path": "fixtures/parcel/target.json",
+      "sha256": "6841ad2c03a983451666ae1f2cb1031601e0c1dbe83b553aeb8d7676b443d949"
+    },
+    {
+      "path": "fixtures/vault/adapter.py",
+      "sha256": "b044614bb97953cba3385c7af7bfe35b0ee6adb3b3b35a25c48cda6d4060642e"
+    },
+    {
+      "path": "fixtures/vault/state.json",
+      "sha256": "8562855b39fd87d97802efae9fb9176687d69c9bd5a17dee760030d8572763c0"
+    },
+    {
+      "path": "fixtures/vault/target.json",
+      "sha256": "00d96c4c4f6f324f06cd91d0cc439197ca299f2f74e79ba04db96adddd19d026"
+    },
+    {
+      "path": "fixtures/vault/vault.py",
+      "sha256": "fd8d87761f631d61baf96410231313f430ba4e69e229f518e8ae26ab91182c6f"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "1c11d7b48e96b0ed8c356bd93c91cf97996dfdce46e145e0ea3f905ce6a15889"
+    },
+    {
+      "path": "hidden/cli-parcel.json",
+      "sha256": "1452423f2b2fc3c7834e0ccfff7192556985ec517fc9594e1c8e3f97c6dc0208"
+    },
+    {
+      "path": "hidden/cli-vault.json",
+      "sha256": "b3dd030ed893deeea47dbee8322e992cc210da00b8fb1a1c6302bb920c65334e"
+    },
+    {
+      "path": "preflight-smoke.json",
+      "sha256": "df18adc81ae9190d1103f14536f2ab7a556977232c07d17c2af93d80e20281c7"
+    },
+    {
+      "path": "preflight.py",
+      "sha256": "0e6b28346cd9a16bd918ab89944d595b9751037d6805482c39d8360ce013ba78"
+    },
+    {
+      "path": "targets.lock.json",
+      "sha256": "d77bbbd8780abae14b2dde29b3b8dd151f460aeb26d9f9730b42c1cb1b16f1e3"
+    }
+  ],
+  "frozen_before_first_evaluation": true,
+  "notes": [
+    "Both targets were preflighted before this freeze.",
+    "Any fixture, hidden-workflow, normalization or scoring change after this freeze requires a new suite version.",
+    "The evaluation is run exactly once after freeze; the result is preserved even if negative."
+  ],
+  "source_commit": "28f9cbfaefe3550e393473d2a76896d85b88a986",
+  "source_tree": "c7aa717d5925643f07327be4dedea80a8741d825",
+  "suite": "reforgebench-phase66-external"
+}
