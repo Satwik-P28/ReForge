@@ -5,7 +5,7 @@
     {"action": "publish_post", "params": {"id": "2"}},
     {"action": "post_count", "params": {}}
   ],
-  "topydo-0.14": [
+  "todo.txt-cli-2.12.0": [
     {"action": "add_task", "params": {"title": "smoke task"}},
     {"action": "read_task", "params": {"id": "1"}},
     {"action": "complete_task", "params": {"id": "1"}},

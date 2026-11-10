@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).resolve().parent
 APPS = {
     "json-server-0.17.4": (SUITE / "json-server", "post_count"),
-    "topydo-0.14": (SUITE / "topydo", "stats"),
+    "todo.txt-cli-2.12.0": (SUITE / "todotxt-cli", "stats"),
 }
 
 
@@ -105,7 +105,7 @@ def main() -> int:
         entrypoint = fixture / "runtime" / (
             "node_modules/json-server/lib/cli/bin.js"
             if spec["target_name"] == "json-server"
-            else "venv/bin/topydo"
+            else "todo.txt_cli-2.12.0/todo.sh"
         )
         if not entrypoint.exists():
             failures.append(f"{target_id}: installed entrypoint is missing")

@@ -19,12 +19,12 @@
     "license": "MIT",
     "version": "6.7.0"
   },
-  "topydo": {
-    "install": "python3 -m venv topydo/runtime/venv && topydo/runtime/venv/bin/pip install topydo==0.14",
+  "todo.txt-cli": {
+    "install": "benchmarks/phase71-external/install.sh",
     "license": "GPL-3.0-or-later",
-    "tarball": "topydo-0.14-py3-none-any.whl",
-    "tarball_sha256": "82ac6ebd82ffeae8ed0091549ef124bd4d1183660623099b07d1a5ad29237d08",
-    "upstream": "https://github.com/topydo/topydo",
-    "version": "0.14"
+    "tarball": "todo.txt_cli-2.12.0.tar.gz",
+    "tarball_sha256": "e6da9b2c8022658c514a0b1613b3eae52f6240bf2b3494a83dae713ea445d13e",
+    "upstream": "https://github.com/todotxt/todo.txt-cli",
+    "version": "2.12.0"
   }
 }

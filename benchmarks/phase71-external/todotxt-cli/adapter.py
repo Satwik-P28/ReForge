@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Thin CLI adapter for the unmodified topydo 0.14 todo.txt application.
+"""Thin adapter for unmodified todo.txt-cli 2.12.0.
 
-The adapter invokes the pinned application, normalizes its displayed IDs and
-todo.txt records, and emits one JSON envelope. It does not implement todo
-semantics: allocation, completion, archive, priority and deletion are performed
-by topydo.
+todo.txt-cli is responsible for allocation, completion/archive, priority,
+deletion, and persistence. This harness only supplies an isolated config and
+normalizes the CLI's displayed records.
 """
 from __future__ import annotations
 
@@ -16,27 +15,29 @@ import sys
 from pathlib import Path
 
 SPEC = Path(__file__).resolve().parent
-TOP = SPEC / "runtime/venv/bin/topydo"
+APP = SPEC / "runtime/todo.txt_cli-2.12.0/todo.sh"
 STATE = Path("state.json")
-LINE = re.compile(r"^\|\s*(\d+)\|\s*(?:\(([A-Z])\)\s*)?(?:(\d{4}-\d{2}-\d{2})\s+)?(.*)$")
+CFG = Path("todo.cfg")
+LINE = re.compile(r"^\s*(\d+)\s+(?:\(([A-Z])\)\s*)?(.*)$")
+
+
+def write_config() -> None:
+    here = os.getcwd()
+    CFG.write_text(
+        f'export TODO_DIR="{here}"\nexport TODO_FILE="{here}/todo.txt"\nexport DONE_FILE="{here}/done.txt"\nexport TODOTXT_FORCE=1\n',
+        encoding="utf-8",
+    )
 
 
 def run(args: list[str]):
-    env = {
-        **os.environ,
-        "HOME": os.getcwd(),
-        "XDG_CONFIG_HOME": os.path.join(os.getcwd(), ".config"),
-        "NO_COLOR": "1",
-        "TERM": "dumb",
-        "COLUMNS": "200",
-    }
+    write_config()
     return subprocess.run(
-        [str(TOP), "-C", "0", "-t", "todo.txt", "-d", "done.txt", *args],
+        [str(APP), "-d", "todo.cfg", *args],
         cwd=os.getcwd(),
-        env=env,
         text=True,
         capture_output=True,
         timeout=15,
+        env={**os.environ, "TERM": "dumb", "NO_COLOR": "1", "COLUMNS": "200"},
     )
 
 
@@ -47,37 +48,26 @@ def active_tasks() -> list[dict]:
         match = LINE.match(line.strip())
         if not match:
             continue
-        ident, priority, _date, title = match.groups()
+        ident, priority, title = match.groups()
         tasks.append(
-            {
-                "id": int(ident),
-                "title": title.strip(),
-                "priority": priority,
-                "done": False,
-            }
+            {"id": int(ident), "title": title.strip(), "priority": priority, "done": False}
         )
     return tasks
 
 
 def done_count() -> int:
-    if not Path("done.txt").exists():
-        return 0
-    return sum(
-        1
-        for line in Path("done.txt").read_text(encoding="utf-8").splitlines()
-        if line.startswith("x ")
+    path = Path("done.txt")
+    return (
+        sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.startswith("x "))
+        if path.exists()
+        else 0
     )
 
 
 def snapshot() -> dict:
     tasks = active_tasks()
     done = done_count()
-    state = {
-        "tasks": tasks,
-        "open": len(tasks),
-        "done": done,
-        "total": len(tasks) + done,
-    }
+    state = {"tasks": tasks, "open": len(tasks), "done": done, "total": len(tasks) + done}
     STATE.write_text(json.dumps(state, sort_keys=True, separators=(",", ":")), encoding="utf-8")
     return state
 
@@ -95,13 +85,8 @@ def emit(outcome: str, **extra) -> None:
     print(json.dumps({"outcome": outcome, **extra}, sort_keys=True))
 
 
-def invalid(result) -> bool:
-    text = result.stdout + result.stderr
-    return "Invalid todo number" in text or "Invalid todo" in text
-
-
 def main(argv: list[str]) -> int:
-    if not argv or not TOP.exists():
+    if not argv or not APP.exists():
         emit("error", error="target_unavailable")
         return 0
     action, args = argv[0], argv[1:]
@@ -124,38 +109,35 @@ def main(argv: list[str]) -> int:
                 state = snapshot()
                 emit("success", id=task["id"], title=task["title"], priority=task["priority"], done=False, open=state["open"], done_count=state["done"])
         elif action == "complete_task":
-            tasks = active_tasks()
-            task = find_task(tasks, args[0] if args else "")
+            task = find_task(active_tasks(), args[0] if args else "")
             if task is None:
                 emit("error", error="not_found", id=args[0] if args else None)
             else:
                 result = run(["do", str(task["id"])])
-                if invalid(result):
+                if "marked as done" not in result.stdout:
                     emit("error", error="not_found", id=task["id"])
                 else:
                     state = snapshot()
                     emit("success", id=task["id"], completed=True, title=task["title"], done_count=state["done"], open=state["open"], events=["task_completed"])
         elif action == "delete_task":
-            tasks = active_tasks()
-            task = find_task(tasks, args[0] if args else "")
+            task = find_task(active_tasks(), args[0] if args else "")
             if task is None:
                 emit("error", error="not_found", id=args[0] if args else None)
             else:
                 result = run(["del", str(task["id"])])
-                if invalid(result):
+                if "deleted" not in result.stdout:
                     emit("error", error="not_found", id=task["id"])
                 else:
                     state = snapshot()
                     emit("success", deleted=True, deleted_id=task["id"], deleted_pool="task", open=state["open"], events=["task_deleted"])
         elif action == "set_priority":
-            tasks = active_tasks()
-            task = find_task(tasks, args[0] if args else "")
+            task = find_task(active_tasks(), args[0] if args else "")
             if task is None:
                 emit("error", error="not_found", id=args[0] if args else None)
             else:
                 priority = (args[1] if len(args) > 1 else "A").upper()
                 result = run(["pri", str(task["id"]), priority])
-                if invalid(result):
+                if "prioritized" not in result.stdout:
                     emit("error", error="not_found", id=task["id"])
                 else:
                     emit("success", id=task["id"], priority=priority, events=["priority_set"])

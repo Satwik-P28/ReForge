@@ -42,7 +42,7 @@ def main() -> None:
     lock = load(SUITE / "targets.lock.json")
     manifest = {
         "suite": "reforgebench-phase71-external",
-        "suite_version": 2,
+        "suite_version": 3,
         "frozen_before_first_evaluation": True,
         "invalidated_previous": {
             "freeze": "bench-results/phase71-invalidated/FREEZE.v1.json",
@@ -52,6 +52,11 @@ def main() -> None:
                 "/tmp/phase71-blackbox-topydo.failed.v1.json",
                 "/tmp/phase71-rea-guided-json.failed.v1.json"
             ]
+        },
+        "invalidated_v2": {
+            "reason": "topydo was already evaluated in Phase 6.4/6.5 and is not an independent target; its literal encoding also failed before any action",
+            "preserved_blackbox": "bench-results/phase71-blackbox.frozen-v2.json",
+            "preserved_freeze": "bench-results/phase71-invalidated/FREEZE.v1.json"
         },
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "source_commit": head,
@@ -66,11 +71,11 @@ def main() -> None:
                 "runtime": "benchmarks/phase71-external/json-server/runtime",
                 "rea_analysis": "source-assisted JavaScript",
             },
-            "topydo": {
-                "version": "0.14",
+            "todo.txt-cli": {
+                "version": "2.12.0",
                 "license": "GPL-3.0-or-later",
-                "upstream": "https://github.com/topydo/topydo",
-                "runtime": "benchmarks/phase71-external/topydo/runtime",
+                "upstream": "https://github.com/todotxt/todo.txt-cli",
+                "runtime": "benchmarks/phase71-external/todotxt-cli/runtime",
                 "rea_analysis": "not supported; black-box-only",
             },
         },
@@ -82,7 +87,7 @@ def main() -> None:
             "experiment_budget": 64,
             "app_specs": [
                 "benchmarks/phase71-external/json-server/target.json",
-                "benchmarks/phase71-external/topydo/target.json",
+                "benchmarks/phase71-external/todotxt-cli/target.json",
             ],
             "blackbox_artifact": "bench-results/phase71-blackbox.json",
             "rea_artifact": "bench-results/phase71-rea-guided.json",

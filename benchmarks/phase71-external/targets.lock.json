@@ -6,11 +6,11 @@
     "package_json_sha256": "db4a533c15355cc9d5b18b5712713561e581b280b72ca7fc4a6a95f83aaf1940",
     "version": "0.17.4"
   },
-  "topydo": {
-    "command": "topydo/runtime/venv/bin/topydo",
-    "entrypoint_sha256": "7f54e04dd422127ed8b75ecadd4f337dbd86f349c13284e4201258afa6c030eb",
+  "todo.txt-cli": {
+    "command": "todotxt-cli/runtime/todo.txt_cli-2.12.0/todo.sh",
+    "entrypoint_sha256": "507ea0069f8cadcd513cc080f49cc3dcbbf1b98cf021498386d75c04ae4a5fad",
     "license": "GPL-3.0-or-later",
-    "package_sha256": "e154071d533e1cb6fc231276daf5e907fa4d4ecd2348cdf8ea70d3198fa1df14",
-    "version": "0.14"
+    "tarball_sha256": "e6da9b2c8022658c514a0b1613b3eae52f6240bf2b3494a83dae713ea445d13e",
+    "version": "2.12.0"
   }
 }
