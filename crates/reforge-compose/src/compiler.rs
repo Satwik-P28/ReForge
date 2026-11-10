@@ -64,9 +64,10 @@ pub fn compile_composition(
         let queries: Vec<_> = pkg.manifest.interfaces.queries.keys().cloned().collect();
         let events: Vec<_> = pkg.manifest.interfaces.events.keys().cloned().collect();
         let has_twin = pkg.twin.is_some();
-        if !has_twin {
+        let has_data_program = pkg.data_program.is_some();
+        if !has_twin && !has_data_program {
             assumptions.push(format!(
-                "instance '{}': no twin — commands cannot be executed by TwinEngine",
+                "instance '{}': no executable implementation — commands cannot be executed",
                 decl.instance
             ));
         }
@@ -83,6 +84,7 @@ pub fn compile_composition(
                 queries,
                 events,
                 has_twin,
+                has_data_program,
                 contracts: pkg
                     .manifest
                     .contract_inline

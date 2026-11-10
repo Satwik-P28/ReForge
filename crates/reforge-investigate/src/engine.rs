@@ -368,6 +368,29 @@ impl EntityPool {
         }
     }
 
+    /// Stop offering an identifier after the target confirms its deletion.
+    /// This is generic allocator bookkeeping: the deletion is still an observed
+    /// outcome, and no unobserved entity is ever synthesized.
+    pub fn observe_deleted_entity(&mut self, outputs: &IndexMap<String, TypedValue>) {
+        let Some(id) = outputs.get("deleted_id").and_then(output_identity_text) else {
+            return;
+        };
+        if let Some(pool) = outputs.get("deleted_pool").and_then(|v| v.as_str()) {
+            if let Some(ids) = self.entities.get_mut(pool) {
+                ids.retain(|existing| existing != &id);
+            }
+            if let Some(singular) = pool.strip_suffix('s') {
+                if let Some(ids) = self.entities.get_mut(singular) {
+                    ids.retain(|existing| existing != &id);
+                }
+            }
+        } else {
+            for ids in self.entities.values_mut() {
+                ids.retain(|existing| existing != &id);
+            }
+        }
+    }
+
     pub fn add(&mut self, pool: &str, id: &str) {
         let entry = self.entities.entry(pool.to_string()).or_default();
         if !entry.iter().any(|e| e == id) {
@@ -623,6 +646,7 @@ pub fn investigate(
         let discovered_actions =
             merge_discovered_actions(&mut alphabet, &observation.outputs, config);
         pool.observe_outputs(&observation.outputs);
+        pool.observe_deleted_entity(&observation.outputs);
         if let Some(state) = &observation.state_document {
             pool.observe_created_entity(&observation.outputs, state);
         }

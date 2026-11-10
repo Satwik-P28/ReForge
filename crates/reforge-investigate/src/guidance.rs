@@ -40,11 +40,15 @@ impl EvidenceGuidance {
                     name == term || name.contains(&term)
                 });
                 if matches {
-                    score += 0.9;
+                    // Categories overlap (delete matches both mutation and
+                    // persistence). Count an action once at its strongest
+                    // category; adding every match made one action dominate
+                    // exploration and starved unrelated experiments.
+                    score = score.max(0.9);
                 }
             }
             if score > 0.0 {
-                scores.insert(entry.action.clone(), score.min(2.7));
+                scores.insert(entry.action.clone(), score);
             }
         }
         scores

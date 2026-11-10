@@ -5,7 +5,9 @@ use crate::contracts::{synthesize_contract, synthesize_operations};
 use crate::discover::{discover_capabilities, CapabilityCandidate};
 use crate::portability::{audit_package, PortabilityReport};
 use indexmap::IndexMap;
-use reforge_investigate::{synthesize_twin, InvestigationRecord, TwinSynthConfig};
+use reforge_investigate::{
+    synthesize_data_program, synthesize_twin, InvestigationRecord, TwinSynthConfig,
+};
 use reforge_types::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -120,6 +122,8 @@ pub fn extract_capability(
     // transitions so the generic composer can bind to them. Payloads were not
     // captured, so the event declarations remain payload-free.
     attach_observed_events(&mut twin, record);
+    let data_program = synthesize_data_program(record);
+    let data_executable = !data_program.rules.is_empty();
 
     let mut evidence = reforge_investigate::build_evidence(
         &record.log,
@@ -191,24 +195,61 @@ pub fn extract_capability(
         contract_inline: vec![synthesized.contract.clone()],
         dependencies: Vec::new(),
         permissions: Vec::new(),
-        runtime_requirements: vec![RuntimeRequirement {
-            name: "reforge-twin-engine".into(),
-            version_req: Some(">=0.1.0".into()),
-            notes: Some("executes the extracted twin deterministically".into()),
-        }],
-        implementations: vec![ImplementationRef {
-            id: Id::new("impl.twin").expect("static id"),
-            kind: ImplementationKind::ReferenceTwin,
-            path: Some("twin.json".into()),
-            version: Some(config.package_version.clone()),
-            operations: actions.clone(),
-            environment: vec!["deterministic twin interpreter".into()],
-            demonstrated_by_tests: Vec::new(),
-            notes: Some(
-                "Synthesized from observations. Executes only modeled behavior; unmodeled actions return Unknown. runner.py is twin-backed; implementation.py embeds the observed machine in generated Python and runs without the twin or the reference program. Neither reimplements unobserved domain logic."
-                    .to_string(),
-            ),
-        }],
+        runtime_requirements: {
+            let mut requirements = vec![RuntimeRequirement {
+                name: "reforge-twin-engine".into(),
+                version_req: Some(">=0.1.0".into()),
+                notes: Some("executes the extracted abstract twin deterministically".into()),
+            }];
+            if data_executable {
+                requirements.push(RuntimeRequirement {
+                    name: "reforge-data-program".into(),
+                    version_req: Some(">=1.1.0".into()),
+                    notes: Some(
+                        "executes the typed, data-aware program against persisted JSON state"
+                            .into(),
+                    ),
+                });
+            }
+            requirements
+        },
+        implementations: {
+            let mut implementations = vec![ImplementationRef {
+                id: Id::new("impl.twin").expect("static id"),
+                kind: ImplementationKind::ReferenceTwin,
+                path: Some("twin.json".into()),
+                version: Some(config.package_version.clone()),
+                operations: actions.clone(),
+                environment: vec!["deterministic twin interpreter".into()],
+                demonstrated_by_tests: Vec::new(),
+                notes: Some(
+                    "Abstract outcome machine. Executes only modeled behavior; unmodeled actions return Unknown. It is retained as evidence, not as the data-aware implementation."
+                        .to_string(),
+                ),
+            }];
+            if data_executable {
+                implementations.push(ImplementationRef {
+                    id: Id::new("impl.data").expect("static id"),
+                    kind: ImplementationKind::Other("data_program".into()),
+                    path: Some("data-program.json".into()),
+                    version: Some(config.package_version.clone()),
+                    operations: data_program
+                        .rules
+                        .iter()
+                        .map(|rule| rule.action.clone())
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .into_iter()
+                        .collect(),
+                    environment: vec!["typed data-program interpreter".into()],
+                    demonstrated_by_tests: Vec::new(),
+                    notes: Some(
+                        "Executes typed guards, entity effects, derived outputs and persistence without the reference. Unsupported actions return Unknown."
+                            .into(),
+                    ),
+                });
+            }
+            implementations
+        },
         test_fixtures: Vec::new(),
         evidence: evidence
             .evidence
@@ -250,6 +291,14 @@ pub fn extract_capability(
         serde_json::to_string_pretty(&twin).map_err(|e| ExtractError::Package(e.to_string()))?;
     std::fs::write(out_dir.join("twin.json"), &twin_json)
         .map_err(|e| ExtractError::Io(e.to_string()))?;
+    if data_executable {
+        std::fs::write(
+            out_dir.join("data-program.json"),
+            serde_json::to_vec_pretty(&data_program)
+                .map_err(|e| ExtractError::Package(e.to_string()))?,
+        )
+        .map_err(|e| ExtractError::Io(e.to_string()))?;
+    }
     if let Some(projection) = &config.rea_projection {
         std::fs::write(
             out_dir.join("rea-evidence.json"),
@@ -268,8 +317,7 @@ pub fn extract_capability(
             projection.source_evidence_sha256,
             projection.facts.len(),
         ));
-        std::fs::write(out_dir.join("REA.md"), md)
-            .map_err(|e| ExtractError::Io(e.to_string()))?;
+        std::fs::write(out_dir.join("REA.md"), md).map_err(|e| ExtractError::Io(e.to_string()))?;
     }
     let graph_json = evidence
         .export_bundle()
@@ -367,6 +415,9 @@ pub fn extract_capability(
         "evidence/graph.json".into(),
         "EXTRACTION.md".into(),
     ];
+    if data_executable {
+        files.push("data-program.json".into());
+    }
     if config.rea_projection.is_some() {
         files.push("rea-evidence.json".into());
         files.push("REA.md".into());

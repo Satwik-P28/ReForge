@@ -1,5 +1,6 @@
 use reforge_behavior::TwinEngine;
 use reforge_evidence::EvidenceGraph;
+use reforge_investigate::DataProgram;
 use reforge_types::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -13,6 +14,11 @@ pub struct LoadedPackage {
     pub twin: Option<BehavioralTwin>,
     #[serde(skip)]
     pub evidence: EvidenceGraph,
+    /// Typed data-aware implementation synthesized from observations. Unlike
+    /// the abstract twin this can create entities, assign identities and
+    /// preserve state across restarts.
+    #[serde(skip)]
+    pub data_program: Option<DataProgram>,
     pub content_digest: Digest,
 }
 
@@ -37,6 +43,7 @@ pub struct PackageInspectReport {
     pub queries: Vec<String>,
     pub dependencies: Vec<String>,
     pub has_twin: bool,
+    pub has_data_program: bool,
     pub evidence_count: usize,
     pub content_digest: String,
 }

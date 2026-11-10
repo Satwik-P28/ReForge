@@ -11,6 +11,7 @@ reforge-types = { workspace = true }
 reforge-canon = { workspace = true }
 reforge-behavior = { workspace = true }
 reforge-evidence = { workspace = true }
+reforge-investigate = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

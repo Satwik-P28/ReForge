@@ -361,6 +361,14 @@ fn check_expr_in_record(
                 }
             })
         }
+        ValueExpr::EntityId {
+            collection,
+            identity,
+            ..
+        } => {
+            ensure_collection(collection, collections)?;
+            Ok(OutputType::from_identity(*identity))
+        }
         ValueExpr::RecordLength { field } => {
             let collection =
                 record.ok_or_else(|| OutputTypeError::RecordExpressionOutsideProjection {
@@ -747,6 +755,24 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
             entity,
             field,
         ),
+        ValueExpr::EntityId {
+            collection,
+            entity,
+            identity,
+        } => {
+            let id = crate::data::entity_ref_value(
+                context.state,
+                context.params,
+                context.collections,
+                collection,
+                entity,
+            )?;
+            let definition = find_collection(context.collections, collection)?;
+            records(context.state, definition)
+                .iter()
+                .any(|(key, _)| key == &id)
+                .then(|| identity.coerce(&id))
+        }
         ValueExpr::RecordLength { field } => context
             .record
             .as_ref()

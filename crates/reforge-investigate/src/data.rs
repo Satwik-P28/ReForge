@@ -352,6 +352,15 @@ pub enum ValueExpr {
         entity: EntityRef,
         field: String,
     },
+    /// The canonical identity of the entity addressed by a parameter,
+    /// preserving the representation observed for this output (number or
+    /// string). Unlike `EntityField` this does not require the record to carry
+    /// a duplicate id field, and it is absent when the entity does not exist.
+    EntityId {
+        collection: String,
+        entity: EntityRef,
+        identity: IdentityKind,
+    },
     /// Length of an array field on the record in scope.
     RecordLength {
         field: String,
@@ -1195,7 +1204,7 @@ pub fn synthesize_data_program_with_samples(
             // necessary condition implied by the effect itself, not a
             // permissive candidate inferred from the action's spelling.
             let (tentative_effects, _, _) = select_effects(&successes, &[], &derived, &collections);
-            let success_guards = implicit_effect_guards(&tentative_effects);
+            let mut success_guards = implicit_effect_guards(&tentative_effects);
             let (mut effects, mut reproduced, effect_alternatives) =
                 select_effects(&successes, &success_guards, &derived, &collections);
             let reconciled = reconcile_constant_postconditions(&successes, &effects, &collections);
@@ -1214,6 +1223,13 @@ pub fn synthesize_data_program_with_samples(
                     reproduced = reconciled_matches;
                 }
             }
+            let execution = infer_execution_semantics(&successes);
+            let outputs = infer_outputs(&successes, execution.output_snapshot, &collections);
+            for guard in implicit_output_guards(&outputs, &successes) {
+                if !success_guards.iter().any(|existing| existing == &guard) {
+                    success_guards.push(guard);
+                }
+            }
             let mut provenance = rule_provenance(RuleProvenanceInput {
                 branch: &successes,
                 guards: &success_guards,
@@ -1224,8 +1240,6 @@ pub fn synthesize_data_program_with_samples(
                 reproduced: &reproduced,
                 collections: &collections,
             });
-            let execution = infer_execution_semantics(&successes);
-            let outputs = infer_outputs(&successes, execution.output_snapshot, &collections);
             let mut output_reproduced = 0;
             provenance.output_contract = infer_output_contract(
                 &successes,
@@ -5170,11 +5184,118 @@ fn infer_parameter_output(key: &str, successes: &[Sample]) -> Option<ValueExpr> 
         if !reference.is_string() && !reference.is_number() && !reference.is_boolean() {
             continue;
         }
-        if carriers
-            .iter()
-            .all(|sample| sample.params.get(name) == sample.outputs.get(key))
-        {
+        if carriers.iter().all(|sample| {
+            sample
+                .params
+                .get(name)
+                .zip(sample.outputs.get(key))
+                .is_some_and(|(parameter, output)| {
+                    parameter == output
+                        || identity_string(parameter)
+                            .zip(identity_string(output))
+                            .is_some_and(|(left, right)| left == right)
+                })
+        }) {
             return Some(ValueExpr::Param { name: name.clone() });
+        }
+    }
+    None
+}
+
+/// Output copied from the record addressed by a declared parameter.
+fn infer_entity_field_output(
+    key: &str,
+    successes: &[Sample],
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty() {
+        return None;
+    }
+    for collection in collections {
+        if collection.layout == CollectionLayout::Set {
+            continue;
+        }
+        for name in carriers[0].params.keys() {
+            let mut matched = 0usize;
+            for sample in &carriers {
+                let Some(id) = sample.params.get(name).and_then(identity_string) else {
+                    break;
+                };
+                let Some(record) =
+                    record_by_id_auto(output_source(sample, snapshot), &collection.name, &id)
+                else {
+                    break;
+                };
+                if record.get(key) != sample.outputs.get(key) {
+                    break;
+                }
+                matched += 1;
+            }
+            if matched == carriers.len() {
+                return Some(ValueExpr::EntityField {
+                    collection: collection.name.clone(),
+                    entity: EntityRef::Param(name.clone()),
+                    field: key.to_string(),
+                });
+            }
+        }
+    }
+    None
+}
+
+/// Output that echoes the canonical identity of the entity addressed by a
+/// parameter. This is distinct from a created identity (the action allocated
+/// it) and from an entity field (the record stores a copy of it).
+fn infer_entity_id_output(
+    key: &str,
+    successes: &[Sample],
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty() {
+        return None;
+    }
+    let identity = carriers[0]
+        .outputs
+        .get(key)
+        .and_then(IdentityKind::from_value)?;
+    for collection in collections {
+        if collection.layout == CollectionLayout::Set {
+            continue;
+        }
+        for name in carriers[0].params.keys() {
+            let mut matched = 0usize;
+            for sample in &carriers {
+                let Some(id) = sample.params.get(name).and_then(identity_string) else {
+                    break;
+                };
+                let Some(_record) =
+                    record_by_id_auto(output_source(sample, snapshot), &collection.name, &id)
+                else {
+                    break;
+                };
+                if sample.outputs.get(key).and_then(identity_string).as_deref() != Some(id.as_str())
+                {
+                    break;
+                }
+                matched += 1;
+            }
+            if matched == carriers.len() {
+                return Some(ValueExpr::EntityId {
+                    collection: collection.name.clone(),
+                    entity: EntityRef::Param(name.clone()),
+                    identity,
+                });
+            }
         }
     }
     None
@@ -5302,6 +5423,51 @@ fn infer_output_contract(
     contract
 }
 
+/// A successful output that reads an entity is only reproducible when that
+/// entity exists. This is implied by the output expression, not by an action
+/// name. It is added only when every supporting observation contains the
+/// entity, so it cannot silently remove a valid observed success.
+fn implicit_output_guards(
+    outputs: &BTreeMap<String, ValueExpr>,
+    successes: &[Sample],
+) -> Vec<Guard> {
+    let mut guards = Vec::new();
+    for expression in outputs.values() {
+        let (collection, entity) = match expression {
+            ValueExpr::EntityField {
+                collection, entity, ..
+            }
+            | ValueExpr::EntityId {
+                collection, entity, ..
+            } => (collection, entity),
+            _ => continue,
+        };
+        let Guard::Exists {
+            collection: _,
+            entity: _,
+        } = (Guard::Exists {
+            collection: collection.clone(),
+            entity: entity.clone(),
+        })
+        else {
+            unreachable!()
+        };
+        let guard = Guard::Exists {
+            collection: collection.clone(),
+            entity: entity.clone(),
+        };
+        if !guards.iter().any(|existing| existing == &guard) {
+            guards.push(guard);
+        }
+    }
+    guards.retain(|guard| {
+        successes
+            .iter()
+            .all(|sample| guards_match(std::slice::from_ref(guard), sample))
+    });
+    guards
+}
+
 fn infer_outputs(
     successes: &[Sample],
     snapshot: OutputSnapshot,
@@ -5341,6 +5507,19 @@ fn infer_outputs(
             }
         }
         if let Some(expression) = infer_parameter_output(&key, successes) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_entity_field_output(&key, successes, snapshot, collections)
+        {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_entity_id_output(&key, successes, snapshot, collections) {
             if output_matches_all(&key, &expression, successes, snapshot, collections) {
                 outputs.insert(key.clone(), expression);
                 continue;
@@ -6740,6 +6919,16 @@ fn collection_size(state: &Value, collection: &Collection) -> usize {
             .unwrap_or(0),
         _ => records(state, collection).len(),
     }
+}
+
+pub(crate) fn entity_ref_value(
+    _state: &Value,
+    params: &BTreeMap<String, Value>,
+    _collections: &[Collection],
+    _collection: &str,
+    entity: &EntityRef,
+) -> Option<String> {
+    entity_id(params, entity)
 }
 
 pub(crate) fn entity_field_value(

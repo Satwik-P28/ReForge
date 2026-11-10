@@ -126,6 +126,7 @@ mod tests {
         let cands = vec![ActionInstance::new("x")];
         let model = BehaviorModel::new();
         let summary = AbstractionSummary::default();
+        let evidence = std::collections::BTreeMap::new();
         let ctx = DecisionContext {
             class: "s0",
             initial_class: "s0",
@@ -136,6 +137,7 @@ mod tests {
             step: 0,
             max_actions: 10,
             consecutive_failures: 0,
+            evidence_bonus: &evidence,
         };
         let v = encode(&ctx, "x");
         assert_eq!(v.len(), FEATURE_DIM);
@@ -151,6 +153,7 @@ mod tests {
         let cands = vec![ActionInstance::new("y")];
         let model = BehaviorModel::new();
         let summary = AbstractionSummary::default();
+        let evidence = std::collections::BTreeMap::new();
         let ctx = DecisionContext {
             class: "s1",
             initial_class: "s1",
@@ -161,6 +164,7 @@ mod tests {
             step: 3,
             max_actions: 20,
             consecutive_failures: 0,
+            evidence_bonus: &evidence,
         };
         assert_eq!(encode(&ctx, "y"), encode(&ctx, "y"));
     }

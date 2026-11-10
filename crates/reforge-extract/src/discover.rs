@@ -280,6 +280,7 @@ mod tests {
 
         let count = transitions.len();
         InvestigationRecord {
+            evidence_guidance: None,
             schema_version: "2.0.0".into(),
             target: TargetIdentity {
                 id: Id::new("t1").unwrap(),

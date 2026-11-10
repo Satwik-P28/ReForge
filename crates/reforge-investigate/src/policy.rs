@@ -175,7 +175,8 @@ impl Policy for HypothesisPolicy {
                 novelty + conflict + bonus
             } else {
                 conflict + 0.9 * h_outcome + 0.7 * h_successor + 0.8 * frontier - cost
-                    + failure_pressure + bonus
+                    + failure_pressure
+                    + bonus
             }
         })
     }
@@ -227,11 +228,11 @@ impl Policy for PrerequisitePolicy {
             // evidence therefore steers the choice once the current state has
             // no untried action left.
             if untried {
-                6.0 + 0.8 * frontier + 0.5 / (1.0 + global as f64)
-                    + evidence_bonus(ctx, action)
+                6.0 + 0.8 * frontier + 0.5 / (1.0 + global as f64) + evidence_bonus(ctx, action)
             } else {
                 (1.5 * unlock).min(4.0) + 0.8 * frontier + 0.5 * h_outcome - 0.1 * samples as f64
-                    + failure_pressure + evidence_bonus(ctx, action)
+                    + failure_pressure
+                    + evidence_bonus(ctx, action)
             }
         })
     }

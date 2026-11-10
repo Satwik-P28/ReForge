@@ -312,7 +312,9 @@ impl ReaProjection {
             ),
             (
                 "mutation",
-                &["update", "set", "check", "complete", "delete", "remove", "patch"],
+                &[
+                    "update", "set", "check", "complete", "delete", "remove", "patch",
+                ],
                 "REA found mutation paths; test state transitions and guards",
             ),
             (
@@ -358,11 +360,11 @@ impl ReaProjection {
     /// into an existing evidence graph. The raw digest and location are kept as
     /// metadata, preserving the original REA Evidence identity.
     pub fn attach_to(&self, graph: &mut EvidenceGraph, raw_path: &Path) -> Result<(), ReaError> {
-        let payload = serde_json::to_vec_pretty(self)
-            .map_err(|e| ReaError::Malformed(e.to_string()))?;
+        let payload =
+            serde_json::to_vec_pretty(self).map_err(|e| ReaError::Malformed(e.to_string()))?;
         let digest = graph.insert_payload(&payload);
-        let id = Id::new(self.evidence_id.clone())
-            .map_err(|e| ReaError::Malformed(e.to_string()))?;
+        let id =
+            Id::new(self.evidence_id.clone()).map_err(|e| ReaError::Malformed(e.to_string()))?;
         let mut metadata = IndexMap::new();
         metadata.insert("target".into(), self.target.clone());
         metadata.insert("target_sha256".into(), self.target_sha256.clone());
@@ -370,7 +372,10 @@ impl ReaProjection {
         metadata.insert("provider_version".into(), self.provider_version.clone());
         metadata.insert("authority".into(), self.authority.clone());
         metadata.insert("raw_evidence_path".into(), raw_path.display().to_string());
-        metadata.insert("raw_evidence_sha256".into(), self.source_evidence_sha256.clone());
+        metadata.insert(
+            "raw_evidence_sha256".into(),
+            self.source_evidence_sha256.clone(),
+        );
         metadata.insert("fact_count".into(), self.facts.len().to_string());
         metadata.insert(
             "relationship".into(),
@@ -380,9 +385,7 @@ impl ReaProjection {
             schema_version: SchemaVersion::current(),
             id: id.clone(),
             evidence_type: EvidenceType::Other("rea_javascript_application".into()),
-            source: EvidenceSource::Tool {
-                name: "rea".into(),
-            },
+            source: EvidenceSource::Tool { name: "rea".into() },
             acquisition_method: AcquisitionMethod::StaticExtraction,
             collection_context: Some("REA JavaScript application analysis".into()),
             timestamp: None,
@@ -470,7 +473,9 @@ fn project(
     let mut hint_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut seen = BTreeSet::new();
     for node in &nodes {
-        let Some(object) = node.as_object() else { continue };
+        let Some(object) = node.as_object() else {
+            continue;
+        };
         let node_kind = object
             .get("kind")
             .and_then(Value::as_str)
@@ -600,27 +605,78 @@ fn categories() -> &'static [(&'static str, &'static [&'static str])] {
     &[
         (
             "identity",
-            &["generateid", "generate_id", "randomid", "random-id", "uuid", "allocat", "sequence", "counter", "nextid", "next_id"],
+            &[
+                "generateid",
+                "generate_id",
+                "randomid",
+                "random-id",
+                "uuid",
+                "allocat",
+                "sequence",
+                "counter",
+                "nextid",
+                "next_id",
+            ],
         ),
         (
             "derived",
-            &["getstats", "get_stats", "stats", "count", "total", "percent", "sum", "aggregate", ".length"],
+            &[
+                "getstats",
+                "get_stats",
+                "stats",
+                "count",
+                "total",
+                "percent",
+                "sum",
+                "aggregate",
+                ".length",
+            ],
         ),
         (
             "mutation",
-            &["create", "insert", "update", "delete", "remove", "destroy", "patch", "write", "save", "archive"],
+            &[
+                "create", "insert", "update", "delete", "remove", "destroy", "patch", "write",
+                "save", "archive",
+            ],
         ),
         (
             "retrieval",
-            &["findbyid", "find_by_id", "find", "read", "list", "lookup", "show", "detail"],
+            &[
+                "findbyid",
+                "find_by_id",
+                "find",
+                "read",
+                "list",
+                "lookup",
+                "show",
+                "detail",
+            ],
         ),
         (
             "validation",
-            &["validate", "invalid", "notfound", "not_found", "required", "guard", "reject", "missing"],
+            &[
+                "validate",
+                "invalid",
+                "notfound",
+                "not_found",
+                "required",
+                "guard",
+                "reject",
+                "missing",
+            ],
         ),
         (
             "persistence",
-            &["storage", "persist", "database", "sqlite", "jsonfile", "writefile", "save", "watch"],
+            &[
+                "storage",
+                "persist",
+                "database",
+                "sqlite",
+                "jsonfile",
+                "writefile",
+                "save",
+                "watch",
+            ],
         ),
     ]
 }
@@ -716,14 +772,24 @@ mod tests {
             version: TESTED_REA_VERSION.into(),
             runtime: "node".into(),
         };
-        let p = project(&raw, Path::new("/tmp/app"), "ev_test", &version, "sha".into()).unwrap();
+        let p = project(
+            &raw,
+            Path::new("/tmp/app"),
+            "ev_test",
+            &version,
+            "sha".into(),
+        )
+        .unwrap();
         assert_eq!(p.evidence_id, "ev_test");
         assert_eq!(p.target_sha256, "abc");
         assert!(p.hint_counts.contains_key("identity"));
         assert!(p.hint_counts.contains_key("derived"));
         let guidance = p.guidance();
         assert!(!guidance.hints.is_empty());
-        assert!(guidance.hints.iter().all(|h| h.evidence_ids == vec!["ev_test"]));
+        assert!(guidance
+            .hints
+            .iter()
+            .all(|h| h.evidence_ids == vec!["ev_test"]));
     }
 
     #[test]
@@ -733,7 +799,14 @@ mod tests {
             version: TESTED_REA_VERSION.into(),
             runtime: "node".into(),
         };
-        let err = project(&serde_json::json!({"evidence_id":"ev_x"}), Path::new("/tmp"), "ev_x", &version, "x".into()).unwrap_err();
+        let err = project(
+            &serde_json::json!({"evidence_id":"ev_x"}),
+            Path::new("/tmp"),
+            "ev_x",
+            &version,
+            "x".into(),
+        )
+        .unwrap_err();
         assert!(matches!(err, ReaError::Malformed(_)));
     }
 

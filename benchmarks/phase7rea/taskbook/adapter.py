@@ -34,13 +34,31 @@ def run(extra):
 
 
 def save_state():
+    """Expose persisted task records without interpreting their semantics.
+
+    Taskbook stores a top-level map keyed by numeric id. The adapter only
+    groups entries carrying Taskbook's own `_isTask` marker under `tasks`;
+    every field value remains exactly as persisted by the target.
+    """
     src = os.path.join(home, ".taskbook", "storage", "storage.json")
     dst = os.path.join(home, "state.json")
+    tasks = {}
     if os.path.exists(src):
-        shutil.copyfile(src, dst)
-    else:
-        with open(dst, "w") as f:
-            f.write("{}")
+        with open(src, encoding="utf-8") as f:
+            raw = json.load(f)
+        for key, value in raw.items():
+            if not isinstance(value, dict) or value.get("_isTask") is not True:
+                continue
+            # Persistence bookkeeping (`_id`, `_timestamp`, `_date`) and the
+            # internal marker are not domain state. The map key carries
+            # identity and the remaining fields are the target's own values.
+            tasks[str(key)] = {
+                field: value[field]
+                for field in ("description", "isComplete", "inProgress", "isStarred", "priority", "boards")
+                if field in value
+            }
+    with open(dst, "w") as f:
+        json.dump({"tasks": tasks}, f, sort_keys=True)
 
 
 def out(value):
@@ -59,6 +77,16 @@ def board():
     stats = re.search(r"(\d+) done\s*·\s*(\d+) in-progress\s*·\s*(\d+) pending\s*·\s*(\d+) notes", text)
     values = [int(x) for x in stats.groups()] if stats else [0, 0, 0, 0]
     return items, complete, values
+
+
+def _task(wanted):
+    src = os.path.join(home, ".taskbook", "storage", "storage.json")
+    if not os.path.exists(src):
+        return None
+    with open(src, encoding="utf-8") as f:
+        raw = json.load(f)
+    value = raw.get(str(wanted))
+    return value if isinstance(value, dict) and value.get("_isTask") is True else None
 
 
 def error_code(text):
@@ -83,8 +111,10 @@ def main():
         items, percent, (done, progress, pending, notes) = board()
         if wanted not in items:
             out({"outcome": "error", "error": "not_found", "id": wanted})
-        status = "complete" if wanted in [i for i in items if "✔" in items[i]] else "pending"
-        out({"outcome": "success", "id": wanted, "title": items[wanted].lstrip("✔☐ "), "status": status, "done": done, "pending": pending})
+        task = _task(wanted)
+        if task is None:
+            out({"outcome": "error", "error": "not_found", "id": wanted})
+        out({"outcome": "success", "id": wanted, "description": task.get("description"), "isComplete": bool(task.get("isComplete")), "done": done, "pending": pending})
     if action == "check_task":
         wanted = int(args[1])
         p = run(["--check", str(wanted)])
@@ -97,7 +127,7 @@ def main():
         p = run(["--delete", str(wanted)])
         if p.returncode != 0 or "Unable to find item" in p.stdout + p.stderr:
             out({"outcome": "error", "error": "not_found", "id": wanted})
-        out({"outcome": "success", "id": wanted, "deleted": True, "events": ["task_deleted"]})
+        out({"outcome": "success", "id": wanted, "deleted": True, "deleted_id": wanted, "deleted_pool": "task", "events": ["task_deleted"]})
     if action == "stats":
         items, percent, (done, progress, pending, notes) = board()
         out({"outcome": "success", "total": done + progress + pending, "done": done, "in_progress": progress, "pending": pending, "notes": notes, "percent": percent})

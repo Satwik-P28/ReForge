@@ -12,6 +12,7 @@ reforge-behavior = { workspace = true }
 reforge-capability = { workspace = true }
 reforge-compose = { workspace = true }
 reforge-canon = { workspace = true }
+reforge-investigate = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
