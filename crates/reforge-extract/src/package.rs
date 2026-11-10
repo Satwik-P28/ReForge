@@ -31,6 +31,11 @@ pub struct ExtractionConfig {
     pub package_version: String,
     /// Which discovered candidate to emit when several are found.
     pub candidate_index: usize,
+    /// Optional REA projection used to guide the investigation. It is carried
+    /// into the package evidence graph and provenance rather than silently
+    /// treated as behavioral verification.
+    pub rea_projection: Option<reforge_rea::ReaProjection>,
+    pub rea_raw_path: Option<PathBuf>,
 }
 
 impl ExtractionConfig {
@@ -39,6 +44,8 @@ impl ExtractionConfig {
             out_root: out_root.into(),
             package_version: "0.1.0".into(),
             candidate_index: 0,
+            rea_projection: None,
+            rea_raw_path: None,
         }
     }
 }
@@ -114,7 +121,7 @@ pub fn extract_capability(
     // captured, so the event declarations remain payload-free.
     attach_observed_events(&mut twin, record);
 
-    let evidence = reforge_investigate::build_evidence(
+    let mut evidence = reforge_investigate::build_evidence(
         &record.log,
         &record.abstraction,
         &record.transitions,
@@ -123,6 +130,17 @@ pub fn extract_capability(
         env!("CARGO_PKG_VERSION"),
     )
     .map_err(ExtractError::Investigation)?;
+    if let Some(projection) = &config.rea_projection {
+        projection
+            .attach_to(
+                &mut evidence,
+                config
+                    .rea_raw_path
+                    .as_deref()
+                    .unwrap_or_else(|| Path::new("<rea-raw>")),
+            )
+            .map_err(|e| ExtractError::Package(e.to_string()))?;
+    }
 
     let mut interfaces = PackageInterfaces {
         commands: IndexMap::new(),
@@ -192,7 +210,11 @@ pub fn extract_capability(
             ),
         }],
         test_fixtures: Vec::new(),
-        evidence: evidence.evidence.keys().filter_map(|k| Id::new(k).ok()).collect(),
+        evidence: evidence
+            .evidence
+            .keys()
+            .filter_map(|k| Id::new(k).ok())
+            .collect(),
         twin_ref: Some(twin.id.clone()),
         ui_bindings: Vec::new(),
         persistence_bindings: vec![PersistenceBinding {
@@ -228,6 +250,27 @@ pub fn extract_capability(
         serde_json::to_string_pretty(&twin).map_err(|e| ExtractError::Package(e.to_string()))?;
     std::fs::write(out_dir.join("twin.json"), &twin_json)
         .map_err(|e| ExtractError::Io(e.to_string()))?;
+    if let Some(projection) = &config.rea_projection {
+        std::fs::write(
+            out_dir.join("rea-evidence.json"),
+            serde_json::to_vec_pretty(projection)
+                .map_err(|e| ExtractError::Package(e.to_string()))?,
+        )
+        .map_err(|e| ExtractError::Io(e.to_string()))?;
+        let mut md = String::from("# REA structural provenance\n\n");
+        md.push_str(&format!(
+            "- Evidence ID: `{}`\n- Provider: `{} {}`\n- Target SHA-256: `{}`\n- Raw Evidence: `{}`\n- Raw SHA-256: `{}`\n- Facts: {}\n\nStatic evidence only proposed hypotheses. Behavioral claims in this package are backed by observations or tests, not static facts.\n",
+            projection.evidence_id,
+            projection.provider,
+            projection.provider_version,
+            projection.target_sha256,
+            config.rea_raw_path.as_deref().unwrap_or_else(|| Path::new("<external>")).display(),
+            projection.source_evidence_sha256,
+            projection.facts.len(),
+        ));
+        std::fs::write(out_dir.join("REA.md"), md)
+            .map_err(|e| ExtractError::Io(e.to_string()))?;
+    }
     let graph_json = evidence
         .export_bundle()
         .map_err(|e| ExtractError::Package(e.to_string()))?;
@@ -324,6 +367,10 @@ pub fn extract_capability(
         "evidence/graph.json".into(),
         "EXTRACTION.md".into(),
     ];
+    if config.rea_projection.is_some() {
+        files.push("rea-evidence.json".into());
+        files.push("REA.md".into());
+    }
     if let Ok(entries) = std::fs::read_dir(out_dir.join("evidence/payloads")) {
         for entry in entries.flatten() {
             files.push(format!(

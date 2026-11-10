@@ -17,3 +17,6 @@ Cargo.lock.bak
 *.sqlite-wal
 /dist/
 /tmp/
+# Phase 7 disposable audit workspace and installed target runtimes
+/.phase7-audit/
+**/node_modules/

@@ -17,7 +17,7 @@ use crate::neural::ActionScorer;
 use crate::rng::Rng;
 use reforge_observe::{ActionAlphabet, ActionInstance};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Everything a policy may look at. Read-only by construction.
 pub struct DecisionContext<'a> {
@@ -32,6 +32,13 @@ pub struct DecisionContext<'a> {
     pub step: u32,
     pub max_actions: u32,
     pub consecutive_failures: u32,
+    /// Optional structural-evidence ranking. This only reorders candidates;
+    /// every recorded outcome still comes from the target.
+    pub evidence_bonus: &'a BTreeMap<String, f64>,
+}
+
+fn evidence_bonus(ctx: &DecisionContext, action: &str) -> f64 {
+    ctx.evidence_bonus.get(action).copied().unwrap_or(0.0)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,6 +118,7 @@ impl Policy for CoveragePolicy {
                 + 1.0 / (1.0 + samples as f64)
                 + 0.5 / (1.0 + global as f64)
                 + 0.2 * (class_degree / alphabet_len)
+                + evidence_bonus(ctx, action)
         })
     }
 }
@@ -162,11 +170,12 @@ impl Policy for HypothesisPolicy {
             // Untried cells are scored by novelty alone. Counting unobserved
             // entropy *and* frontier mass *and* novelty triple-counts the same
             // ignorance and buries open contradictions under new cells.
+            let bonus = evidence_bonus(ctx, action);
             if untried {
-                novelty + conflict
+                novelty + conflict + bonus
             } else {
                 conflict + 0.9 * h_outcome + 0.7 * h_successor + 0.8 * frontier - cost
-                    + failure_pressure
+                    + failure_pressure + bonus
             }
         })
     }
@@ -219,9 +228,10 @@ impl Policy for PrerequisitePolicy {
             // no untried action left.
             if untried {
                 6.0 + 0.8 * frontier + 0.5 / (1.0 + global as f64)
+                    + evidence_bonus(ctx, action)
             } else {
                 (1.5 * unlock).min(4.0) + 0.8 * frontier + 0.5 * h_outcome - 0.1 * samples as f64
-                    + failure_pressure
+                    + failure_pressure + evidence_bonus(ctx, action)
             }
         })
     }
@@ -332,6 +342,8 @@ mod tests {
     };
     use reforge_types::TypeDesc;
 
+    static EMPTY_EVIDENCE: BTreeMap<String, f64> = BTreeMap::new();
+
     fn alphabet() -> ActionAlphabet {
         ActionAlphabet {
             entries: ["add", "delete", "list"]
@@ -382,6 +394,7 @@ mod tests {
             step: 2,
             max_actions: 20,
             consecutive_failures: 0,
+            evidence_bonus: &EMPTY_EVIDENCE,
         };
         let mut rng = Rng::new(1);
         let chosen = CoveragePolicy.select(&ctx, &mut rng).unwrap();
@@ -420,6 +433,7 @@ mod tests {
             step: 2,
             max_actions: 20,
             consecutive_failures: 0,
+            evidence_bonus: &EMPTY_EVIDENCE,
         };
         let mut rng = Rng::new(3);
         let chosen = HypothesisPolicy.select(&ctx, &mut rng).unwrap();
@@ -457,6 +471,7 @@ mod tests {
             step: 1,
             max_actions: 20,
             consecutive_failures: 0,
+            evidence_bonus: &EMPTY_EVIDENCE,
         };
         let mut rng = Rng::new(7);
         let chosen = PrerequisitePolicy.select(&ctx, &mut rng).unwrap();
@@ -479,6 +494,7 @@ mod tests {
             step: 0,
             max_actions: 10,
             consecutive_failures: 0,
+            evidence_bonus: &EMPTY_EVIDENCE,
         };
         let mut a = Rng::new(99);
         let mut b = Rng::new(99);

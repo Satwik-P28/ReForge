@@ -23,6 +23,7 @@ pub mod engine;
 pub mod evidence;
 pub mod experiments;
 pub mod feature;
+pub mod guidance;
 pub mod model;
 pub mod neural;
 pub mod output;
@@ -67,6 +68,7 @@ pub use experiments::{
     ExperimentStage, InteractionLedger, InteractionRecord, InteractionStage, SelectionStrategy,
 };
 pub use feature::{feature_layout, FEATURE_DIM};
+pub use guidance::{EvidenceGuidance, EvidenceHint};
 pub use model::{BehaviorModel, OutcomeKind, PairStats, TransitionRecord};
 pub use neural::{ActionScorer, ModelArtifact, ModelMetrics};
 pub use output::{check_expr, eval_expr, EvalContext, OutputSchema, OutputType, OutputTypeError};

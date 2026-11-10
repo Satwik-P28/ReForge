@@ -44,6 +44,8 @@ pub struct InvestigationConfig {
     pub neural_model: Option<PathBuf>,
     /// Parameter sources for actions discovered at runtime.
     pub discovered_action_params: BTreeMap<String, IndexMap<String, ParamSource>>,
+    /// Optional structural-evidence guidance from a static provider such as REA.
+    pub evidence_guidance: Option<crate::guidance::EvidenceGuidance>,
 }
 
 impl Default for InvestigationConfig {
@@ -63,6 +65,7 @@ impl Default for InvestigationConfig {
             record_dataset: false,
             neural_model: None,
             discovered_action_params: BTreeMap::new(),
+            evidence_guidance: None,
         }
     }
 }
@@ -203,6 +206,9 @@ pub struct InvestigationRecord {
     pub log: ObservationLog,
     pub dataset: Vec<DatasetRow>,
     pub notes: Vec<String>,
+    /// Structural evidence used for ranking, retained as provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_guidance: Option<crate::guidance::EvidenceGuidance>,
 }
 
 impl InvestigationRecord {
@@ -506,6 +512,11 @@ pub fn investigate(
             "target exposed an empty action alphabet".into(),
         ));
     }
+    let evidence_bonus = config
+        .evidence_guidance
+        .as_ref()
+        .map(|guidance| guidance.score_actions(&alphabet))
+        .unwrap_or_default();
     let mut abstraction = StateAbstraction::new(AbstractionProfile::with_keys(
         config.abstraction_keys.clone(),
     ));
@@ -582,6 +593,7 @@ pub fn investigate(
                 step: budget.actions_used(),
                 max_actions: config.limits.max_actions,
                 consecutive_failures,
+                evidence_bonus: &evidence_bonus,
             };
             let Some(action) = policy.select(&ctx, &mut rng) else {
                 break;
@@ -807,6 +819,7 @@ pub fn investigate(
         log,
         dataset,
         notes,
+        evidence_guidance: config.evidence_guidance.clone(),
     };
 
     Ok(record)

@@ -16,6 +16,7 @@ reforge-investigate = { workspace = true }
 reforge-behavior = { workspace = true }
 reforge-evidence = { workspace = true }
 reforge-capability = { workspace = true }
+reforge-rea = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

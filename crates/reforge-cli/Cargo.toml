@@ -24,4 +24,5 @@ reforge-export = { workspace = true }
 reforge-observe = { workspace = true }
 reforge-investigate = { workspace = true }
 reforge-extract = { workspace = true }
+reforge-rea = { workspace = true }
 reforge-diff = { workspace = true }
