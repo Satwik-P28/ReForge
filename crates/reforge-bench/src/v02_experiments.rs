@@ -98,6 +98,7 @@ fn run_scheduled_sequence(
         let sample = data_sample(&setup, &current, &observation);
         current = observation.state_document.clone().unwrap_or(current);
         pool.observe_outputs(&observation.outputs);
+        pool.observe_created_entity(&observation.outputs, &current);
         actions = instantiate_actions(&record.alphabet, &mut pool);
         Some(sample)
     } else {
@@ -123,6 +124,7 @@ fn run_scheduled_sequence(
         cost += 1;
         current = observation.state_document.clone().unwrap_or(current);
         pool.observe_outputs(&observation.outputs);
+        pool.observe_created_entity(&observation.outputs, &current);
         out.push(data_sample(&action, &before, &observation));
     }
     Ok((setup_sample, out, cost))

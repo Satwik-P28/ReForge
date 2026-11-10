@@ -1,0 +1,30 @@
+{
+  "app": "cli-parcel",
+  "workflows": [
+    {"name": "numeric-create-nest-seal-deliver", "steps": [
+      {"action": "ship", "params": {"name": "beta parcel"}},
+      {"action": "load", "params": {"parcel_id": "2", "item": "handle"}},
+      {"action": "seal", "params": {"parcel_id": "2"}},
+      {"action": "inspect", "params": {"parcel_id": "2"}},
+      {"action": "summary", "params": {}},
+      {"action": "deliver", "params": {"parcel_id": "2"}},
+      {"action": "inspect", "params": {"parcel_id": "2"}}
+    ]},
+    {"name": "delete-guard-allocator", "steps": [
+      {"action": "remove", "params": {"parcel_id": "1"}},
+      {"action": "load", "params": {"parcel_id": "1", "item": "missing"}},
+      {"action": "summary", "params": {}},
+      {"action": "ship", "params": {"name": "gamma parcel"}},
+      {"action": "inspect", "params": {"parcel_id": "3"}},
+      {"action": "summary", "params": {}}
+    ]},
+    {"name": "validation-precedence", "steps": [
+      {"action": "load", "params": {"parcel_id": "1", "item": "starter"}},
+      {"action": "ship", "params": {"name": "   "}},
+      {"action": "seal", "params": {"parcel_id": "1"}},
+      {"action": "seal", "params": {"parcel_id": "1"}},
+      {"action": "deliver", "params": {"parcel_id": "1"}},
+      {"action": "summary", "params": {}}
+    ]}
+  ]
+}

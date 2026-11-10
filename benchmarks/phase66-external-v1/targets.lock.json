@@ -1,0 +1,16 @@
+{
+  "parcel": {
+    "executable_sha256": "95623aefe7f37464ea77fc3c31fad8218c1cc5c489d207bdb089843f416d8830",
+    "exposed_subset": "ship, load, seal, deliver, remove, inspect, summary",
+    "kind": "internally-authored-python-cli",
+    "license": "MIT",
+    "version": "1.0.0"
+  },
+  "vault": {
+    "executable_sha256": "fd8d87761f631d61baf96410231313f430ba4e69e229f518e8ae26ab91182c6f",
+    "exposed_subset": "create, put, publish, archive, drop, show, set_owner, stats",
+    "kind": "internally-authored-python-cli",
+    "license": "MIT",
+    "version": "1.0.0"
+  }
+}

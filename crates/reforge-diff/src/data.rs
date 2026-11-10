@@ -735,6 +735,183 @@ mod tests {
     }
 
     #[test]
+    fn output_envelope_is_checked_independently_of_state() {
+        let mut missing_output = program();
+        missing_output.rules[0].outputs.remove("count");
+        assert!(
+            campaign(&missing_output).diverged(),
+            "missing required output key"
+        );
+
+        let mut extra_output = program();
+        extra_output.rules[0]
+            .outputs
+            .insert("ghost".into(), ValueExpr::Literal { value: json!(1) });
+        assert!(
+            campaign(&extra_output).diverged(),
+            "unexpected extra output key"
+        );
+
+        let mut state_correct_output_wrong = program();
+        state_correct_output_wrong.rules[0]
+            .outputs
+            .insert("count".into(), ValueExpr::Literal { value: json!(99) });
+        assert!(
+            campaign(&state_correct_output_wrong).diverged(),
+            "correct state with wrong output must diverge"
+        );
+
+        let mut output_correct_state_wrong = program();
+        output_correct_state_wrong.rules[0]
+            .effects
+            .push(Effect::SetState {
+                field: "rejects".into(),
+                value: ValueExpr::Literal { value: json!(1) },
+            });
+        assert!(
+            campaign(&output_correct_state_wrong).diverged(),
+            "correct output with wrong state must diverge"
+        );
+    }
+
+    struct CreateTarget {
+        inner: MockTarget,
+    }
+
+    impl CreateTarget {
+        fn new() -> Self {
+            let mut inner = MockTarget::new();
+            inner.state = json!({"items": [], "next_id": 1});
+            inner.initial = inner.state.clone();
+            Self { inner }
+        }
+    }
+
+    impl InvestigationTarget for CreateTarget {
+        fn identity(&self) -> &TargetIdentity {
+            self.inner.identity()
+        }
+        fn alphabet(&self) -> &ActionAlphabet {
+            self.inner.alphabet()
+        }
+        fn environment(&self) -> EnvironmentInfo {
+            self.inner.environment()
+        }
+        fn reset_policy(&self) -> ResetPolicy {
+            ResetPolicy::ProcessRestart
+        }
+        fn reset(&mut self) -> Result<ResetOutcome, reforge_observe::InvestigationError> {
+            self.inner.reset()
+        }
+        fn observe(&mut self) -> Result<Observation, reforge_observe::InvestigationError> {
+            self.inner.observe()
+        }
+        fn perform(
+            &mut self,
+            action: &ActionInstance,
+        ) -> Result<Observation, reforge_observe::InvestigationError> {
+            let before = self.inner.state.clone();
+            if action.action != "create" {
+                return self.inner.perform(action);
+            }
+            let id = before["next_id"].as_i64().unwrap_or(1);
+            self.inner.state["items"]
+                .as_array_mut()
+                .expect("items")
+                .push(json!({"id": id}));
+            self.inner.state["next_id"] = json!(id + 1);
+            let mut outputs = IndexMap::new();
+            outputs.insert("outcome".into(), TypedValue::String("success".into()));
+            outputs.insert("created_id".into(), TypedValue::Int(id));
+            Ok(observation(
+                &self.inner.state,
+                &before,
+                Some(action),
+                outputs,
+            ))
+        }
+    }
+
+    fn create_program() -> DataProgram {
+        DataProgram {
+            schema_version: "1.1.0".into(),
+            target_id: "mock-create".into(),
+            initial_state: json!({"items": [], "next_id": 1}),
+            state_schema: StateSchema::default(),
+            collections: vec![reforge_investigate::data::Collection {
+                name: "items".into(),
+                layout: reforge_investigate::data::CollectionLayout::List,
+                id_field: "id".into(),
+                id_kind: reforge_investigate::data::IdentityKind::Integer,
+            }],
+            derived: Vec::new(),
+            rules: vec![DataRule {
+                id: "rule.create.success".into(),
+                action: "create".into(),
+                branch: RuleBranch::Success,
+                error: None,
+                guards: Vec::new(),
+                effects: vec![
+                    Effect::CreateEntity {
+                        collection: "items".into(),
+                        id: reforge_investigate::data::IdExpr::Allocator {
+                            field: "next_id".into(),
+                            prefix: String::new(),
+                        },
+                        fields: BTreeMap::new(),
+                    },
+                    Effect::IncrementState {
+                        field: "next_id".into(),
+                        by: ValueExpr::Literal { value: json!(1) },
+                    },
+                ],
+                events: Vec::new(),
+                outputs: [(
+                    "created_id".to_string(),
+                    ValueExpr::CreatedId {
+                        identity: reforge_investigate::data::IdentityKind::Integer,
+                    },
+                )]
+                .into_iter()
+                .collect(),
+                execution: ExecutionSemantics::default(),
+                support: 1,
+                reproduced: 1,
+                provenance: RuleProvenance::default(),
+            }],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    fn create_campaign(program: &DataProgram) -> DataCampaignReport {
+        let mut target = CreateTarget::new();
+        data_campaign(
+            &mut target,
+            program,
+            &[vec![ActionInstance::new("create")]],
+            &DataCampaignConfig::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn corrupt_generated_identity_output_is_a_divergence() {
+        let base = create_campaign(&create_program());
+        assert!(!base.diverged(), "unmutated create: {:?}", base.divergences);
+        assert_eq!(base.matching_steps, 1);
+
+        let mut wrong_identity = create_program();
+        wrong_identity.rules[0]
+            .outputs
+            .insert("created_id".into(), ValueExpr::Literal { value: json!(99) });
+        assert!(
+            create_campaign(&wrong_identity).diverged(),
+            "corrupt generated identifier output"
+        );
+    }
+
+    #[test]
     fn unverified_steps_are_not_counted_as_matches() {
         let mut missing_rule = program();
         missing_rule.rules.retain(|rule| rule.action != "inc");

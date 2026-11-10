@@ -269,6 +269,25 @@ fn merge_discovered_actions(
     added
 }
 
+fn identity_text_from_json(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(text) => Some(text.clone()),
+        serde_json::Value::Number(number) => Some(number.to_string()),
+        serde_json::Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    }
+}
+
+fn output_identity_text(value: &TypedValue) -> Option<String> {
+    match value {
+        TypedValue::String(text) => Some(text.clone()),
+        TypedValue::Int(number) => Some(number.to_string()),
+        TypedValue::Float(number) => Some(number.to_string()),
+        TypedValue::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    }
+}
+
 /// Resolves parameter placeholders into concrete values.
 #[derive(Clone, Debug, Default)]
 pub struct EntityPool {
@@ -294,10 +313,52 @@ impl EntityPool {
     }
 
     pub fn observe_outputs(&mut self, outputs: &IndexMap<String, TypedValue>) {
-        let id = outputs.get("created_id").and_then(|v| v.as_str());
+        let id = outputs.get("created_id").and_then(output_identity_text);
         let pool = outputs.get("created_pool").and_then(|v| v.as_str());
         if let (Some(id), Some(pool)) = (id, pool) {
-            self.add(pool, id);
+            self.add(pool, &id);
+        }
+    }
+
+    /// Some targets expose a generated identifier without a `created_pool`
+    /// label. Bind it to the collection that actually gained the record in the
+    /// observed post-state. Both the collection name and its singular form are
+    /// registered because parameter pools are declared independently of state
+    /// container names.
+    pub fn observe_created_entity(
+        &mut self,
+        outputs: &IndexMap<String, TypedValue>,
+        state: &serde_json::Value,
+    ) {
+        if outputs.contains_key("created_pool") {
+            return;
+        }
+        let Some(id) = outputs.get("created_id").and_then(output_identity_text) else {
+            return;
+        };
+        let Some(object) = state.as_object() else {
+            return;
+        };
+        for (name, entries) in object {
+            let contains = match entries {
+                serde_json::Value::Object(records) => records.contains_key(&id),
+                serde_json::Value::Array(items) => items.iter().any(|item| {
+                    item.as_object().is_some_and(|record| {
+                        record.values().any(|value| {
+                            identity_text_from_json(value).as_deref() == Some(id.as_str())
+                        })
+                    })
+                }),
+                _ => false,
+            };
+            if !contains {
+                continue;
+            }
+            self.add(name, &id);
+            if let Some(singular) = name.strip_suffix('s').filter(|stem| !stem.is_empty()) {
+                self.add(singular, &id);
+            }
+            return;
         }
     }
 
@@ -550,6 +611,9 @@ pub fn investigate(
         let discovered_actions =
             merge_discovered_actions(&mut alphabet, &observation.outputs, config);
         pool.observe_outputs(&observation.outputs);
+        if let Some(state) = &observation.state_document {
+            pool.observe_created_entity(&observation.outputs, state);
+        }
 
         // Contradiction detection: same abstract state, new outcome.
         let contradiction = model
@@ -778,6 +842,22 @@ mod tests {
     use super::*;
     use crate::abstraction::ClassSummary;
     use crate::model::OutcomeKind;
+
+    #[test]
+    fn numeric_created_id_binds_to_state_collection_without_pool_metadata() {
+        let mut pool = EntityPool::default();
+        let mut outputs = IndexMap::new();
+        outputs.insert("created_id".into(), TypedValue::Int(2));
+        let state = serde_json::json!({"notes": [{"id": 1}, {"id": 2}]});
+        pool.observe_created_entity(&outputs, &state);
+        let resolved = pool.resolve(&ParamSource::LastEntity {
+            pool: "note".into(),
+        });
+        assert_eq!(
+            resolved.and_then(|value| value.as_str().map(str::to_string)),
+            Some("2".to_string())
+        );
+    }
 
     #[test]
     fn entity_pool_resolves_fresh_ids_deterministically() {

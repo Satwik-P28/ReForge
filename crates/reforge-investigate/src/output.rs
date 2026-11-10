@@ -12,7 +12,7 @@
 //! nodes are only valid inside a projection and are checked against every
 //! observed record shape for that collection.
 
-use crate::data::{BoolOp, Collection, CollectionLayout, NumOp, ValueExpr};
+use crate::data::{BoolOp, Collection, CollectionLayout, IdentityKind, NumOp, ValueExpr};
 use crate::relational::{value_type, CmpOp, ValueType};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -46,6 +46,15 @@ impl OutputType {
 
     pub fn numeric(self) -> bool {
         matches!(self, OutputType::Int | OutputType::Float)
+    }
+
+    fn from_identity(identity: IdentityKind) -> Self {
+        match identity {
+            IdentityKind::String => OutputType::String,
+            IdentityKind::Integer => OutputType::Int,
+            IdentityKind::Float => OutputType::Float,
+            IdentityKind::Boolean => OutputType::Bool,
+        }
     }
 
     fn value_type(self) -> Option<ValueType> {
@@ -294,7 +303,7 @@ fn check_expr_in_record(
                     parameter: name.clone(),
                 })
         }
-        ValueExpr::CreatedId => Ok(OutputType::String),
+        ValueExpr::CreatedId { identity } => Ok(OutputType::from_identity(*identity)),
         ValueExpr::State { field } | ValueExpr::PreState { field } => schema
             .state_type(field)
             .ok_or_else(|| OutputTypeError::UnknownStateField {
@@ -696,7 +705,7 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
         ValueExpr::Null => Some(Value::Null),
         ValueExpr::Literal { value } => Some(value.clone()),
         ValueExpr::Param { name } => context.params.get(name).cloned(),
-        ValueExpr::CreatedId => context.created_id.map(|id| Value::String(id.to_string())),
+        ValueExpr::CreatedId { identity } => context.created_id.map(|id| identity.coerce(id)),
         ValueExpr::State { field } | ValueExpr::PreState { field } => {
             context.state.get(field).cloned()
         }

@@ -1,0 +1,20 @@
+{
+  "target_id": "cli-parcel",
+  "target_name": "parcel",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase66-work-parcel-v1",
+  "state_file": "state.json",
+  "timeout_ms": 15000,
+  "actions": [
+    {"action": "ship", "argv": ["ship", "$name"], "params": {"name": {"kind": "fresh_id", "prefix": "parcel"}}},
+    {"action": "load", "argv": ["load", "$parcel_id", "$item"], "params": {"parcel_id": {"kind": "last_entity", "pool": "parcel"}, "item": {"kind": "fresh_id", "prefix": "item"}}},
+    {"action": "seal", "argv": ["seal", "$parcel_id"], "params": {"parcel_id": {"kind": "last_entity", "pool": "parcel"}}},
+    {"action": "deliver", "argv": ["deliver", "$parcel_id"], "params": {"parcel_id": {"kind": "last_entity", "pool": "parcel"}}},
+    {"action": "remove", "argv": ["remove", "$parcel_id"], "params": {"parcel_id": {"kind": "last_entity", "pool": "parcel"}}},
+    {"action": "inspect", "argv": ["inspect", "$parcel_id"], "params": {"parcel_id": {"kind": "last_entity", "pool": "parcel"}}},
+    {"action": "summary", "argv": ["summary"]}
+  ]
+}

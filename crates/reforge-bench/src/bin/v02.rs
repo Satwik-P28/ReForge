@@ -225,6 +225,16 @@ fn output_value(value: &TypedValue) -> serde_json::Value {
     }
 }
 
+fn output_identity_text(value: &TypedValue) -> Option<String> {
+    match value {
+        TypedValue::String(text) => Some(text.clone()),
+        TypedValue::Int(number) => Some(number.to_string()),
+        TypedValue::Float(number) => Some(number.to_string()),
+        TypedValue::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    }
+}
+
 fn data_sample(
     action: &ActionInstance,
     before: &serde_json::Value,
@@ -268,8 +278,7 @@ fn data_sample(
         created_id: observation
             .outputs
             .get("created_id")
-            .and_then(|value| value.as_str())
-            .map(str::to_string),
+            .and_then(output_identity_text),
         created_pool: observation
             .outputs
             .get("created_pool")
@@ -497,6 +506,7 @@ fn collect_counterfactual_samples(
             let sample = data_sample(&setup, &current, &observation);
             current = observation.state_document.clone().unwrap_or(current);
             pool.observe_outputs(&observation.outputs);
+            pool.observe_created_entity(&observation.outputs, &current);
             actions = instantiate_actions(&record.alphabet, pool);
             Some(sample)
         } else {
@@ -517,6 +527,7 @@ fn collect_counterfactual_samples(
             interactions += 1;
             current = observation.state_document.clone().unwrap_or(current);
             pool.observe_outputs(&observation.outputs);
+            pool.observe_created_entity(&observation.outputs, &current);
             out.push(data_sample(&action, &before, &observation));
         }
         Ok((setup_sample, out))

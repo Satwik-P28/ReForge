@@ -18,9 +18,9 @@
 
 use crate::causal::{EvidenceKind, EvidenceSource, ObservationProvenance};
 use crate::relational::{
-    classify_parameter, infer_output_semantics, CmpOp, ExecutionSemantics, ExecutionTrace,
-    OutputObservation, OutputSnapshot, ParameterStateKind, Stage, StageRecord, TypedPredicate,
-    ValueType,
+    classify_parameter, infer_output_semantics, value_type, CmpOp, ExecutionSemantics,
+    ExecutionTrace, OutputObservation, OutputSnapshot, ParameterStateKind, Stage, StageRecord,
+    TypedPredicate, ValueType,
 };
 use crate::{InvestigationRecord, OutcomeKind};
 use reforge_observe::Observation;
@@ -65,7 +65,7 @@ pub enum IdentityKind {
 }
 
 impl IdentityKind {
-    fn from_value(value: &Value) -> Option<Self> {
+    pub(crate) fn from_value(value: &Value) -> Option<Self> {
         match value {
             Value::String(_) => Some(Self::String),
             Value::Number(number) if number.is_i64() || number.is_u64() => Some(Self::Integer),
@@ -75,7 +75,7 @@ impl IdentityKind {
         }
     }
 
-    fn coerce(self, id: &str) -> Value {
+    pub(crate) fn coerce(self, id: &str) -> Value {
         match self {
             Self::String => Value::String(id.to_string()),
             Self::Integer => id
@@ -131,6 +131,10 @@ pub enum Guard {
         entity: EntityRef,
     },
     ParamNonEmpty {
+        param: String,
+    },
+    /// A rejection condition for a missing or whitespace-only text payload.
+    ParamBlank {
         param: String,
     },
     ParamNonNegative {
@@ -264,7 +268,13 @@ pub enum ValueExpr {
     Param {
         name: String,
     },
-    CreatedId,
+    /// The identifier allocated by the current effect. `identity` preserves
+    /// the observed JSON representation; the canonical identifier remains a
+    /// string internally for lookup.
+    CreatedId {
+        #[serde(default)]
+        identity: IdentityKind,
+    },
     State {
         field: String,
     },
@@ -551,6 +561,13 @@ pub enum Derived {
         source: String,
         value: Value,
     },
+    /// Sum of the lengths of an array field over a collection. Empty arrays
+    /// contribute zero, which is different from an unobserved field.
+    SumLength {
+        field: String,
+        collection: String,
+        source: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -606,6 +623,48 @@ pub struct GuardClaim {
     pub identifiable: bool,
 }
 
+/// One observed output key. Presence is kept separate from value so an absent
+/// key, an explicit null, a zero and an empty collection remain distinguishable.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OutputFieldContract {
+    /// Observations in this branch where the key was present.
+    #[serde(default)]
+    pub observed: u32,
+    /// Branch observations where the key was absent.
+    #[serde(default)]
+    pub absent: u32,
+    /// Present values that were explicit JSON null.
+    #[serde(default)]
+    pub nulls: u32,
+    /// Every JSON kind observed for the key, without coercion.
+    #[serde(default)]
+    pub kinds: Vec<ValueType>,
+    #[serde(default)]
+    pub always_present: bool,
+    /// True when the selected expression reproduces every observed carrier.
+    #[serde(default)]
+    pub resolved: bool,
+}
+
+/// The complete observable response contract for one rule branch. It records
+/// observed keys even when no expression was identified, so an unresolved
+/// field cannot silently disappear from the synthesized program.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OutputContract {
+    #[serde(default)]
+    pub observations: u32,
+    #[serde(default)]
+    pub fields: BTreeMap<String, OutputFieldContract>,
+    /// Observed keys with no expression that reproduces the evidence.
+    #[serde(default)]
+    pub unresolved: Vec<String>,
+    /// Expressions that would emit keys not observed on this branch.
+    #[serde(default)]
+    pub unexpected: Vec<String>,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct RuleProvenance {
     /// `observational`, `counterfactual-supported`, or `mixed`.
@@ -651,6 +710,13 @@ pub struct RuleProvenance {
     /// the exploration policy.
     #[serde(default)]
     pub counterfactual_support: u32,
+    /// Complete observed output contract for this branch.
+    #[serde(default)]
+    pub output_contract: OutputContract,
+    #[serde(default)]
+    pub output_support: u32,
+    #[serde(default)]
+    pub output_reproduced: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -699,7 +765,12 @@ pub struct DataRule {
 
 impl DataRule {
     pub fn exact(&self) -> bool {
-        self.support > 0 && self.support == self.reproduced
+        self.support > 0
+            && self.support == self.reproduced
+            && self.provenance.output_contract.unresolved.is_empty()
+            && self.provenance.output_contract.unexpected.is_empty()
+            && (self.provenance.output_support == 0
+                || self.provenance.output_support == self.provenance.output_reproduced)
     }
 }
 
@@ -1075,7 +1146,7 @@ pub fn synthesize_data_program_with_samples(
                     .first()
                     .map(|sample| sample.events.clone())
                     .unwrap_or_default();
-                let provenance = rule_provenance(RuleProvenanceInput {
+                let mut provenance = rule_provenance(RuleProvenanceInput {
                     branch: &branch,
                     guards: &guards,
                     guard_hypotheses: &hypotheses,
@@ -1085,6 +1156,16 @@ pub fn synthesize_data_program_with_samples(
                     reproduced: &reproduced,
                     collections: &collections,
                 });
+                let mut output_reproduced = 0;
+                provenance.output_contract = infer_output_contract(
+                    &branch,
+                    &outputs,
+                    execution.output_snapshot,
+                    &collections,
+                    &mut output_reproduced,
+                );
+                provenance.output_support = branch.len() as u32;
+                provenance.output_reproduced = output_reproduced;
                 rules.push(DataRule {
                     id: format!("rule.{action}.error.{code}"),
                     action: action.clone(),
@@ -1133,7 +1214,7 @@ pub fn synthesize_data_program_with_samples(
                     reproduced = reconciled_matches;
                 }
             }
-            let provenance = rule_provenance(RuleProvenanceInput {
+            let mut provenance = rule_provenance(RuleProvenanceInput {
                 branch: &successes,
                 guards: &success_guards,
                 guard_hypotheses: std::slice::from_ref(&success_guards),
@@ -1145,6 +1226,16 @@ pub fn synthesize_data_program_with_samples(
             });
             let execution = infer_execution_semantics(&successes);
             let outputs = infer_outputs(&successes, execution.output_snapshot, &collections);
+            let mut output_reproduced = 0;
+            provenance.output_contract = infer_output_contract(
+                &successes,
+                &outputs,
+                execution.output_snapshot,
+                &collections,
+                &mut output_reproduced,
+            );
+            provenance.output_support = successes.len() as u32;
+            provenance.output_reproduced = output_reproduced;
             rules.push(DataRule {
                 id: format!("rule.{action}.success"),
                 action: action.clone(),
@@ -1202,7 +1293,7 @@ pub fn synthesize_data_program_with_samples(
                         expression,
                         output_source(sample, OutputSnapshot::Post),
                         &sample.params,
-                        None,
+                        sample.created_id.as_deref(),
                         &collections,
                     ) == sample.outputs.get(key).cloned()
                 });
@@ -1295,7 +1386,7 @@ pub fn synthesize_data_program_with_samples(
                         candidate,
                         output_source(sample, OutputSnapshot::Post),
                         &sample.params,
-                        None,
+                        sample.created_id.as_deref(),
                         &collections,
                     ) == sample.outputs.get(key).cloned()
                 })
@@ -1707,6 +1798,7 @@ fn guard_specificity(guard: &Guard) -> u16 {
         | Guard::NoEntityFieldCmp { .. }
         | Guard::SetContains { .. } => 7,
         Guard::ParamNonEmpty { .. }
+        | Guard::ParamBlank { .. }
         | Guard::ParamNonNegative { .. }
         | Guard::ParamPositive { .. }
         | Guard::ParamOneOf { .. }
@@ -1940,10 +2032,7 @@ fn samples(record: &InvestigationRecord) -> Vec<Sample> {
         for (name, value) in &observation.outputs {
             outputs.insert(name.clone(), typed_to_json(value));
         }
-        let created_id = outputs
-            .get("created_id")
-            .and_then(|value| value.as_str())
-            .map(str::to_string);
+        let created_id = outputs.get("created_id").and_then(identity_string);
         let created_pool = outputs
             .get("created_pool")
             .and_then(|value| value.as_str())
@@ -2629,6 +2718,12 @@ fn guard_candidates(all: &[Sample], collections: &[Collection]) -> Vec<Candidate
             },
             &mut guards,
         );
+        add(
+            Guard::ParamBlank {
+                param: param.clone(),
+            },
+            &mut guards,
+        );
         // Length constraints are only tried for payload strings, never for a
         // value that resolves to an entity identity. Both byte and Unicode
         // scalar units are generated because ASCII evidence cannot distinguish
@@ -2889,6 +2984,7 @@ fn affinity(guard: &Guard, words: &BTreeSet<String>) -> i32 {
             Guard::ParamCmpEntityField { .. } | Guard::ParamCmpDiff { .. } => 3,
             Guard::SetContains { .. } | Guard::EntityListContains { .. } => 3,
             Guard::NoEntityFieldCmp { .. } | Guard::AnyEntityFieldCmp { .. } => 2,
+            Guard::ParamNonEmpty { .. } | Guard::ParamBlank { .. } => 6,
             Guard::ParamContains { .. } => 1,
             Guard::ParamStringLength { op, .. } => match op {
                 CmpOp::Lt | CmpOp::Le => 4,
@@ -3086,6 +3182,11 @@ fn guard_holds(guard: &Guard, state: &Value, params: &BTreeMap<String, Value>) -
             .get(param)
             .and_then(|value| value.as_str())
             .map(|text| !text.trim().is_empty())
+            .unwrap_or(false),
+        Guard::ParamBlank { param } => params
+            .get(param)
+            .and_then(|value| value.as_str())
+            .map(|text| text.trim().is_empty())
             .unwrap_or(false),
         Guard::ParamNonNegative { param } => params
             .get(param)
@@ -3955,7 +4056,9 @@ fn value_expr_or_none(value: &Value, sample: &Sample, created: Option<&str>) -> 
     }
     if let Some(created) = created {
         if value.as_str() == Some(created) {
-            return Some(ValueExpr::CreatedId);
+            return Some(ValueExpr::CreatedId {
+                identity: IdentityKind::from_value(value).unwrap_or_default(),
+            });
         }
     }
     None
@@ -3993,7 +4096,9 @@ fn value_expr(value: &Value, sample: &Sample, created: Option<&str>) -> ValueExp
     }
     if let Some(created) = created {
         if value.as_str() == Some(created) {
-            return ValueExpr::CreatedId;
+            return ValueExpr::CreatedId {
+                identity: IdentityKind::from_value(value).unwrap_or_default(),
+            };
         }
     }
     match value {
@@ -4562,6 +4667,7 @@ fn guard_parameter_names(guard: &Guard) -> Vec<String> {
     }
     match guard {
         Guard::ParamNonEmpty { param }
+        | Guard::ParamBlank { param }
         | Guard::ParamNonNegative { param }
         | Guard::ParamPositive { param }
         | Guard::ParamOneOf { param, .. }
@@ -4690,6 +4796,9 @@ fn rule_provenance(input: RuleProvenanceInput<'_>) -> RuleProvenance {
         counterfactual_support,
         selected_guards: guard_claims(branch, guards, collections),
         parameters: parameter_provenance(branch),
+        output_contract: OutputContract::default(),
+        output_support: 0,
+        output_reproduced: 0,
     }
 }
 
@@ -4774,6 +4883,7 @@ fn infer_success_guards(
             Guard::SetContains { collection, param } => format!("set:{collection}:{param}"),
             Guard::Exists { collection, entity } => format!("exists:{collection}:{entity:?}"),
             Guard::ParamNonEmpty { param } => format!("nonempty:{param}"),
+            Guard::ParamBlank { param } => format!("blank:{param}"),
             Guard::ParamStringLength { param, op, .. } => format!("length:{param}:{op:?}"),
             Guard::ParamPositive { param } => format!("positive:{param}"),
             _ => format!("{guard:?}"),
@@ -4862,7 +4972,7 @@ fn output_matches_all(
                 expression,
                 output_source(sample, snapshot),
                 &sample.params,
-                None,
+                sample.created_id.as_deref(),
                 collections,
             ) == sample.outputs.get(key).cloned()
         })
@@ -5005,6 +5115,193 @@ fn checked_output(
     crate::output::check_expr(expression, schema, collections).is_ok()
 }
 
+/// Any output whose value is the identifier allocated by this action is a
+/// causal identity output, regardless of the envelope key. The representation
+/// of the observed value decides whether execution emits a number, a string or
+/// a boolean.
+fn infer_identity_output(
+    key: &str,
+    successes: &[Sample],
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let mut kind: Option<IdentityKind> = None;
+    let mut carriers = 0usize;
+    for sample in successes {
+        let Some(observed) = sample.outputs.get(key) else {
+            continue;
+        };
+        let created = sample.created_id.as_deref()?;
+        if identity_string(observed).as_deref() != Some(created) {
+            return None;
+        }
+        // `created_id` is an adapter field name, not proof that this action
+        // allocated an entity. Subscribe-like actions can return a parameter
+        // under that name. Only causal creation evidence binds an expression
+        // to the generated identity pool.
+        if !collections
+            .iter()
+            .any(|collection| record_by_id_auto(&sample.after, &collection.name, created).is_some())
+        {
+            return None;
+        }
+        kind.get_or_insert_with(|| IdentityKind::from_value(observed).unwrap_or_default());
+        carriers += 1;
+    }
+    if carriers == 0 {
+        return None;
+    }
+    Some(ValueExpr::CreatedId {
+        identity: kind.unwrap_or_default(),
+    })
+}
+
+fn infer_parameter_output(key: &str, successes: &[Sample]) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty() {
+        return None;
+    }
+    for name in carriers[0].params.keys() {
+        let Some(reference) = carriers[0].params.get(name) else {
+            continue;
+        };
+        if !reference.is_string() && !reference.is_number() && !reference.is_boolean() {
+            continue;
+        }
+        if carriers
+            .iter()
+            .all(|sample| sample.params.get(name) == sample.outputs.get(key))
+        {
+            return Some(ValueExpr::Param { name: name.clone() });
+        }
+    }
+    None
+}
+
+fn observable_outputs(sample: &Sample) -> BTreeMap<String, Value> {
+    sample
+        .outputs
+        .iter()
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "outcome" | "error" | "events" | "available_actions"
+            )
+        })
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+fn evaluate_output_envelope(
+    outputs: &BTreeMap<String, ValueExpr>,
+    sample: &Sample,
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> BTreeMap<String, Value> {
+    outputs
+        .iter()
+        .filter_map(|(key, expression)| {
+            eval_value(
+                expression,
+                output_source(sample, snapshot),
+                &sample.params,
+                sample.created_id.as_deref(),
+                collections,
+            )
+            .map(|value| (key.clone(), value))
+        })
+        .collect()
+}
+
+fn infer_output_contract(
+    branch: &[Sample],
+    outputs: &BTreeMap<String, ValueExpr>,
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+    reproduced: &mut u32,
+) -> OutputContract {
+    let mut contract = OutputContract {
+        observations: branch.len() as u32,
+        ..OutputContract::default()
+    };
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+    for sample in branch {
+        keys.extend(observable_outputs(sample).into_keys());
+    }
+    for key in keys {
+        let carriers: Vec<&Sample> = branch
+            .iter()
+            .filter(|sample| sample.outputs.contains_key(&key))
+            .collect();
+        let mut kinds = Vec::new();
+        for value in carriers
+            .iter()
+            .filter_map(|sample| sample.outputs.get(&key))
+        {
+            let kind = value_type(value);
+            if !kinds.contains(&kind) {
+                kinds.push(kind);
+            }
+        }
+        let resolved = outputs.get(&key).is_some_and(|expression| {
+            carriers.iter().all(|sample| {
+                eval_value(
+                    expression,
+                    output_source(sample, snapshot),
+                    &sample.params,
+                    sample.created_id.as_deref(),
+                    collections,
+                ) == sample.outputs.get(&key).cloned()
+            })
+        });
+        let nulls = carriers
+            .iter()
+            .filter(|sample| sample.outputs.get(&key).is_some_and(Value::is_null))
+            .count() as u32;
+        if !resolved {
+            contract.unresolved.push(key.clone());
+        }
+        contract.fields.insert(
+            key,
+            OutputFieldContract {
+                observed: carriers.len() as u32,
+                absent: branch.len() as u32 - carriers.len() as u32,
+                nulls,
+                kinds,
+                always_present: carriers.len() == branch.len(),
+                resolved,
+            },
+        );
+    }
+    for sample in branch {
+        let expected = observable_outputs(sample);
+        let actual = evaluate_output_envelope(outputs, sample, snapshot, collections);
+        if expected == actual {
+            *reproduced += 1;
+        }
+        for key in actual.keys() {
+            if !expected.contains_key(key) && !contract.unexpected.contains(key) {
+                contract.unexpected.push(key.clone());
+            }
+        }
+    }
+    if !contract.unresolved.is_empty() {
+        contract.notes.push(format!(
+            "unresolved output keys: {}",
+            contract.unresolved.join(", ")
+        ));
+    }
+    if !contract.unexpected.is_empty() {
+        contract.notes.push(format!(
+            "expressions emit unobserved keys: {}",
+            contract.unexpected.join(", ")
+        ));
+    }
+    contract
+}
+
 fn infer_outputs(
     successes: &[Sample],
     snapshot: OutputSnapshot,
@@ -5012,17 +5309,7 @@ fn infer_outputs(
 ) -> BTreeMap<String, ValueExpr> {
     let schema = output_schema(successes, snapshot, collections);
     let mut outputs = BTreeMap::new();
-    let first = &successes[0];
-    if let Some(created) = &first.created_id {
-        let expression = first
-            .params
-            .iter()
-            .find(|(_, value)| value.as_str() == Some(created.as_str()))
-            .map(|(name, _)| ValueExpr::Param { name: name.clone() })
-            .unwrap_or(ValueExpr::CreatedId);
-        outputs.insert("created_id".into(), expression);
-    }
-    if let Some(pool) = &first.created_pool {
+    if let Some(pool) = &successes[0].created_pool {
         outputs.insert(
             "created_pool".into(),
             ValueExpr::Literal {
@@ -5037,7 +5324,7 @@ fn infer_outputs(
     for key in keys {
         if matches!(
             key.as_str(),
-            "outcome" | "error" | "events" | "available_actions" | "created_id" | "created_pool"
+            "outcome" | "error" | "events" | "available_actions" | "created_pool"
         ) {
             continue;
         }
@@ -5047,6 +5334,18 @@ fn infer_outputs(
         else {
             continue;
         };
+        if let Some(expression) = infer_identity_output(&key, successes, collections) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_parameter_output(&key, successes) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
         let source = output_source(carrier, snapshot);
         if source.get(&key).is_some()
             && successes
@@ -5408,7 +5707,7 @@ fn infer_arithmetic_output(
                             &expression,
                             output_source(sample, snapshot),
                             &sample.params,
-                            None,
+                            sample.created_id.as_deref(),
                             collections,
                         )
                     })
@@ -5883,7 +6182,8 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             | Derived::NestedSum { field: name, .. }
             | Derived::NestedGroupSum { field: name, .. }
             | Derived::Sum { field: name, .. }
-            | Derived::CountWhere { field: name, .. } => name == &field,
+            | Derived::CountWhere { field: name, .. }
+            | Derived::SumLength { field: name, .. } => name == &field,
         }) {
             continue;
         }
@@ -6125,6 +6425,115 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
                                 ));
                             }
                         }
+                    }
+                }
+            }
+
+            // A scalar field with a small observed value set can define a
+            // filtered count. This covers booleans and enums without naming
+            // status or any other target vocabulary.
+            let mut scalar_filters: BTreeSet<(String, String)> = BTreeSet::new();
+            for (state, _) in &observations {
+                for (_, record) in records(state, collection) {
+                    for (source, value) in &record {
+                        if source == &collection.id_field {
+                            continue;
+                        }
+                        if value.is_boolean() || value.is_string() || value.is_number() {
+                            scalar_filters.insert((
+                                source.clone(),
+                                serde_json::to_string(value).unwrap_or_default(),
+                            ));
+                        }
+                    }
+                }
+            }
+            for (source, encoded) in scalar_filters {
+                let Ok(target_value) = serde_json::from_str::<Value>(&encoded) else {
+                    continue;
+                };
+                if observations.iter().all(|(state, count)| {
+                    (*count
+                        - records(state, collection)
+                            .iter()
+                            .filter(|(_, record)| record.get(&source) == Some(&target_value))
+                            .count() as f64)
+                        .abs()
+                        < 1e-9
+                }) && observations.iter().any(|(state, _)| {
+                    records(state, collection)
+                        .iter()
+                        .any(|(_, record)| record.get(&source) == Some(&target_value))
+                }) {
+                    let source_word = source.to_ascii_lowercase();
+                    let score = if lower.contains(&source_word) { 5 } else { 1 };
+                    if best
+                        .as_ref()
+                        .map(|(current, _)| score > *current)
+                        .unwrap_or(true)
+                    {
+                        best = Some((
+                            score,
+                            Derived::CountWhere {
+                                field: field.clone(),
+                                collection: collection.name.clone(),
+                                source: source.clone(),
+                                value: target_value,
+                            },
+                        ));
+                    }
+                }
+            }
+
+            // A count of nested array elements is a sum of array lengths, not
+            // a sum of numeric record fields.
+            let mut array_sources: BTreeSet<String> = BTreeSet::new();
+            for (state, _) in &observations {
+                for (_, record) in records(state, collection) {
+                    for (source, value) in &record {
+                        if value.is_array() {
+                            array_sources.insert(source.clone());
+                        }
+                    }
+                }
+            }
+            for source in array_sources {
+                if observations.iter().all(|(state, value)| {
+                    (*value
+                        - records(state, collection)
+                            .iter()
+                            .filter_map(|(_, record)| record.get(&source).and_then(Value::as_array))
+                            .map(|items| items.len())
+                            .sum::<usize>() as f64)
+                        .abs()
+                        < 1e-9
+                }) && observations.iter().any(|(state, _)| {
+                    records(state, collection).iter().any(|(_, record)| {
+                        record
+                            .get(&source)
+                            .and_then(Value::as_array)
+                            .is_some_and(|items| !items.is_empty())
+                    })
+                }) {
+                    let source_word = source.to_ascii_lowercase();
+                    let score = if lower.contains(&source_word) || lower.contains("count") {
+                        5
+                    } else {
+                        2
+                    };
+                    if best
+                        .as_ref()
+                        .map(|(current, _)| score > *current)
+                        .unwrap_or(true)
+                    {
+                        best = Some((
+                            score,
+                            Derived::SumLength {
+                                field: field.clone(),
+                                collection: collection.name.clone(),
+                                source: source.clone(),
+                            },
+                        ));
                     }
                 }
             }
@@ -6752,7 +7161,7 @@ fn eval_value_legacy(
     match expression {
         ValueExpr::Literal { value } => Some(value.clone()),
         ValueExpr::Param { name } => params.get(name).cloned(),
-        ValueExpr::CreatedId => created.map(|id| Value::String(id.to_string())),
+        ValueExpr::CreatedId { identity } => created.map(|id| identity.coerce(id)),
         ValueExpr::State { field } | ValueExpr::PreState { field } => state.get(field).cloned(),
         ValueExpr::Count { collection } => {
             let definition = collections.iter().find(|c| &c.name == collection)?;
@@ -6960,6 +7369,23 @@ fn apply_derived(derived: &Derived, state: &mut Value, collections: &[Collection
                         .iter()
                         .filter(|(_, record)| record.get(source) == Some(value))
                         .count()),
+                );
+            }
+        }
+        Derived::SumLength {
+            field,
+            collection,
+            source,
+        } => {
+            if let Some(definition) = collections.iter().find(|c| &c.name == collection) {
+                set_key(
+                    state,
+                    field,
+                    json!(records(state, definition)
+                        .iter()
+                        .filter_map(|(_, record)| record.get(source).and_then(Value::as_array))
+                        .map(|items| items.len())
+                        .sum::<usize>()),
                 );
             }
         }
@@ -8288,6 +8714,17 @@ mod tests {
                 value_field: "amount".into(),
                 scale: 1,
             },
+            Derived::SumLength {
+                field: "tag_count".into(),
+                collection: "notes".into(),
+                source: "tags".into(),
+            },
+            Derived::CountWhere {
+                field: "pinned_count".into(),
+                collection: "notes".into(),
+                source: "pinned".into(),
+                value: json!(true),
+            },
         ];
         for value in values {
             let encoded = serde_json::to_string(&value).expect("serialize derived");
@@ -8332,6 +8769,343 @@ mod tests {
         assert!(
             outputs.contains_key("tasks"),
             "outputs={outputs:?} collections={collections:?}"
+        );
+    }
+
+    fn identity_program(identity: IdentityKind, prefix: &str) -> DataProgram {
+        DataProgram {
+            schema_version: DATA_PROGRAM_VERSION.into(),
+            target_id: "identity-runtime".into(),
+            initial_state: json!({"notes": [], "next_id": 1, "note_count": 0}),
+            state_schema: StateSchema::default(),
+            collections: vec![Collection {
+                name: "notes".into(),
+                layout: CollectionLayout::List,
+                id_field: "id".into(),
+                id_kind: identity,
+            }],
+            derived: vec![Derived::Count {
+                field: "note_count".into(),
+                collection: "notes".into(),
+            }],
+            rules: vec![DataRule {
+                id: "rule.add.success".into(),
+                action: "add".into(),
+                branch: RuleBranch::Success,
+                error: None,
+                guards: Vec::new(),
+                effects: vec![
+                    Effect::CreateEntity {
+                        collection: "notes".into(),
+                        id: IdExpr::Allocator {
+                            field: "next_id".into(),
+                            prefix: prefix.into(),
+                        },
+                        fields: [(
+                            "title".to_string(),
+                            ValueExpr::Param {
+                                name: "title".into(),
+                            },
+                        )]
+                        .into_iter()
+                        .collect(),
+                    },
+                    Effect::IncrementState {
+                        field: "next_id".into(),
+                        by: ValueExpr::Literal { value: json!(1) },
+                    },
+                ],
+                events: Vec::new(),
+                outputs: [("created_id".to_string(), ValueExpr::CreatedId { identity })]
+                    .into_iter()
+                    .collect(),
+                execution: ExecutionSemantics::default(),
+                support: 1,
+                reproduced: 1,
+                provenance: RuleProvenance::default(),
+            }],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn numeric_generated_identifier_output_preserves_json_type() {
+        let before = json!({"notes": [], "next_id": 1});
+        let after = json!({
+            "notes": [{"id": 1, "title": "alpha", "tags": []}],
+            "next_id": 2
+        });
+        let mut s = sample(
+            "add",
+            &[("title", json!("alpha"))],
+            before.clone(),
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        s.created_id = Some("1".into());
+        s.outputs.insert("outcome".into(), json!("success"));
+        s.outputs.insert("created_id".into(), json!(1));
+        let collections = detect_collections_with_samples(&[before, after], &[s.clone()]);
+        let outputs = infer_outputs(&[s.clone()], OutputSnapshot::Post, &collections);
+        let expression = outputs.get("created_id").expect("identity output");
+        assert_eq!(
+            eval_value(
+                expression,
+                &s.after,
+                &s.params,
+                s.created_id.as_deref(),
+                &collections
+            ),
+            Some(json!(1))
+        );
+        let mut reproduced = 0;
+        let contract = infer_output_contract(
+            &[s.clone()],
+            &outputs,
+            OutputSnapshot::Post,
+            &collections,
+            &mut reproduced,
+        );
+        assert_eq!(reproduced, 1);
+        assert!(contract.unresolved.is_empty());
+        assert_eq!(contract.fields["created_id"].kinds, vec![ValueType::Int]);
+    }
+
+    #[test]
+    fn string_generated_identifier_output_preserves_json_type() {
+        let before = json!({"items": [], "next_id": 1});
+        let after = json!({
+            "items": [{"id": "i1", "label": "alpha"}],
+            "next_id": 2
+        });
+        let mut s = sample(
+            "add",
+            &[("label", json!("alpha"))],
+            before.clone(),
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        s.created_id = Some("i1".into());
+        s.outputs.insert("outcome".into(), json!("success"));
+        s.outputs.insert("created_id".into(), json!("i1"));
+        let collections = detect_collections_with_samples(&[before, after], &[s.clone()]);
+        let outputs = infer_outputs(&[s.clone()], OutputSnapshot::Post, &collections);
+        let expression = outputs.get("created_id").expect("identity output");
+        assert_eq!(
+            eval_value(
+                expression,
+                &s.after,
+                &s.params,
+                s.created_id.as_deref(),
+                &collections
+            ),
+            Some(json!("i1"))
+        );
+    }
+
+    #[test]
+    fn unresolved_output_contract_blocks_exactness() {
+        let mut first = sample(
+            "inspect",
+            &[],
+            json!({}),
+            json!({}),
+            OutcomeKind::Success,
+            None,
+        );
+        first.outputs.insert("mystery".into(), json!(5));
+        let mut second = first.clone();
+        second.outputs.insert("mystery".into(), json!(7));
+        let outputs = infer_outputs(&[first.clone(), second.clone()], OutputSnapshot::Post, &[]);
+        let mut reproduced = 0;
+        let contract = infer_output_contract(
+            &[first, second],
+            &outputs,
+            OutputSnapshot::Post,
+            &[],
+            &mut reproduced,
+        );
+        assert!(contract.unresolved.contains(&"mystery".to_string()));
+        assert_eq!(reproduced, 0);
+    }
+
+    #[test]
+    fn output_contract_distinguishes_absent_and_explicit_null() {
+        let mut present = sample(
+            "read",
+            &[],
+            json!({}),
+            json!({}),
+            OutcomeKind::Success,
+            None,
+        );
+        present.outputs.insert("selected".into(), Value::Null);
+        let absent = sample(
+            "read",
+            &[],
+            json!({}),
+            json!({}),
+            OutcomeKind::Success,
+            None,
+        );
+        let mut reproduced = 0;
+        let contract = infer_output_contract(
+            &[present, absent],
+            &BTreeMap::new(),
+            OutputSnapshot::Post,
+            &[],
+            &mut reproduced,
+        );
+        let field = &contract.fields["selected"];
+        assert_eq!(field.nulls, 1);
+        assert_eq!(field.absent, 1);
+        assert!(!field.always_present);
+        assert!(!field.resolved);
+    }
+
+    #[test]
+    fn serialized_identity_program_runs_without_reference() {
+        for (identity, prefix, expected) in [
+            (IdentityKind::Integer, "", json!(1)),
+            (IdentityKind::String, "n", json!("n1")),
+        ] {
+            let mut program = identity_program(identity, prefix);
+            program.rules[0].provenance.output_support = 1;
+            program.rules[0].provenance.output_reproduced = 1;
+            let encoded = serde_json::to_string(&program).expect("serialize");
+            let decoded: DataProgram = serde_json::from_str(&encoded).expect("deserialize");
+            let mut state = decoded.initial_state.clone();
+            for (index, expected_id) in [
+                expected,
+                if identity == IdentityKind::String {
+                    json!("n2")
+                } else {
+                    json!(2)
+                },
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let params = [("title".to_string(), json!(format!("note-{index}")))].into();
+                let (next, outcome) = decoded.execute(&state, "add", &params);
+                assert_eq!(outcome.status, DataStatus::Success);
+                let expected_output = if identity == IdentityKind::String {
+                    json!(format!("n{}", index + 1))
+                } else {
+                    json!(index + 1)
+                };
+                assert_eq!(outcome.outputs.get("created_id"), Some(&expected_output));
+                assert_eq!(next["notes"][index]["id"], expected_id);
+                assert_eq!(next["note_count"], json!(index + 1));
+                state = next;
+            }
+        }
+    }
+
+    #[test]
+    fn rule_with_unreproduced_output_contract_is_not_exact() {
+        let mut program = identity_program(IdentityKind::Integer, "");
+        program.rules[0].provenance.output_support = 1;
+        program.rules[0].provenance.output_reproduced = 0;
+        assert!(!program.rules[0].exact());
+        program.rules[0].provenance.output_reproduced = 1;
+        assert!(program.rules[0].exact());
+    }
+
+    #[test]
+    fn derived_infers_boolean_filter_count_and_array_length_sum() {
+        let base = |pinned: bool, tags: Value, pinned_count: i64, tag_count: i64| {
+            json!({
+                "notes": [{
+                    "id": "n1", "title": "welcome", "pinned": pinned, "tags": tags
+                }],
+                "note_count": 1,
+                "pinned_count": pinned_count,
+                "tag_count": tag_count
+            })
+        };
+        let before = base(false, json!(["intro"]), 0, 1);
+        let pinned = base(true, json!(["intro"]), 1, 1);
+        let tagged = base(false, json!(["intro", "work"]), 0, 2);
+        let collections = detect_collections(&[before.clone(), pinned.clone(), tagged.clone()]);
+        let derived = infer_derived(&[before, pinned.clone(), tagged.clone()], &collections);
+        assert!(derived.iter().any(|item| matches!(
+            item,
+            Derived::CountWhere { field, collection, source, value }
+                if field == "pinned_count" && collection == "notes" && source == "pinned" && value == &json!(true)
+        )), "derived={derived:?}");
+        assert!(
+            derived.iter().any(|item| matches!(
+                item,
+                Derived::SumLength { field, collection, source }
+                    if field == "tag_count" && collection == "notes" && source == "tags"
+            )),
+            "derived={derived:?}"
+        );
+
+        let mut recomputed = pinned.clone();
+        for item in &derived {
+            apply_derived(item, &mut recomputed, &collections);
+        }
+        assert_eq!(recomputed["pinned_count"], json!(1));
+        let mut recomputed = tagged.clone();
+        for item in &derived {
+            apply_derived(item, &mut recomputed, &collections);
+        }
+        assert_eq!(recomputed["tag_count"], json!(2));
+    }
+
+    #[test]
+    fn blank_rejection_prefers_non_blank_guard_over_length_zero() {
+        let before = json!({"notes": []});
+        let rejected = sample(
+            "add",
+            &[("title", json!(""))],
+            before.clone(),
+            before.clone(),
+            OutcomeKind::Rejected,
+            Some("title_required"),
+        );
+        let success = sample(
+            "add",
+            &[("title", json!("alpha"))],
+            before.clone(),
+            json!({"notes": [{"id": 1, "title": "alpha"}]}),
+            OutcomeKind::Success,
+            None,
+        );
+        let all = vec![rejected, success];
+        let collections = detect_collections(&[all[0].before.clone()]);
+        let candidates = guard_candidates(&all, &collections);
+        let guards = select_error_guards(&candidates, &all, "title_required").expect("guard");
+        assert!(
+            guards
+                .iter()
+                .any(|guard| matches!(guard, Guard::ParamBlank { param } if param == "title")),
+            "guards={guards:?}"
+        );
+    }
+
+    #[test]
+    fn identity_shaped_output_can_be_an_action_parameter_without_creation() {
+        let mut subscribed = sample(
+            "subscribe",
+            &[("channel", json!("ops"))],
+            json!({"subscribers": [], "view": "list"}),
+            json!({"subscribers": ["ops"], "view": "subscribed"}),
+            OutcomeKind::Success,
+            None,
+        );
+        subscribed.outputs.insert("created_id".into(), json!("ops"));
+        let outputs = infer_outputs(&[subscribed], OutputSnapshot::Post, &[]);
+        assert_eq!(
+            outputs.get("created_id"),
+            Some(&ValueExpr::Param {
+                name: "channel".into()
+            })
         );
     }
 }
