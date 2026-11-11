@@ -1,0 +1,22 @@
+{
+  "target_id": "npm-cli-11.20.0",
+  "target_name": "npm-cli",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": "pristine",
+  "workdir": "../../../target/reforge-phase8-work-npm",
+  "state_file": "state.json",
+  "timeout_ms": 60000,
+  "actions": [
+    {"action": "install_alpha", "argv": ["install_alpha"]},
+    {"action": "install_beta", "argv": ["install_beta"]},
+    {"action": "uninstall_alpha", "argv": ["uninstall_alpha"]},
+    {"action": "uninstall_beta", "argv": ["uninstall_beta"]},
+    {"action": "install_missing", "argv": ["install_missing"]},
+    {"action": "bump_version", "argv": ["bump_version"]},
+    {"action": "prune_packages", "argv": ["prune_packages"]},
+    {"action": "list_packages", "argv": ["list_packages"]},
+    {"action": "stats", "argv": ["stats"]}
+  ]
+}

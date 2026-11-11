@@ -1,0 +1,8 @@
+{
+  "suite": "reforgebench-phase8-independent",
+  "description": "Two previously unused external applications evaluated under a frozen, adapter-only contract: npm 11.20.0 (JavaScript/Node dependency graph) and buku 5.1 (Python/SQLite bookmark store).",
+  "apps": [
+    {"spec": "benchmarks/phase8-independent/fixtures/npm/target.json", "split": "holdout"},
+    {"spec": "benchmarks/phase8-independent/fixtures/buku/target.json", "split": "holdout"}
+  ]
+}

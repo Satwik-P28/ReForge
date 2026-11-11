@@ -1,0 +1,110 @@
+{
+  "app": "buku-5.1",
+  "workflows": [
+    {
+      "name": "add-update-list-stats",
+      "steps": [
+        {
+          "action": "add_bookmark",
+          "params": {
+            "url": "https://example.com/hidden-add-update-list-stats-1",
+            "title": "Hidden add-update-list-stats 1",
+            "tag": "work"
+          }
+        },
+        {
+          "action": "update_bookmark",
+          "params": {
+            "id": "1",
+            "title": "Updated add-update-list-stats",
+            "tag": "edited"
+          }
+        },
+        {
+          "action": "list_bookmarks"
+        },
+        {
+          "action": "stats"
+        }
+      ]
+    },
+    {
+      "name": "duplicate-and-missing",
+      "steps": [
+        {
+          "action": "add_duplicate"
+        },
+        {
+          "action": "add_duplicate"
+        },
+        {
+          "action": "delete_missing"
+        },
+        {
+          "action": "list_bookmarks"
+        }
+      ]
+    },
+    {
+      "name": "delete-then-allocate",
+      "steps": [
+        {
+          "action": "add_bookmark",
+          "params": {
+            "url": "https://example.com/hidden-delete-then-allocate-1",
+            "title": "Hidden delete-then-allocate 1",
+            "tag": "work"
+          }
+        },
+        {
+          "action": "add_duplicate"
+        },
+        {
+          "action": "delete_bookmark",
+          "params": {
+            "id": "1"
+          }
+        },
+        {
+          "action": "add_bookmark",
+          "params": {
+            "url": "https://example.com/hidden-delete-then-allocate-2",
+            "title": "Hidden delete-then-allocate 2",
+            "tag": "work"
+          }
+        },
+        {
+          "action": "stats"
+        }
+      ]
+    },
+    {
+      "name": "tag-search-delete",
+      "steps": [
+        {
+          "action": "add_bookmark",
+          "params": {
+            "url": "https://example.com/hidden-tag-search-delete-1",
+            "title": "Hidden tag-search-delete 1",
+            "tag": "work"
+          }
+        },
+        {
+          "action": "add_duplicate"
+        },
+        {
+          "action": "search_work"
+        },
+        {
+          "action": "delete_bookmark",
+          "params": {
+            "id": "2"
+          }
+        },
+        {
+          "action": "list_bookmarks"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "phase": "8",
+  "purpose": "Targets that may not be treated as untouched holdout evidence.",
+  "excluded_families": [
+    {"family": "final2", "targets": ["cli-taskboard", "cli-inventory", "cli-forms", "cli-contacts", "cli-events", "cli-library", "cli-tickets"], "reason": "used for implementation and regression"},
+    {"family": "final3", "targets": ["cli-garden", "cli-ledger"], "reason": "used for implementation and regression"},
+    {"family": "final4", "targets": ["cli-depot"], "reason": "used for implementation and regression"},
+    {"family": "final5", "targets": ["cli-atelier"], "reason": "used for implementation and regression"},
+    {"family": "final8", "targets": ["cli-foundry", "cli-orchard"], "reason": "used for implementation and regression"},
+    {"family": "phase6.3-holdout", "targets": ["cli-bakery", "cli-desk", "cli-notes"], "reason": "internally authored and used for holdout development"},
+    {"family": "causal-holdout", "targets": ["cli-kiln"], "reason": "used for causal holdout development"},
+    {"family": "phase6.4-external", "targets": ["cli-hledger", "cli-topydo", "cli-sqlite"], "reason": "used for external adapter development and regression"},
+    {"family": "phase6.5-external", "targets": ["cli-notecli"], "reason": "used for identity/allocation development"},
+    {"family": "phase6.6-external", "targets": ["cli-parcel", "cli-vault"], "reason": "used for external reconstruction and baseline"},
+    {"family": "phase7.1-external", "targets": ["json-server-0.17.4", "todo.txt-cli-2.12.0"], "reason": "used for Phase 7 development and tuning"},
+    {"family": "phase7.4-taskbook", "targets": ["taskbook-0.3.0"], "reason": "used for composition and export development"},
+    {"family": "invalidated-or-version-variants", "targets": ["all earlier versions/snapshots of the above"], "reason": "version changes do not create independent evidence when the application family was already studied"}
+  ],
+  "new_targets": [
+    {
+      "target": "npm-cli-11.20.0",
+      "family": "npm command-line package manager",
+      "language": "JavaScript on Node",
+      "persistence": "package.json and package-lock.json with a materialized node_modules graph",
+      "why_unfamiliar": "Never appears in any benchmark fixture, target spec or prior Phase 6-7 suite; not derived from ReForge grammar; selected before any reconstruction.",
+      "rea_source": "target/phase8-tools/npm-src/package"
+    },
+    {
+      "target": "buku-5.1",
+      "family": "buku bookmark manager",
+      "language": "Python",
+      "persistence": "SQLite bookmarks database",
+      "why_unfamiliar": "Never appears in any benchmark fixture, target spec or prior Phase 6-7 suite; a distinct language and storage family; selected before any reconstruction.",
+      "rea_source": "not applicable (REA arm remains black-box for this target)"
+    }
+  ],
+  "selection_rule": "Exact target families, not just version numbers, are excluded. The two new targets are the only Phase 8 holdout applications."
+}

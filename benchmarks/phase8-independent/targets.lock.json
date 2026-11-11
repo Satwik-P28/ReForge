@@ -1,0 +1,24 @@
+{
+  "npm-cli": {
+    "kind": "external-node-cli",
+    "version": "11.20.0",
+    "license": "Artistic-2.0",
+    "tarball": "https://registry.npmjs.org/npm/-/npm-11.20.0.tgz",
+    "tarball_sha256": "d1a92f40e6c407b84c3a00c3cf978a10b24fd42f153c527e2016cef7bb34a483",
+    "package_json_sha256": "61a7554a8e9eef42eca2ad2bee87ba3f34b3200368e2a681bdf186fb214cd780",
+    "node_version": "26.13.0",
+    "node_sha256": "0adde40d1b7dfa57c8bc83cbc319758c3ec6ebba21363bb2fa752ea6b267ad1b",
+    "source_tree": "target/phase8-tools/npm-src/package",
+    "exposed_subset": "install alpha, install beta, uninstall alpha, uninstall beta, install missing, bump version, prune, list, stats"
+  },
+  "buku": {
+    "kind": "external-python-cli",
+    "version": "5.1",
+    "license": "GPL-3.0",
+    "distribution": "PyPI buku==5.1",
+    "executable_sha256": "9e250e8fa9b6bdf0cadcd354e8ff316750847ab6103aa0e6da1832ba0954c05e",
+    "python_version": "3.12.3",
+    "module_path": "target/phase8-tools/buku-venv/lib/python3.12/site-packages/buku.py",
+    "exposed_subset": "add bookmark, add duplicate, update bookmark, delete bookmark, delete missing, list, search tag, stats"
+  }
+}
