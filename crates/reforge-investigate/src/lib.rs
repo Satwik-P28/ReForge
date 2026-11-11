@@ -48,8 +48,9 @@ pub use causal::{
 };
 pub use data::{
     synthesize_data_program, synthesize_data_program_with_samples, CollectionLayout, DataOutcome,
-    DataProgram, DataRule, DataSample, DataStatus, Derived, Effect, ExecutionResult, Guard,
-    OutputContract, OutputFieldContract, RuleBranch, RuleProvenance, StateUpdateClaim, ValueExpr,
+    DataProgram, DataRule, DataSample, DataStatus, Derived, Effect, ExecutionMemory,
+    ExecutionResult, Guard, OutputContract, OutputFieldContract, PositionDisposition, RuleBranch,
+    RuleProvenance, StateUpdateClaim, ValueExpr,
 };
 pub use relational::{
     classify_parameter, infer_output_semantics, CmpOp, EntityRef, ExecutionSemantics,

@@ -7,7 +7,7 @@
 //!
 //! A program that has no rule for a step is *unverified*, not divergent.
 
-use reforge_investigate::{DataOutcome, DataProgram, DataStatus};
+use reforge_investigate::{DataProgram, DataStatus};
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_types::TypedValue;
 use serde::{Deserialize, Serialize};
@@ -268,6 +268,7 @@ pub fn data_campaign(
         }
 
         let mut model_state = program.initial_state.clone();
+        let mut model_memory = reforge_investigate::ExecutionMemory::default();
         let mut stopped = false;
         for (step, action) in actions.iter().enumerate() {
             if stopped {
@@ -281,8 +282,15 @@ pub fn data_campaign(
             let (expected_status, expected_error) = reference_status(&observation);
             let expected_events = events(&observation);
             let expected_outputs = observable_outputs(&observation);
-            let (next_state, outcome): (Value, DataOutcome) =
-                program.execute(&model_state, &action.action, &params(action));
+            let result = program.execute_tracked(
+                &model_state,
+                &model_memory,
+                &action.action,
+                &params(action),
+            );
+            let next_state = result.state;
+            let outcome = result.outcome;
+            model_memory = result.memory;
             let model_status = outcome.status;
             let state_match = reference_state
                 .as_ref()

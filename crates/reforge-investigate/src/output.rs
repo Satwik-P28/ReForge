@@ -520,6 +520,17 @@ fn check_expr_in_record(
             }
             Ok(OutputType::Bool)
         }
+        ValueExpr::FilteredCount { collection, filter } => {
+            ensure_collection(collection, collections)?;
+            if !schema.has_record_field(collection, &filter.field) {
+                return Err(OutputTypeError::UnknownRecordField {
+                    collection: collection.clone(),
+                    field: filter.field.clone(),
+                });
+            }
+            check_expr_in_record(&filter.value, schema, collections, Some(collection))?;
+            Ok(OutputType::Int)
+        }
         ValueExpr::CountWhere {
             collection,
             field,
@@ -899,6 +910,20 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
                 },
             ))
         }
+        ValueExpr::FilteredCount { collection, filter } => {
+            let definition = find_collection(context.collections, collection)?;
+            let wanted = eval_expr(&filter.value, context);
+            Some(Value::from(
+                records(context.state, definition)
+                    .iter()
+                    .filter(|(_, record)| {
+                        wanted
+                            .as_ref()
+                            .is_some_and(|wanted| record.get(&filter.field) == Some(wanted))
+                    })
+                    .count() as u64,
+            ))
+        }
         ValueExpr::CountWhere {
             collection,
             field,
@@ -1006,7 +1031,7 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
                 let mut item = Map::new();
                 for (out_field, source) in fields {
                     if source == "__id__" {
-                        item.insert(out_field.clone(), Value::String(id.clone()));
+                        item.insert(out_field.clone(), definition.id_kind.coerce(&id));
                     } else if let Some(value) = record.get(source) {
                         item.insert(out_field.clone(), value.clone());
                     }
