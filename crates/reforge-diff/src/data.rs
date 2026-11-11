@@ -843,6 +843,7 @@ mod tests {
                 layout: reforge_investigate::data::CollectionLayout::List,
                 id_field: "id".into(),
                 id_kind: reforge_investigate::data::IdentityKind::Integer,
+                id_strategy: reforge_investigate::data::IdentityStrategy::Persistent,
             }],
             derived: Vec::new(),
             rules: vec![DataRule {

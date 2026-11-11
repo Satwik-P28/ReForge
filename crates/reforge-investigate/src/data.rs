@@ -108,6 +108,21 @@ pub struct Collection {
     /// default to string; numeric identities are an explicit inference result.
     #[serde(default)]
     pub id_kind: IdentityKind,
+    /// How the observable locator of a record is allocated. A positional list
+    /// renumbers entries after removal; a persistent list keeps each record's
+    /// allocated identifier. Defaulting preserves older serialized programs.
+    #[serde(default)]
+    pub id_strategy: IdentityStrategy,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IdentityStrategy {
+    #[default]
+    Persistent,
+    /// Records are addressed by their current display position. Positions are
+    /// recomputed after a mutation and are not stable record identities.
+    Positional { start: i64 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -268,6 +283,13 @@ pub enum ValueExpr {
     Param {
         name: String,
     },
+    /// A raw action parameter rendered in the scalar representation observed
+    /// for this output. The canonical value must still agree with the input;
+    /// this is evidence-backed conversion, not global string-to-number coercion.
+    ParamConverted {
+        name: String,
+        identity: IdentityKind,
+    },
     /// The identifier allocated by the current effect. `identity` preserves
     /// the observed JSON representation; the canonical identifier remains a
     /// string internally for lookup.
@@ -352,6 +374,13 @@ pub enum ValueExpr {
         entity: EntityRef,
         field: String,
     },
+    /// A field of an entity addressed by a parameter, read from the snapshot
+    /// captured before mutation. Removed records remain readable here.
+    PreEntityField {
+        collection: String,
+        entity: EntityRef,
+        field: String,
+    },
     /// The canonical identity of the entity addressed by a parameter,
     /// preserving the representation observed for this output (number or
     /// string). Unlike `EntityField` this does not require the record to carry
@@ -403,7 +432,16 @@ pub enum ValueExpr {
         derived: BTreeMap<String, ValueExpr>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sort_by: Option<String>,
+        /// Restrict projected rows to those whose field equals a parameter.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filter: Option<CollectionFilter>,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CollectionFilter {
+    pub field: String,
+    pub value: Box<ValueExpr>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1310,13 +1348,8 @@ pub fn synthesize_data_program_with_samples(
                     continue;
                 }
                 let matches = carriers.iter().all(|sample| {
-                    eval_value(
-                        expression,
-                        output_source(sample, OutputSnapshot::Post),
-                        &sample.params,
-                        sample.created_id.as_deref(),
-                        &collections,
-                    ) == sample.outputs.get(key).cloned()
+                    eval_output(expression, sample, OutputSnapshot::Post, &collections)
+                        == sample.outputs.get(key).cloned()
                 });
                 if matches {
                     rule.outputs.insert(key.clone(), expression.clone());
@@ -1403,13 +1436,8 @@ pub fn synthesize_data_program_with_samples(
             }
             if let Some(candidate) = candidates.iter().find(|candidate| {
                 carriers.iter().all(|sample| {
-                    eval_value(
-                        candidate,
-                        output_source(sample, OutputSnapshot::Post),
-                        &sample.params,
-                        sample.created_id.as_deref(),
-                        &collections,
-                    ) == sample.outputs.get(key).cloned()
+                    eval_output(candidate, sample, OutputSnapshot::Post, &collections)
+                        == sample.outputs.get(key).cloned()
                 })
             }) {
                 rule.outputs.insert(key.clone(), candidate.clone());
@@ -1914,7 +1942,9 @@ impl DataProgram {
         };
 
         let mut next = state.clone();
-        let mut input_snapshot: Option<Value> = None;
+        // Outputs may mix pre- and post-state facts. Keep the pre-action
+        // document available even when the rule's default ordering is post.
+        let mut input_snapshot: Option<Value> = Some(state.clone());
         let mut post: Option<Value> = None;
         let mut created = None;
         let mut outputs = BTreeMap::new();
@@ -1939,6 +1969,7 @@ impl DataProgram {
                     for effect in &rule.effects {
                         apply_effect(effect, &mut next, params, &mut created, &self.collections);
                     }
+                    normalize_positional_collections(&mut next, &self.collections);
                     "effects applied to the working copy".into()
                 }
                 Stage::PostStateEvaluation => {
@@ -1949,17 +1980,16 @@ impl DataProgram {
                     "derived fields recomputed".into()
                 }
                 Stage::OutputConstruction => {
-                    let source = match rule.execution.output_snapshot {
-                        OutputSnapshot::Pre => input_snapshot.as_ref().unwrap_or(state),
-                        _ => post.as_ref().unwrap_or(&next),
-                    };
+                    let source = post.as_ref().unwrap_or(&next);
+                    let before = input_snapshot.as_ref().unwrap_or(state);
                     outputs = rule
                         .outputs
                         .iter()
                         .filter_map(|(name, expression)| {
-                            eval_value(
+                            eval_value_with_pre(
                                 expression,
                                 source,
+                                before,
                                 params,
                                 created.as_deref(),
                                 &self.collections,
@@ -2230,6 +2260,7 @@ fn detect_collections_with_samples(snapshots: &[Value], samples: &[Sample]) -> V
                 layout: CollectionLayout::Map,
                 id_field: String::new(),
                 id_kind: IdentityKind::String,
+                id_strategy: IdentityStrategy::Persistent,
             });
         }
     }
@@ -2249,11 +2280,13 @@ fn detect_collections_with_samples(snapshots: &[Value], samples: &[Sample]) -> V
                 .map(|(field, _)| field.to_string())
                 .unwrap_or_else(|| "id".into());
             let id_kind = identity_kind_in_snapshots(&name, &id_field, snapshots);
+            let id_strategy = infer_identity_strategy(&name, &id_field, snapshots, samples);
             out.push(Collection {
                 name,
                 layout: CollectionLayout::List,
                 id_field,
                 id_kind,
+                id_strategy,
             });
         }
     }
@@ -2264,11 +2297,97 @@ fn detect_collections_with_samples(snapshots: &[Value], samples: &[Sample]) -> V
                 layout: CollectionLayout::Set,
                 id_field: String::new(),
                 id_kind: IdentityKind::String,
+                id_strategy: IdentityStrategy::Persistent,
             });
         }
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
+}
+
+/// Infer whether list ids are display positions or persistent record ids.
+/// Contiguous ids alone are insufficient: a stable allocated sequence is also
+/// contiguous. Positional semantics additionally require a record to retain its
+/// payload while its locator changes across an observed transition.
+fn infer_identity_strategy(
+    collection: &str,
+    id_field: &str,
+    snapshots: &[Value],
+    samples: &[Sample],
+) -> IdentityStrategy {
+    let mut start: Option<i64> = None;
+    let mut observed_nonempty = false;
+    for state in snapshots {
+        let Some(items) = state.get(collection).and_then(Value::as_array) else {
+            continue;
+        };
+        if items.is_empty() {
+            continue;
+        }
+        observed_nonempty = true;
+        let first = items
+            .first()
+            .and_then(|item| item.get(id_field))
+            .and_then(Value::as_i64);
+        let Some(first) = first else {
+            return IdentityStrategy::Persistent;
+        };
+        start = Some(start.map_or(first, |existing| existing.min(first)));
+        for (offset, item) in items.iter().enumerate() {
+            if item.get(id_field).and_then(Value::as_i64) != Some(first + offset as i64) {
+                return IdentityStrategy::Persistent;
+            }
+        }
+    }
+    if !observed_nonempty {
+        return IdentityStrategy::Persistent;
+    }
+
+    let entries = |state: &Value| -> Vec<(String, Map<String, Value>)> {
+        state
+            .get(collection)
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        let record = item.as_object()?;
+                        let id = record.get(id_field).and_then(identity_string)?;
+                        Some((id, record.clone()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let shifted = samples.iter().any(|sample| {
+        let before = entries(&sample.before);
+        let after = entries(&sample.after);
+        before.iter().any(|(before_id, before_record)| {
+            after.iter().any(|(after_id, after_record)| {
+                before_id != after_id
+                    && records_equal_except_id(before_record, after_record, id_field)
+            })
+        })
+    });
+    if shifted {
+        IdentityStrategy::Positional {
+            start: start.unwrap_or(1),
+        }
+    } else {
+        IdentityStrategy::Persistent
+    }
+}
+
+fn records_equal_except_id(
+    left: &Map<String, Value>,
+    right: &Map<String, Value>,
+    id_field: &str,
+) -> bool {
+    let mut left = left.clone();
+    let mut right = right.clone();
+    left.remove(id_field);
+    right.remove(id_field);
+    left == right
 }
 
 fn identity_field_prior(field: &str) -> u8 {
@@ -3434,6 +3553,7 @@ fn collection_def_from_state(name: &str, state: &Value) -> Option<Collection> {
             layout: CollectionLayout::Map,
             id_field: String::new(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }),
         Value::Array(items) => {
             let id_field = items
@@ -3458,6 +3578,7 @@ fn collection_def_from_state(name: &str, state: &Value) -> Option<Collection> {
                 layout: CollectionLayout::List,
                 id_field,
                 id_kind,
+                id_strategy: IdentityStrategy::Persistent,
             })
         }
         _ => None,
@@ -4978,6 +5099,27 @@ fn output_source(sample: &Sample, snapshot: OutputSnapshot) -> &Value {
     }
 }
 
+fn eval_output(
+    expression: &ValueExpr,
+    sample: &Sample,
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<Value> {
+    let post = if snapshot == OutputSnapshot::Pre {
+        &sample.before
+    } else {
+        &sample.after
+    };
+    eval_value_with_pre(
+        expression,
+        post,
+        &sample.before,
+        &sample.params,
+        sample.created_id.as_deref(),
+        collections,
+    )
+}
+
 fn output_matches_all(
     key: &str,
     expression: &ValueExpr,
@@ -4989,13 +5131,8 @@ fn output_matches_all(
         .iter()
         .filter(|sample| sample.outputs.contains_key(key))
         .all(|sample| {
-            eval_value(
-                expression,
-                output_source(sample, snapshot),
-                &sample.params,
-                sample.created_id.as_deref(),
-                collections,
-            ) == sample.outputs.get(key).cloned()
+            eval_output(expression, sample, snapshot, collections)
+                == sample.outputs.get(key).cloned()
         })
 }
 
@@ -5027,6 +5164,7 @@ fn merge_output_expression(existing: &ValueExpr, candidate: &ValueExpr) -> Value
                 lengths,
                 derived,
                 sort_by,
+                filter,
             },
             ValueExpr::CollectionProjection {
                 collection: candidate_collection,
@@ -5034,11 +5172,13 @@ fn merge_output_expression(existing: &ValueExpr, candidate: &ValueExpr) -> Value
                 lengths: candidate_lengths,
                 derived: candidate_derived,
                 sort_by: candidate_sort,
+                filter: candidate_filter,
             },
         ) if collection == candidate_collection
             && fields == candidate_fields
             && lengths == candidate_lengths
-            && sort_by == candidate_sort =>
+            && sort_by == candidate_sort
+            && filter == candidate_filter =>
         {
             let mut merged = derived.clone();
             for (key, expression) in candidate_derived {
@@ -5052,6 +5192,7 @@ fn merge_output_expression(existing: &ValueExpr, candidate: &ValueExpr) -> Value
                 lengths: lengths.clone(),
                 derived: merged,
                 sort_by: sort_by.clone(),
+                filter: filter.clone(),
             }
         }
         _ => existing.clone(),
@@ -5063,6 +5204,7 @@ fn structural_output(expression: &ValueExpr) -> bool {
         expression,
         ValueExpr::State { .. }
             | ValueExpr::PreState { .. }
+            | ValueExpr::PreEntityField { .. }
             | ValueExpr::Length { .. }
             | ValueExpr::MapHasKey { .. }
             | ValueExpr::CollectionProjection { .. }
@@ -5196,12 +5338,7 @@ fn infer_parameter_output(key: &str, successes: &[Sample]) -> Option<ValueExpr> 
                 .params
                 .get(name)
                 .zip(sample.outputs.get(key))
-                .is_some_and(|(parameter, output)| {
-                    parameter == output
-                        || identity_string(parameter)
-                            .zip(identity_string(output))
-                            .is_some_and(|(left, right)| left == right)
-                })
+                .is_some_and(|(parameter, output)| parameter == output)
         }) {
             return Some(ValueExpr::Param { name: name.clone() });
         }
@@ -5209,7 +5346,53 @@ fn infer_parameter_output(key: &str, successes: &[Sample]) -> Option<ValueExpr> 
     None
 }
 
-/// Output copied from the record addressed by a declared parameter.
+/// A scalar parameter echoed in a different observed JSON representation. This
+/// is only accepted when the exact parameter candidate failed and the canonical
+/// scalar values agree in every observation. It never coerces arbitrary text:
+/// leading zeros, invalid numbers and unrelated strings cannot match.
+fn infer_typed_parameter_output(key: &str, successes: &[Sample]) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty() {
+        return None;
+    }
+    for name in carriers[0].params.keys() {
+        let mut identity: Option<IdentityKind> = None;
+        let mut matched = 0usize;
+        for sample in &carriers {
+            let Some(parameter) = sample.params.get(name) else {
+                break;
+            };
+            let Some(output) = sample.outputs.get(key) else {
+                break;
+            };
+            let Some(kind) = IdentityKind::from_value(output) else {
+                break;
+            };
+            if identity.is_some_and(|current| current != kind) {
+                break;
+            }
+            identity = Some(kind);
+            if parameter == output || identity_string(parameter) != identity_string(output) {
+                break;
+            }
+            matched += 1;
+        }
+        if matched == carriers.len() {
+            return identity.map(|identity| ValueExpr::ParamConverted {
+                name: name.clone(),
+                identity,
+            });
+        }
+    }
+    None
+}
+
+/// Output copied from the record addressed by a declared parameter. Post-state
+/// fields are preferred when the record still exists; an explicit pre-state
+/// expression covers actions that remove or replace the addressed record.
 fn infer_entity_field_output(
     key: &str,
     successes: &[Sample],
@@ -5223,32 +5406,45 @@ fn infer_entity_field_output(
     if carriers.is_empty() {
         return None;
     }
-    for collection in collections {
-        if collection.layout == CollectionLayout::Set {
-            continue;
-        }
-        for name in carriers[0].params.keys() {
-            let mut matched = 0usize;
-            for sample in &carriers {
-                let Some(id) = sample.params.get(name).and_then(identity_string) else {
-                    break;
-                };
-                let Some(record) =
-                    record_by_id_auto(output_source(sample, snapshot), &collection.name, &id)
-                else {
-                    break;
-                };
-                if record.get(key) != sample.outputs.get(key) {
-                    break;
-                }
-                matched += 1;
+    for use_pre in [false, true] {
+        for collection in collections {
+            if collection.layout == CollectionLayout::Set {
+                continue;
             }
-            if matched == carriers.len() {
-                return Some(ValueExpr::EntityField {
-                    collection: collection.name.clone(),
-                    entity: EntityRef::Param(name.clone()),
-                    field: key.to_string(),
-                });
+            for name in carriers[0].params.keys() {
+                let mut matched = 0usize;
+                for sample in &carriers {
+                    let Some(id) = sample.params.get(name).and_then(identity_string) else {
+                        break;
+                    };
+                    let source = if use_pre {
+                        &sample.before
+                    } else {
+                        output_source(sample, snapshot)
+                    };
+                    let Some(record) = record_by_id(source, collection, &id) else {
+                        break;
+                    };
+                    if record.get(key) != sample.outputs.get(key) {
+                        break;
+                    }
+                    matched += 1;
+                }
+                if matched == carriers.len() {
+                    return Some(if use_pre {
+                        ValueExpr::PreEntityField {
+                            collection: collection.name.clone(),
+                            entity: EntityRef::Param(name.clone()),
+                            field: key.to_string(),
+                        }
+                    } else {
+                        ValueExpr::EntityField {
+                            collection: collection.name.clone(),
+                            entity: EntityRef::Param(name.clone()),
+                            field: key.to_string(),
+                        }
+                    });
+                }
             }
         }
     }
@@ -5285,14 +5481,9 @@ fn infer_entity_id_output(
                 let Some(id) = sample.params.get(name).and_then(identity_string) else {
                     break;
                 };
-                // The output can name the entity the action just removed
-                // (deleted_id) or a related entity that is not guaranteed to
-                // exist after the mutation. Identity evidence is valid when
-                // either the pre- or post-state contains that entity.
-                let exists =
-                    record_by_id_auto(output_source(sample, snapshot), &collection.name, &id)
-                        .or_else(|| record_by_id_auto(&sample.before, &collection.name, &id))
-                        .is_some();
+                let exists = record_by_id(output_source(sample, snapshot), collection, &id)
+                    .or_else(|| record_by_id(&sample.before, collection, &id))
+                    .is_some();
                 if !exists {
                     break;
                 }
@@ -5381,13 +5572,8 @@ fn infer_output_contract(
         }
         let resolved = outputs.get(&key).is_some_and(|expression| {
             carriers.iter().all(|sample| {
-                eval_value(
-                    expression,
-                    output_source(sample, snapshot),
-                    &sample.params,
-                    sample.created_id.as_deref(),
-                    collections,
-                ) == sample.outputs.get(&key).cloned()
+                eval_output(expression, sample, snapshot, collections)
+                    == sample.outputs.get(&key).cloned()
             })
         });
         let nulls = carriers
@@ -5513,13 +5699,28 @@ fn infer_outputs(
         else {
             continue;
         };
-        if let Some(expression) = infer_identity_output(&key, successes, collections) {
+        // Exact parameter equality is the strongest scalar echo. Entity
+        // identity is next: it uses the addressed record rather than assuming
+        // that a numeric-looking parameter must become a number everywhere.
+        if let Some(expression) = infer_parameter_output(&key, successes) {
             if output_matches_all(&key, &expression, successes, snapshot, collections) {
                 outputs.insert(key.clone(), expression);
                 continue;
             }
         }
-        if let Some(expression) = infer_parameter_output(&key, successes) {
+        if let Some(expression) = infer_entity_id_output(&key, successes, snapshot, collections) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_typed_parameter_output(&key, successes) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) = infer_identity_output(&key, successes, collections) {
             if output_matches_all(&key, &expression, successes, snapshot, collections) {
                 outputs.insert(key.clone(), expression);
                 continue;
@@ -5527,12 +5728,6 @@ fn infer_outputs(
         }
         if let Some(expression) = infer_entity_field_output(&key, successes, snapshot, collections)
         {
-            if output_matches_all(&key, &expression, successes, snapshot, collections) {
-                outputs.insert(key.clone(), expression);
-                continue;
-            }
-        }
-        if let Some(expression) = infer_entity_id_output(&key, successes, snapshot, collections) {
             if output_matches_all(&key, &expression, successes, snapshot, collections) {
                 outputs.insert(key.clone(), expression);
                 continue;
@@ -6025,6 +6220,7 @@ fn infer_projection(
         let mut field_pairs: ProjectionFieldSamples = BTreeMap::new();
         let mut natural_order = true;
         let mut matched = true;
+        let mut filter_spec: Option<(String, String)> = None;
 
         for sample in &carriers {
             let Some(observed) = sample.outputs.get(key).and_then(Value::as_array) else {
@@ -6032,7 +6228,54 @@ fn infer_projection(
                 break;
             };
             let source = output_source(sample, snapshot);
-            let available = records(source, collection);
+            let mut available = records(source, collection);
+            if available.len() != observed.len() {
+                // Some read operations expose a relation-filtered subset rather
+                // than the whole collection. Infer the filter from a field
+                // whose value canonically equals one action parameter.
+                if let Some((field, param)) = &filter_spec {
+                    let wanted = sample.params.get(param).and_then(identity_string);
+                    available.retain(|(_, record)| {
+                        record.get(field).and_then(identity_string) == wanted
+                    });
+                } else {
+                    let mut chosen = None;
+                    for (field, _) in available
+                        .first()
+                        .map(|(_, r)| r)
+                        .into_iter()
+                        .flat_map(|r| r.iter())
+                    {
+                        if field == &collection.id_field {
+                            continue;
+                        }
+                        for name in sample.params.keys() {
+                            let wanted = sample.params.get(name).and_then(identity_string);
+                            if wanted.is_none() {
+                                continue;
+                            }
+                            let selected: Vec<_> = available
+                                .iter()
+                                .filter(|(_, record)| {
+                                    record.get(field).and_then(identity_string) == wanted
+                                })
+                                .cloned()
+                                .collect();
+                            if selected.len() == observed.len() {
+                                chosen = Some((field.clone(), name.clone(), selected));
+                                break;
+                            }
+                        }
+                        if chosen.is_some() {
+                            break;
+                        }
+                    }
+                    if let Some((field, name, selected)) = chosen {
+                        filter_spec = Some((field, name));
+                        available = selected;
+                    }
+                }
+            }
             if available.len() != observed.len() {
                 matched = false;
                 break;
@@ -6169,12 +6412,34 @@ fn infer_projection(
             continue;
         }
 
+        let filter = filter_spec.map(|(field, name)| {
+            let identity = carriers
+                .iter()
+                .flat_map(|sample| records(output_source(sample, snapshot), collection))
+                .find_map(|(_, record)| record.get(&field).and_then(IdentityKind::from_value))
+                .unwrap_or(IdentityKind::String);
+            let parameter = carriers[0]
+                .params
+                .get(&name)
+                .and_then(IdentityKind::from_value)
+                .unwrap_or(identity);
+            let value = if parameter == identity {
+                ValueExpr::Param { name }
+            } else {
+                ValueExpr::ParamConverted { name, identity }
+            };
+            CollectionFilter {
+                field,
+                value: Box::new(value),
+            }
+        });
         return Some(ValueExpr::CollectionProjection {
             collection: collection.name.clone(),
             fields,
             lengths,
             derived,
             sort_by,
+            filter,
         });
     }
     None
@@ -6993,10 +7258,35 @@ fn reproduces(
             collections,
         );
     }
+    normalize_positional_collections(&mut state, collections);
     for derived in derived {
         apply_derived(derived, &mut state, collections);
     }
     state == sample.after
+}
+
+fn normalize_positional_collections(state: &mut Value, collections: &[Collection]) {
+    for collection in collections {
+        let IdentityStrategy::Positional { start } = collection.id_strategy else {
+            continue;
+        };
+        let Some(items) = state
+            .get_mut(&collection.name)
+            .and_then(Value::as_array_mut)
+        else {
+            continue;
+        };
+        for (offset, item) in items.iter_mut().enumerate() {
+            let Some(record) = item.as_object_mut() else {
+                continue;
+            };
+            let identity = start + offset as i64;
+            record.insert(
+                collection.id_field.clone(),
+                collection.id_kind.coerce(&identity.to_string()),
+            );
+        }
+    }
 }
 
 fn apply_effect(
@@ -7361,6 +7651,19 @@ fn eval_value(
     crate::output::eval_expr(expression, &context)
 }
 
+fn eval_value_with_pre(
+    expression: &ValueExpr,
+    state: &Value,
+    pre_state: &Value,
+    params: &BTreeMap<String, Value>,
+    created: Option<&str>,
+    collections: &[Collection],
+) -> Option<Value> {
+    let context =
+        crate::output::EvalContext::root_with_pre(state, pre_state, params, created, collections);
+    crate::output::eval_expr(expression, &context)
+}
+
 #[allow(dead_code)]
 fn eval_value_legacy(
     expression: &ValueExpr,
@@ -7411,6 +7714,7 @@ fn eval_value_legacy(
             lengths,
             derived: _,
             sort_by,
+            filter: _,
         } => {
             let definition = collections.iter().find(|c| &c.name == collection)?;
             let mut entries = records(state, definition);
@@ -7828,6 +8132,7 @@ mod tests {
             layout: CollectionLayout::List,
             id_field: "id".into(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let effects = infer_effects(&sample, &collections);
         assert!(effects.iter().any(|effect| matches!(
@@ -8283,6 +8588,7 @@ mod tests {
             layout: CollectionLayout::Map,
             id_field: String::new(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let expression = ValueExpr::CollectionProjection {
             collection: "items".into(),
@@ -8297,6 +8603,7 @@ mod tests {
             .into_iter()
             .collect(),
             sort_by: None,
+            filter: None,
         };
         assert!(crate::output::check_expr(&expression, &schema, &collections).is_err());
     }
@@ -8323,6 +8630,7 @@ mod tests {
             layout: CollectionLayout::List,
             id_field: "id".into(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let outputs = infer_outputs(&[s], OutputSnapshot::Post, &collections);
         eprintln!("OUTPUTS {:?}", outputs);
@@ -8393,6 +8701,7 @@ mod tests {
             layout: CollectionLayout::Map,
             id_field: "id".into(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let mut schema = crate::output::OutputSchema::default();
         for record in state["accounts"].as_object().unwrap().values() {
@@ -8445,6 +8754,7 @@ mod tests {
             layout: CollectionLayout::Map,
             id_field: "id".into(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let empty_params = BTreeMap::new();
         let empty_context =
@@ -8739,6 +9049,7 @@ mod tests {
             layout: CollectionLayout::Map,
             id_field: String::new(),
             id_kind: IdentityKind::String,
+            id_strategy: IdentityStrategy::Persistent,
         }];
         let first_before = json!({
             "accounts": {"a1": {"status": "open", "balance": 2}},
@@ -8888,12 +9199,14 @@ mod tests {
                 layout: CollectionLayout::List,
                 id_field: "id".into(),
                 id_kind: IdentityKind::Integer,
+                id_strategy: IdentityStrategy::Persistent,
             },
             Collection {
                 name: "completed".into(),
                 layout: CollectionLayout::Set,
                 id_field: String::new(),
                 id_kind: IdentityKind::String,
+                id_strategy: IdentityStrategy::Persistent,
             },
         ];
         let effects = infer_effects(&complete, &collections);
@@ -9061,6 +9374,7 @@ mod tests {
                 layout: CollectionLayout::List,
                 id_field: "id".into(),
                 id_kind: identity,
+                id_strategy: IdentityStrategy::Persistent,
             }],
             derived: vec![Derived::Count {
                 field: "note_count".into(),
@@ -9417,5 +9731,153 @@ mod tests {
         }
         assert_eq!(state["total"], json!(1));
         assert_eq!(decoded, *expression);
+    }
+    #[test]
+    fn typed_identity_echo_preserves_entity_representation_without_global_coercion() {
+        let before = json!({"posts": [{"id": 1, "title": "one"}, {"id": 2, "title": "two"}]});
+        let after = json!({
+            "posts": [{"id": 1, "title": "one"}, {"id": 2, "title": "two"}],
+            "comments": [{"id": 1, "postId": 2, "body": "ship"}]
+        });
+        let mut comment = sample(
+            "add_comment",
+            &[("post_id", json!("2")), ("body", json!("ship"))],
+            before.clone(),
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        comment.created_id = Some("1".into());
+        comment.outputs.insert("postId".into(), json!(2));
+        comment.outputs.insert("created_id".into(), json!(1));
+        let collections =
+            detect_collections_with_samples(&[before, after], std::slice::from_ref(&comment));
+        let outputs = infer_outputs(
+            std::slice::from_ref(&comment),
+            OutputSnapshot::Post,
+            &collections,
+        );
+        let expression = outputs.get("postId").expect("typed identity echo");
+        assert!(
+            matches!(
+                expression,
+                ValueExpr::EntityId {
+                    identity: IdentityKind::Integer,
+                    ..
+                }
+            ),
+            "unexpected expression: {expression:?}"
+        );
+        assert_eq!(
+            eval_output(expression, &comment, OutputSnapshot::Post, &collections),
+            Some(json!(2))
+        );
+
+        let mut unchanged = comment.clone();
+        unchanged.outputs.insert("postId".into(), json!("2"));
+        let outputs = infer_outputs(
+            std::slice::from_ref(&unchanged),
+            OutputSnapshot::Post,
+            &collections,
+        );
+        assert!(matches!(
+            outputs.get("postId"),
+            Some(ValueExpr::Param { name }) if name == "post_id"
+        ));
+
+        let mut lossy = comment.clone();
+        lossy.params.insert("post_id".into(), json!("02"));
+        lossy.outputs.insert("postId".into(), json!(2));
+        assert!(infer_typed_parameter_output("postId", &[lossy]).is_none());
+    }
+
+    #[test]
+    fn pre_state_entity_output_survives_removal_and_reindexes_positional_locator() {
+        let before = json!({
+            "tasks": [
+                {"id": 1, "title": "Alpha task", "priority": null, "done": false},
+                {"id": 2, "title": "Beta task", "priority": null, "done": false}
+            ],
+            "open": 2, "done": 0, "total": 2
+        });
+        let after = json!({
+            "tasks": [
+                {"id": 1, "title": "Beta task", "priority": null, "done": false}
+            ],
+            "open": 1, "done": 1, "total": 2
+        });
+        let mut completed = sample(
+            "complete_task",
+            &[("id", json!("1"))],
+            before.clone(),
+            after,
+            OutcomeKind::Success,
+            None,
+        );
+        completed
+            .outputs
+            .insert("title".into(), json!("Alpha task"));
+        completed.outputs.insert("id".into(), json!(1));
+        completed.outputs.insert("open".into(), json!(1));
+        // Detection needs the transition evidence to identify positional ids.
+        let collections = detect_collections_with_samples(
+            &[before.clone(), completed.after.clone()],
+            std::slice::from_ref(&completed),
+        );
+        let tasks = collections
+            .iter()
+            .find(|collection| collection.name == "tasks")
+            .expect("tasks collection");
+        assert_eq!(tasks.id_strategy, IdentityStrategy::Positional { start: 1 });
+        let outputs = infer_outputs(
+            std::slice::from_ref(&completed),
+            OutputSnapshot::Post,
+            &collections,
+        );
+        assert!(matches!(
+            outputs.get("title"),
+            Some(ValueExpr::PreEntityField { collection, field, .. })
+                if collection == "tasks" && field == "title"
+        ));
+        let mut program = DataProgram {
+            schema_version: DATA_PROGRAM_VERSION.into(),
+            target_id: "positional-removal".into(),
+            initial_state: before,
+            state_schema: StateSchema::default(),
+            collections,
+            derived: Vec::new(),
+            rules: vec![DataRule {
+                id: "rule.complete_task.success".into(),
+                action: "complete_task".into(),
+                branch: RuleBranch::Success,
+                error: None,
+                guards: Vec::new(),
+                effects: vec![Effect::DeleteEntity {
+                    collection: "tasks".into(),
+                    entity: EntityRef::Param("id".into()),
+                }],
+                events: vec!["task_completed".into()],
+                outputs,
+                execution: ExecutionSemantics::default(),
+                support: 1,
+                reproduced: 1,
+                provenance: RuleProvenance::default(),
+            }],
+            unsupported: Vec::new(),
+            notes: Vec::new(),
+        };
+        let encoded = serde_json::to_string(&program).expect("serialize program");
+        program = serde_json::from_str(&encoded).expect("deserialize program");
+        let params = [("id".to_string(), json!("1"))].into_iter().collect();
+        let result =
+            program.execute_with_trace(&program.initial_state.clone(), "complete_task", &params);
+        assert_eq!(
+            result.outcome.outputs.get("title"),
+            Some(&json!("Alpha task"))
+        );
+        assert_eq!(result.outcome.outputs.get("id"), Some(&json!(1)));
+        assert_eq!(result.state["tasks"][0]["title"], json!("Beta task"));
+        assert_eq!(result.state["tasks"][0]["id"], json!(1));
+        assert_eq!(result.state["tasks"].as_array().unwrap().len(), 1);
     }
 }

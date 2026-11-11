@@ -19,6 +19,7 @@ APP = SPEC / "runtime/todo.txt_cli-2.12.0/todo.sh"
 STATE = Path("state.json")
 CFG = Path("todo.cfg")
 LINE = re.compile(r"^\s*(\d+)\s+(?:\(([A-Z])\)\s*)?(.*)$")
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def write_config() -> None:
@@ -44,7 +45,9 @@ def run(args: list[str]):
 def active_tasks() -> list[dict]:
     result = run(["ls"])
     tasks = []
-    for line in result.stdout.splitlines():
+    # todo.sh colors list output even with NO_COLOR/TERM=dumb in this release.
+    # Strip terminal control sequences before parsing the displayed locator.
+    for line in ANSI.sub("", result.stdout).splitlines():
         match = LINE.match(line.strip())
         if not match:
             continue

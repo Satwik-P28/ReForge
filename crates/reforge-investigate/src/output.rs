@@ -303,6 +303,14 @@ fn check_expr_in_record(
                     parameter: name.clone(),
                 })
         }
+        ValueExpr::ParamConverted { name, identity } => {
+            schema
+                .param_type(name)
+                .ok_or_else(|| OutputTypeError::UnknownParameter {
+                    parameter: name.clone(),
+                })?;
+            Ok(OutputType::from_identity(*identity))
+        }
         ValueExpr::CreatedId { identity } => Ok(OutputType::from_identity(*identity)),
         ValueExpr::State { field } | ValueExpr::PreState { field } => schema
             .state_type(field)
@@ -351,6 +359,9 @@ fn check_expr_in_record(
             })
         }
         ValueExpr::EntityField {
+            collection, field, ..
+        }
+        | ValueExpr::PreEntityField {
             collection, field, ..
         } => {
             ensure_collection(collection, collections)?;
@@ -601,8 +612,18 @@ fn check_expr_in_record(
             lengths,
             derived,
             sort_by: _,
+            filter,
         } => {
             ensure_collection(collection, collections)?;
+            if let Some(filter) = filter {
+                if !schema.has_record_field(collection, &filter.field) {
+                    return Err(OutputTypeError::UnknownRecordField {
+                        collection: collection.clone(),
+                        field: filter.field.clone(),
+                    });
+                }
+                check_expr_in_record(&filter.value, schema, collections, Some(collection))?;
+            }
             for source in fields.values().filter(|source| source.as_str() != "__id__") {
                 if !schema.has_record_field(collection, source) {
                     return Err(OutputTypeError::UnknownRecordField {
@@ -661,7 +682,12 @@ pub fn eval_record_expr(
 }
 
 pub struct EvalContext<'a> {
+    /// The post-action (or only) document. Expressions that explicitly name a
+    /// snapshot decide which value they read; this remains the default.
     pub state: &'a Value,
+    /// The pre-action document when a rule needs both snapshots. `None` means
+    /// the only available document is `state`.
+    pub pre_state: Option<&'a Value>,
     pub params: &'a BTreeMap<String, Value>,
     pub created_id: Option<&'a str>,
     pub collections: &'a [Collection],
@@ -682,6 +708,24 @@ impl<'a> EvalContext<'a> {
     ) -> Self {
         Self {
             state,
+            pre_state: None,
+            params,
+            created_id,
+            collections,
+            record: None,
+        }
+    }
+
+    pub fn root_with_pre(
+        state: &'a Value,
+        pre_state: &'a Value,
+        params: &'a BTreeMap<String, Value>,
+        created_id: Option<&'a str>,
+        collections: &'a [Collection],
+    ) -> Self {
+        Self {
+            state,
+            pre_state: Some(pre_state),
             params,
             created_id,
             collections,
@@ -697,6 +741,7 @@ impl<'a> EvalContext<'a> {
     ) -> Self {
         Self {
             state: self.state,
+            pre_state: self.pre_state,
             params: self.params,
             created_id: self.created_id,
             collections: self.collections,
@@ -713,10 +758,18 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
         ValueExpr::Null => Some(Value::Null),
         ValueExpr::Literal { value } => Some(value.clone()),
         ValueExpr::Param { name } => context.params.get(name).cloned(),
+        ValueExpr::ParamConverted { name, identity } => context
+            .params
+            .get(name)
+            .and_then(crate::data::identity_string)
+            .map(|value| identity.coerce(&value)),
         ValueExpr::CreatedId { identity } => context.created_id.map(|id| identity.coerce(id)),
-        ValueExpr::State { field } | ValueExpr::PreState { field } => {
-            context.state.get(field).cloned()
-        }
+        ValueExpr::State { field } => context.state.get(field).cloned(),
+        ValueExpr::PreState { field } => context
+            .pre_state
+            .unwrap_or(context.state)
+            .get(field)
+            .cloned(),
         ValueExpr::Length { field } => context
             .state
             .get(field)
@@ -755,6 +808,18 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
             entity,
             field,
         ),
+        ValueExpr::PreEntityField {
+            collection,
+            entity,
+            field,
+        } => crate::data::entity_field_value(
+            context.pre_state.unwrap_or(context.state),
+            context.params,
+            context.collections,
+            collection,
+            entity,
+            field,
+        ),
         ValueExpr::EntityId {
             collection,
             entity,
@@ -768,9 +833,9 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
                 entity,
             )?;
             let definition = find_collection(context.collections, collection)?;
-            records(context.state, definition)
-                .iter()
-                .any(|(key, _)| key == &id)
+            let present =
+                |state: &Value| records(state, definition).iter().any(|(key, _)| key == &id);
+            (present(context.state) || context.pre_state.is_some_and(present))
                 .then(|| identity.coerce(&id))
         }
         ValueExpr::RecordLength { field } => context
@@ -923,10 +988,20 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
             lengths,
             derived,
             sort_by,
+            filter,
         } => {
             let definition = find_collection(context.collections, collection)?;
+            let mut selected = records(context.state, definition);
+            if let Some(filter) = filter {
+                let wanted = eval_expr(&filter.value, context);
+                selected.retain(|(_, record)| {
+                    wanted
+                        .as_ref()
+                        .is_some_and(|wanted| record.get(&filter.field) == Some(wanted))
+                });
+            }
             let mut items: Vec<Value> = Vec::new();
-            for (id, record) in records(context.state, definition) {
+            for (id, record) in selected {
                 let record_context = context.with_record(definition, &id, &record);
                 let mut item = Map::new();
                 for (out_field, source) in fields {
