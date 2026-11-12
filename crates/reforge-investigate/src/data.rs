@@ -587,6 +587,12 @@ pub enum IdExpr {
         name: String,
     },
     Created,
+    /// An identity computed from an observed expression. This is used when a
+    /// created record has a non-allocated identity (for example a supplied or
+    /// related name) and avoids freezing a generic rule to a numeric allocator.
+    Expr {
+        value: ValueExpr,
+    },
     Allocator {
         field: String,
         prefix: String,
@@ -679,6 +685,10 @@ pub enum Effect {
         key: String,
         value: ValueExpr,
     },
+    RemoveMapField {
+        field: String,
+        key: String,
+    },
     ClearMap {
         field: String,
     },
@@ -751,6 +761,14 @@ pub enum Derived {
     /// Sum of the lengths of an array field over a collection. Empty arrays
     /// contribute zero, which is different from an unobserved field.
     SumLength {
+        field: String,
+        collection: String,
+        source: String,
+    },
+    /// Count of distinct values across an array field in a collection. This is
+    /// different from a count of occurrences when the same value appears in
+    /// more than one record.
+    DistinctCount {
         field: String,
         collection: String,
         source: String,
@@ -3908,54 +3926,11 @@ fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
     };
     let mut effects = Vec::new();
     let mut handled: BTreeSet<String> = BTreeSet::new();
-    let output_created = sample.created_id.clone();
-    let structural_created = output_created
-        .is_none()
-        .then(|| discover_created_record(sample, collections))
-        .flatten();
-    let created_record = output_created
-        .as_ref()
-        .and_then(|id| {
-            collections
-                .iter()
-                .find(|collection| {
-                    collection.layout != CollectionLayout::Set
-                        && record_by_id(&sample.before, collection, id).is_none()
-                        && record_by_id(&sample.after, collection, id).is_some()
-                })
-                .map(|collection| (collection.name.clone(), id.clone()))
-        })
-        .or(structural_created);
-    let created = created_record.as_ref().map(|(_, id)| id.as_str());
-    let allocator = output_created
+    let created = sample.created_id.as_deref();
+    let allocator = sample
+        .created_id
         .as_deref()
         .and_then(|id| infer_allocator(sample, id));
-
-    if let (Some(created_id), Some((collection_name, _))) = (created, created_record.as_ref()) {
-        if let Some(collection) = collections.iter().find(|c| &c.name == collection_name) {
-            if let Some(record) = record_by_id(&sample.after, collection, created_id) {
-                let fields = record
-                    .iter()
-                    .filter(|(field, _)| field.as_str() != collection.id_field)
-                    .map(|(field, value)| (field.clone(), value_expr(value, sample, created)))
-                    .collect();
-                let id_expr = allocator
-                    .clone()
-                    .map(|(field, prefix)| IdExpr::Allocator { field, prefix })
-                    .unwrap_or_else(|| IdExpr::NextIdentity {
-                        prefix: split_identifier(created_id)
-                            .map(|(prefix, _)| prefix.to_string())
-                            .unwrap_or_default(),
-                    });
-                effects.push(Effect::CreateEntity {
-                    collection: collection.name.clone(),
-                    id: id_expr,
-                    fields,
-                });
-                handled.insert(collection.name.clone());
-            }
-        }
-    }
 
     for collection in collections {
         if collection.layout == CollectionLayout::Set {
@@ -3992,15 +3967,105 @@ fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
             }
             continue;
         }
-        if created_record
-            .as_ref()
-            .is_some_and(|(name, _)| name == &collection.name)
-        {
+        if collection.layout == CollectionLayout::Map {
+            let before = records(&sample.before, collection);
+            let after = records(&sample.after, collection);
+            for (key, record) in &after {
+                let previous = before
+                    .iter()
+                    .find(|(existing, _)| existing == key)
+                    .map(|(_, record)| record.clone());
+                if previous.as_ref() == Some(record) {
+                    continue;
+                }
+                if let Some(previous) = previous {
+                    // An addressed entity-map record receives a field-level
+                    // update so unrelated fields keep their pre-action values.
+                    // A non-entity map field remains a whole-entry assignment.
+                    let subject = subject_id(sample, collection).filter(|id| id == key);
+                    if let Some(subject) = subject {
+                        let updates = update_fields(&previous, record, sample, created);
+                        if !updates.is_empty() {
+                            effects.push(Effect::UpdateEntity {
+                                collection: collection.name.clone(),
+                                entity: EntityRef::Param(
+                                    subject_param(sample, collection)
+                                        .unwrap_or_else(|| subject.clone()),
+                                ),
+                                fields: updates,
+                            });
+                        }
+                    } else {
+                        effects.push(Effect::SetMapField {
+                            field: collection.name.clone(),
+                            key: key.clone(),
+                            value: value_expr(&Value::Object(record.clone()), sample, created),
+                        });
+                    }
+                // A map key generated by a visible allocator is an entity
+                // identity, not merely a field assignment. Keeping it as a
+                // map field would lose the created identity and its output.
+                } else if infer_allocator(sample, key).is_some() {
+                    let fields = record
+                        .iter()
+                        .map(|(field, value)| (field.clone(), value_expr(value, sample, created)))
+                        .collect();
+                    effects.push(Effect::CreateEntity {
+                        collection: collection.name.clone(),
+                        id: id_expression(sample, key, infer_allocator(sample, key).as_ref()),
+                        fields,
+                    });
+                } else {
+                    effects.push(Effect::SetMapField {
+                        field: collection.name.clone(),
+                        key: key.clone(),
+                        value: value_expr(&Value::Object(record.clone()), sample, created),
+                    });
+                }
+            }
+            for (key, _) in &before {
+                if !after.iter().any(|(existing, _)| existing == key) {
+                    let subject = subject_id(sample, collection).filter(|id| id == key);
+                    if let Some(subject) = subject {
+                        effects.push(Effect::DeleteEntity {
+                            collection: collection.name.clone(),
+                            entity: EntityRef::Param(
+                                subject_param(sample, collection)
+                                    .unwrap_or_else(|| subject.clone()),
+                            ),
+                            disposition: deletion_disposition(collection, &sample.after),
+                        });
+                    } else {
+                        effects.push(Effect::RemoveMapField {
+                            field: collection.name.clone(),
+                            key: key.clone(),
+                        });
+                    }
+                }
+            }
+            handled.insert(collection.name.clone());
             continue;
         }
 
         let before = records(&sample.before, collection);
         let after = records(&sample.after, collection);
+        let before_ids: BTreeSet<&String> = before.iter().map(|(id, _)| id).collect();
+        for (id, record) in &after {
+            if before_ids.contains(id) {
+                continue;
+            }
+            let fields = record
+                .iter()
+                .filter(|(field, _)| field.as_str() != collection.id_field)
+                .map(|(field, value)| (field.clone(), value_expr(value, sample, created)))
+                .collect();
+            effects.push(Effect::CreateEntity {
+                collection: collection.name.clone(),
+                id: id_expression(sample, id, allocator.as_ref()),
+                fields,
+            });
+        }
+        handled.insert(collection.name.clone());
         let subject = subject_id(sample, collection);
 
         if let Some(id) = &subject {
@@ -4214,36 +4279,6 @@ fn infer_effects(sample: &Sample, collections: &[Collection]) -> Vec<Effect> {
     effects
 }
 
-fn discover_created_record(
-    sample: &Sample,
-    collections: &[Collection],
-) -> Option<(String, String)> {
-    let mut found = Vec::new();
-    for collection in collections
-        .iter()
-        .filter(|collection| collection.layout != CollectionLayout::Set)
-    {
-        let before: BTreeSet<String> = records(&sample.before, collection)
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect();
-        let after = records(&sample.after, collection);
-        let added: Vec<String> = after
-            .iter()
-            .map(|(id, _)| id.clone())
-            .filter(|id| !before.contains(id))
-            .collect();
-        if added.len() == 1 {
-            found.push((collection.name.clone(), added[0].clone()));
-        }
-    }
-    if found.len() == 1 {
-        found.pop()
-    } else {
-        None
-    }
-}
-
 fn infer_allocator(sample: &Sample, created_id: &str) -> Option<(String, String)> {
     let (prefix, suffix) = split_identifier(created_id)?;
     let number = suffix.parse::<i64>().ok()?;
@@ -4255,6 +4290,44 @@ fn infer_allocator(sample: &Sample, created_id: &str) -> Option<(String, String)
             None
         }
     })
+}
+
+/// Choose a generic identity expression for a newly observed record. The
+/// action-created identity is allocated when an external allocator is visible,
+/// a parameter-derived identity is retained as an input relation, numeric
+/// sequences use the existing allocator fallback, and otherwise the observed
+/// identity is represented explicitly.
+fn id_expression(sample: &Sample, id: &str, allocator: Option<&(String, String)>) -> IdExpr {
+    if let Some((field, prefix)) = allocator {
+        return IdExpr::Allocator {
+            field: field.clone(),
+            prefix: prefix.clone(),
+        };
+    }
+    if let Some((name, _)) = sample
+        .params
+        .iter()
+        .find(|(_, value)| value.as_str() == Some(id))
+    {
+        return IdExpr::Param { name: name.clone() };
+    }
+    if id.parse::<i64>().is_ok() {
+        return IdExpr::NextIdentity {
+            prefix: String::new(),
+        };
+    }
+    if let Some((prefix, suffix)) = split_identifier(id) {
+        if suffix.parse::<i64>().is_ok() {
+            return IdExpr::NextIdentity {
+                prefix: prefix.to_string(),
+            };
+        }
+    }
+    IdExpr::Expr {
+        value: ValueExpr::Literal {
+            value: Value::String(id.to_string()),
+        },
+    }
 }
 
 fn split_identifier(id: &str) -> Option<(&str, &str)> {
@@ -4653,6 +4726,7 @@ fn reconcile_constant_postconditions(
                 Effect::SetState { field, .. }
                     | Effect::IncrementState { field, .. }
                     | Effect::SetMapField { field, .. }
+                    | Effect::RemoveMapField { field, .. }
                     | Effect::ClearMap { field }
                     | Effect::AppendScalar { field, .. }
                     | Effect::AppendItem { field, .. }
@@ -4914,6 +4988,7 @@ fn state_update_claims(effects: &[Effect], branch: &[Sample]) -> Vec<StateUpdate
             Effect::SetState { field, .. }
             | Effect::IncrementState { field, .. }
             | Effect::SetMapField { field, .. }
+            | Effect::RemoveMapField { field, .. }
             | Effect::ClearMap { field }
             | Effect::AppendScalar { field, .. }
             | Effect::AppendItem { field, .. }
@@ -6997,6 +7072,7 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
             | Derived::Sum { field: name, .. }
             | Derived::CountWhere { field: name, .. }
             | Derived::SumLength { field: name, .. }
+            | Derived::DistinctCount { field: name, .. }
             | Derived::Expression { field: name, .. } => name == &field,
         }) {
             continue;
@@ -7312,29 +7388,29 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
                 }
             }
             for source in array_sources {
-                if observations.iter().all(|(state, value)| {
-                    (*value
-                        - records(state, collection)
-                            .iter()
-                            .filter_map(|(_, record)| record.get(&source).and_then(Value::as_array))
-                            .map(|items| items.len())
-                            .sum::<usize>() as f64)
-                        .abs()
-                        < 1e-9
-                }) && observations.iter().any(|(state, _)| {
-                    records(state, collection).iter().any(|(_, record)| {
-                        record
-                            .get(&source)
-                            .and_then(Value::as_array)
-                            .is_some_and(|items| !items.is_empty())
+                let source_word = source.to_ascii_lowercase();
+                let source_stem = source_word.trim_end_matches('s');
+                let mentions_source = lower.contains(&source_word) || lower.contains(source_stem);
+                let total_length = |state: &Value| {
+                    records(state, collection)
+                        .iter()
+                        .filter_map(|(_, record)| record.get(&source).and_then(Value::as_array))
+                        .map(|items| items.len())
+                        .sum::<usize>()
+                };
+                if observations
+                    .iter()
+                    .all(|(state, value)| (*value - total_length(state) as f64).abs() < 1e-9)
+                    && observations.iter().any(|(state, _)| {
+                        records(state, collection).iter().any(|(_, record)| {
+                            record
+                                .get(&source)
+                                .and_then(Value::as_array)
+                                .is_some_and(|items| !items.is_empty())
+                        })
                     })
-                }) {
-                    let source_word = source.to_ascii_lowercase();
-                    let score = if lower.contains(&source_word) || lower.contains("count") {
-                        5
-                    } else {
-                        2
-                    };
+                {
+                    let score = if mentions_source { 4 } else { 1 };
                     if best
                         .as_ref()
                         .map(|(current, _)| score > *current)
@@ -7343,6 +7419,46 @@ fn infer_derived(snapshots: &[Value], collections: &[Collection]) -> Vec<Derived
                         best = Some((
                             score,
                             Derived::SumLength {
+                                field: field.clone(),
+                                collection: collection.name.clone(),
+                                source: source.clone(),
+                            },
+                        ));
+                    }
+                }
+                let distinct_values = |state: &Value| {
+                    let mut values: BTreeSet<String> = BTreeSet::new();
+                    for (_, record) in records(state, collection) {
+                        let Some(items) = record.get(&source).and_then(Value::as_array) else {
+                            continue;
+                        };
+                        for item in items {
+                            values.insert(serde_json::to_string(item).unwrap_or_default());
+                        }
+                    }
+                    values.len()
+                };
+                if observations
+                    .iter()
+                    .all(|(state, value)| (*value - distinct_values(state) as f64).abs() < 1e-9)
+                    && observations.iter().any(|(state, _)| {
+                        records(state, collection).iter().any(|(_, record)| {
+                            record
+                                .get(&source)
+                                .and_then(Value::as_array)
+                                .is_some_and(|items| !items.is_empty())
+                        })
+                    })
+                {
+                    let score = if mentions_source { 6 } else { 2 };
+                    if best
+                        .as_ref()
+                        .map(|(current, _)| score > *current)
+                        .unwrap_or(true)
+                    {
+                        best = Some((
+                            score,
+                            Derived::DistinctCount {
                                 field: field.clone(),
                                 collection: collection.name.clone(),
                                 source: source.clone(),
@@ -7694,6 +7810,10 @@ fn apply_effect(
                     params.get(name).and_then(Value::as_str).map(str::to_string)
                 }
                 IdExpr::Created => created.clone(),
+                IdExpr::Expr { value } => {
+                    eval_value(value, state, params, created.as_deref(), collections)
+                        .and_then(|value| identity_string(&value))
+                }
                 IdExpr::Allocator { field, prefix } => {
                     let number = state.get(field).and_then(Value::as_i64).unwrap_or(1);
                     Some(format!("{prefix}{number}"))
@@ -7720,7 +7840,9 @@ fn apply_effect(
             let Some(id) = id else {
                 return;
             };
-            *created = Some(id.clone());
+            if created.is_none() {
+                *created = Some(id.clone());
+            }
             let record = fields
                 .iter()
                 .filter_map(|(field, expression)| {
@@ -7862,6 +7984,11 @@ fn apply_effect(
                 if let Some(map) = state.get_mut(field).and_then(Value::as_object_mut) {
                     map.insert(key.clone(), value);
                 }
+            }
+        }
+        Effect::RemoveMapField { field, key } => {
+            if let Some(map) = state.get_mut(field).and_then(Value::as_object_mut) {
+                map.remove(key);
             }
         }
         Effect::ClearMap { field } => {
@@ -8369,6 +8496,21 @@ fn apply_derived(derived: &Derived, state: &mut Value, collections: &[Collection
                         .map(|items| items.len())
                         .sum::<usize>()),
                 );
+            }
+        }
+        Derived::DistinctCount {
+            field,
+            collection,
+            source,
+        } => {
+            if let Some(definition) = collections.iter().find(|c| &c.name == collection) {
+                let distinct: BTreeSet<String> = records(state, definition)
+                    .iter()
+                    .filter_map(|(_, record)| record.get(source).and_then(Value::as_array))
+                    .flatten()
+                    .map(|value| serde_json::to_string(value).unwrap_or_default())
+                    .collect();
+                set_key(state, field, json!(distinct.len()));
             }
         }
     }
@@ -10043,7 +10185,7 @@ mod tests {
         assert!(
             derived.iter().any(|item| matches!(
                 item,
-                Derived::SumLength { field, collection, source }
+                Derived::DistinctCount { field, collection, source }
                     if field == "tag_count" && collection == "notes" && source == "tags"
             )),
             "derived={derived:?}"
@@ -10690,5 +10832,216 @@ mod tests {
             )),
             "completion did not infer compaction: {effects:?}"
         );
+    }
+    #[test]
+    fn duplicate_tags_select_distinct_count_not_occurrences_or_record_count() {
+        let one = json!({
+            "bookmarks": [{"id": 1, "tags": ["a", "b"]}],
+            "bookmark_count": 1,
+            "tag_count": 2
+        });
+        let repeated = json!({
+            "bookmarks": [
+                {"id": 1, "tags": ["a"]},
+                {"id": 2, "tags": ["a"]}
+            ],
+            "bookmark_count": 2,
+            "tag_count": 1
+        });
+        let collections = detect_collections(&[one.clone(), repeated.clone()]);
+        let derived = infer_derived(&[one, repeated.clone()], &collections);
+        assert!(
+            derived.iter().any(|item| matches!(
+                item,
+                Derived::DistinctCount { field, collection, source }
+                    if field == "tag_count" && collection == "bookmarks" && source == "tags"
+            )),
+            "derived={derived:?}"
+        );
+        assert!(
+            derived.iter().any(|item| matches!(
+                item,
+                Derived::Count { field, collection }
+                    if field == "bookmark_count" && collection == "bookmarks"
+            )),
+            "derived={derived:?}"
+        );
+        let mut recomputed = repeated;
+        for item in &derived {
+            apply_derived(item, &mut recomputed, &collections);
+        }
+        assert_eq!(recomputed["tag_count"], json!(1));
+        assert_eq!(recomputed["bookmark_count"], json!(2));
+    }
+
+    #[test]
+    fn one_action_can_create_several_collections_and_map_entries() {
+        let before = json!({
+            "packages": [],
+            "direct_dependencies": [],
+            "lock_packages": {},
+            "package_count": 0,
+            "direct_count": 0
+        });
+        let after = json!({
+            "packages": [{
+                "id": "pkg-alpha",
+                "name": "pkg-alpha",
+                "version": "1.0.0",
+                "dependencies": []
+            }],
+            "direct_dependencies": [{"name": "pkg-alpha", "spec": "file:vendor/pkg-alpha"}],
+            "lock_packages": {
+                "node_modules/pkg-alpha": {"link": true, "resolved": "vendor/pkg-alpha"},
+                "vendor/pkg-alpha": {"version": "1.0.0"}
+            },
+            "package_count": 1,
+            "direct_count": 1
+        });
+        let mut add = sample(
+            "install_alpha",
+            &[],
+            before.clone(),
+            after.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        add.created_id = Some("pkg-alpha".into());
+        add.created_pool = Some("package".into());
+        let collections =
+            detect_collections_with_samples(&[before.clone(), after.clone()], &[add.clone()]);
+        let effects = infer_effects(&add, &collections);
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::CreateEntity { collection, .. } if collection == "packages"
+            )),
+            "effects={effects:?}"
+        );
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::CreateEntity { collection, .. } if collection == "direct_dependencies"
+            )),
+            "effects={effects:?}"
+        );
+        assert_eq!(
+            effects
+                .iter()
+                .filter(|effect| matches!(effect, Effect::SetMapField { .. }))
+                .count(),
+            2,
+            "effects={effects:?}"
+        );
+        let mut next = apply_effect_state(&before, &effects, &add.params, &collections);
+        for item in infer_derived(&[before.clone(), after.clone()], &collections) {
+            apply_derived(&item, &mut next, &collections);
+        }
+        assert_eq!(next, after);
+    }
+    #[test]
+    fn allocator_backed_map_entities_create_update_and_delete_by_identity() {
+        let before = json!({
+            "plots": {"p1": {"name": "mint", "stage": "growing", "water": 0}},
+            "next_id": 2,
+            "view": "detail"
+        });
+        let updated = json!({
+            "plots": {"p1": {"name": "mint", "stage": "growing", "water": 1}},
+            "next_id": 2,
+            "view": "detail"
+        });
+        let mut water = sample(
+            "water",
+            &[("plot_id", json!("p1"))],
+            before.clone(),
+            updated.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        water.created_id = None;
+        let collections = detect_collections_with_samples(
+            &[before.clone(), updated.clone()],
+            std::slice::from_ref(&water),
+        );
+        let effects = infer_effects(&water, &collections);
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::UpdateEntity { collection, entity: EntityRef::Param(param), .. }
+                    if collection == "plots" && param == "plot_id"
+            )),
+            "effects={effects:?}"
+        );
+        assert_eq!(
+            apply_effect_state(&before, &effects, &water.params, &collections),
+            updated
+        );
+
+        let removed = json!({"plots": {}, "next_id": 2, "view": "detail"});
+        let mut delete = sample(
+            "remove",
+            &[("plot_id", json!("p1"))],
+            updated.clone(),
+            removed.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        delete.created_id = None;
+        let collections = detect_collections_with_samples(
+            &[updated.clone(), removed.clone()],
+            std::slice::from_ref(&delete),
+        );
+        let effects = infer_effects(&delete, &collections);
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::DeleteEntity { collection, entity: EntityRef::Param(param), .. }
+                    if collection == "plots" && param == "plot_id"
+            )),
+            "effects={effects:?}"
+        );
+        assert_eq!(
+            apply_effect_state(&updated, &effects, &delete.params, &collections),
+            removed
+        );
+
+        let empty = json!({"plots": {}, "next_id": 2, "view": "list"});
+        let created = json!({
+            "plots": {"p2": {"name": "basil", "stage": "seed", "water": 0}},
+            "next_id": 3,
+            "view": "list"
+        });
+        let mut add = sample(
+            "add",
+            &[("name", json!("basil"))],
+            empty.clone(),
+            created.clone(),
+            OutcomeKind::Success,
+            None,
+        );
+        add.created_id = None;
+        add.created_pool = Some("plot".into());
+        let collections = detect_collections_with_samples(
+            &[empty.clone(), created.clone()],
+            std::slice::from_ref(&add),
+        );
+        let effects = infer_effects(&add, &collections);
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::CreateEntity {
+                    collection,
+                    id: IdExpr::Allocator { field, prefix },
+                    ..
+                } if collection == "plots" && field == "next_id" && prefix == "p"
+            )),
+            "effects={effects:?}"
+        );
+        let mut next = apply_effect_state(&empty, &effects, &add.params, &collections);
+        for item in infer_derived(&[empty, created.clone()], &collections) {
+            apply_derived(&item, &mut next, &collections);
+        }
+        assert_eq!(next, created);
     }
 }

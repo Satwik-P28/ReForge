@@ -1,0 +1,119 @@
+{
+  "phase": 9,
+  "baseline_checkpoint": "8a40181814604a93621e6f9f2bddf96ee60965b2",
+  "phase8_freeze_sha256": "b23160658c422a48ae43d6d8335e44561969a9d130a8b9adc498274b97c489b5",
+  "development_targets_reclassified": ["npm-cli-11.20.0", "buku-5.1"],
+  "development_replay": {
+    "config": {
+      "budget": 32,
+      "seed": 1,
+      "policy": "coverage",
+      "experiment_strategy": "hybrid",
+      "experiment_budget": 128,
+      "apps": ["npm", "buku"]
+    },
+    "phase8": {
+      "matching_steps": 1,
+      "attempted_steps": 37,
+      "fully_matching_workflows": 0,
+      "attempted_workflows": 8
+    },
+    "phase9": {
+      "matching_steps": 11,
+      "attempted_steps": 37,
+      "executed_steps": 19,
+      "excluded_steps": 18,
+      "unverified_steps": 1,
+      "divergences": 7,
+      "fully_matching_workflows": 0,
+      "attempted_workflows": 8,
+      "state_matching_steps": 11,
+      "status_matching_steps": 17,
+      "error_matching_steps": 17,
+      "output_matching_steps": 14,
+      "event_matching_steps": 19,
+      "persistence_matching_steps": 15,
+      "per_app": {
+        "npm": {
+          "matching_steps": 5,
+          "attempted_steps": 19,
+          "executed_steps": 9,
+          "divergences": 3,
+          "unverified_steps": 1
+        },
+        "buku": {
+          "matching_steps": 6,
+          "attempted_steps": 18,
+          "executed_steps": 10,
+          "divergences": 4,
+          "unverified_steps": 0
+        }
+      }
+    }
+  },
+  "remaining_failure_classes": {
+    "output_only": {
+      "count": 3,
+      "steps": [
+        "npm list_packages after install",
+        "npm list_packages after uninstall",
+        "buku search_work"
+      ],
+      "stage": "output_contract_ir"
+    },
+    "state_or_outcome": {
+      "count": 4,
+      "steps": [
+        "npm install_alpha from empty",
+        "buku update_bookmark with prior tags",
+        "buku add_duplicate with an existing fixed URL",
+        "buku delete_bookmark of the first persistent integer id"
+      ],
+      "stage": "evidence_acquisition_effect_selection_allocator_semantics"
+    },
+    "unknown_rule": {
+      "count": 1,
+      "steps": ["npm install_missing"],
+      "stage": "action_coverage"
+    },
+    "matched": 11,
+    "excluded_downstream": 18
+  },
+  "oracle_bounds_from_ledger": {
+    "output_oracle_only": {
+      "matching_steps": 14,
+      "fully_matching_workflows": 0
+    },
+    "state_action_oracle_only": {
+      "matching_steps": 15,
+      "fully_matching_workflows": 0
+    },
+    "combined_ceiling_of_executed_steps": 19,
+    "full_37_ceiling_established": false
+  },
+  "historical_regressions": {
+    "final2": {"matching": 82, "attempted": 84, "workflows": 13, "workflow_attempted": 14, "unverified": 1, "divergences": 0},
+    "final3": {"matching": 25, "attempted": 25, "workflows": 4, "workflow_attempted": 4, "unverified": 0, "divergences": 0},
+    "final4": {"matching": 11, "attempted": 11, "workflows": 2, "workflow_attempted": 2, "unverified": 0, "divergences": 0},
+    "final5": {"matching": 19, "attempted": 19, "workflows": 3, "workflow_attempted": 3, "unverified": 0, "divergences": 0},
+    "final8": {"matching": 21, "attempted": 21, "workflows": 6, "workflow_attempted": 6, "unverified": 0, "divergences": 0},
+    "phase63_holdout": {"matching": 34, "attempted": 34, "workflows": 6, "workflow_attempted": 6, "unverified": 0, "divergences": 0},
+    "external_v3": {"matching": 49, "attempted": 49, "workflows": 12, "workflow_attempted": 12, "unverified": 0, "divergences": 0},
+    "notecli": {"matching": 23, "attempted": 23, "workflows": 4, "workflow_attempted": 4, "unverified": 0, "divergences": 0},
+    "phase66_external": {"matching": 17, "attempted": 39, "workflows": 1, "workflow_attempted": 6, "unverified": 0, "divergences": 5}
+  },
+  "verification": {
+    "reforge_investigate_lib_tests": 110,
+    "cargo_fmt_check": "passed",
+    "cargo_clippy_all_targets_deny_warnings": "passed",
+    "phase8_suite_preflight": "functional checks passed; buku launcher-script hash differs only because the venv absolute shebang changed after workspace restoration",
+    "master_spec_integration": "blocked; no authorized specification available",
+    "fresh_untouched_external_evaluation": "not performed"
+  },
+  "next_investment": {
+    "primary": "experiment_selection_and_evidence_acquisition",
+    "secondary": "bounded_scalar_and_filtered_collection_output_projection",
+    "not_primary": ["richer_general_ir", "more_unconstrained_synthesis"]
+  },
+  "generalization_claim": false
+}
