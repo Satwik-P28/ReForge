@@ -203,6 +203,7 @@ Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_LICENSES.
 | --- | --- |
 | Master specification | [REFORGE_MASTER_SPEC.md](REFORGE_MASTER_SPEC.md) |
 | RFM-001 compliance matrix | [docs/compliance/RFM-001-compliance-matrix.md](docs/compliance/RFM-001-compliance-matrix.md) |
+| Phase 10 causal experiment selection | [docs/research/phase10-causal-experiment-selection.md](docs/research/phase10-causal-experiment-selection.md) |
 | Architecture | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Getting started | [docs/guides/getting-started.md](docs/guides/getting-started.md) |
 | Capability authoring | [docs/guides/capability-authoring.md](docs/guides/capability-authoring.md) |
