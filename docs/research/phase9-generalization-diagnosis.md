@@ -7,10 +7,13 @@ npm 11.20.0 and buku 5.1 development targets. Phase 8 remains the result of
 record for the implementation at that checkpoint. This phase does not rewrite
 the Phase 8 freeze, results or report.
 
-The exact master specification could not be retrieved: there is no local
-`REFORGE_MASTER_SPEC.md`, no branch `docs/reforge-master-spec-v1`, and no commit
-`411a81af305afa69d7e5ee67e14408e976f3ab8e`. Master-spec integration and a
-compliance matrix are therefore **blocked**, not claimed.
+The authoritative master specification was unavailable during Phase 9
+execution. It has since been imported from `main` at
+`3c349c11855b5d46a340251b233a40610b8d6021` without changing the Phase 9 result.
+RFM-001 requirement status is now recorded in
+[`docs/compliance/RFM-001-compliance-matrix.md`](../compliance/RFM-001-compliance-matrix.md).
+Phase 9 is not retroactively claimed as compliant, and the matrix does not turn
+its 11 / 37 result into improved generalization.
 
 ## 1. Root causes separated before tuning
 
@@ -160,8 +163,9 @@ map updates and parameterized map deletion.
   buku 5.1. This is recorded as a toolchain-restoration limitation.
 - No new untouched external target was evaluated. The Phase 9 result must not
   be described as improved generalization.
-- No master-spec comparison is possible without an authorized transfer of the
-  specification.
+- RFM-001 was not available during Phase 9 execution. It was imported afterward;
+  the compliance matrix records current gaps and makes no retroactive
+  Phase 9 acceptance claim.
 
 ## 6. Next investment
 

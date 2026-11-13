@@ -107,7 +107,7 @@
     "cargo_fmt_check": "passed",
     "cargo_clippy_all_targets_deny_warnings": "passed",
     "phase8_suite_preflight": "functional checks passed; buku launcher-script hash differs only because the venv absolute shebang changed after workspace restoration",
-    "master_spec_integration": "blocked; no authorized specification available",
+    "master_spec_integration": "authoritative RFM-001 imported after Phase 9 at 3c349c11855b5d46a340251b233a40610b8d6021; matrix at docs/compliance/RFM-001-compliance-matrix.md; no retroactive compliance claim",
     "fresh_untouched_external_evaluation": "not performed"
   },
   "next_investment": {

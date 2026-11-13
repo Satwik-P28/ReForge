@@ -201,6 +201,8 @@ Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_LICENSES.
 
 | Doc | Path |
 | --- | --- |
+| Master specification | [REFORGE_MASTER_SPEC.md](REFORGE_MASTER_SPEC.md) |
+| RFM-001 compliance matrix | [docs/compliance/RFM-001-compliance-matrix.md](docs/compliance/RFM-001-compliance-matrix.md) |
 | Architecture | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Getting started | [docs/guides/getting-started.md](docs/guides/getting-started.md) |
 | Capability authoring | [docs/guides/capability-authoring.md](docs/guides/capability-authoring.md) |
