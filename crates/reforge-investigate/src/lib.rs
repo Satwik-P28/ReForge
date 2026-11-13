@@ -18,6 +18,7 @@
 pub mod abstraction;
 pub mod adapters;
 pub mod causal;
+pub mod contrasts;
 pub mod data;
 pub mod engine;
 pub mod evidence;
@@ -58,6 +59,10 @@ pub use relational::{
     StageRecord, TypeError, TypedPredicate, ValueType,
 };
 
+pub use contrasts::{
+    candidate_contrasts, contrast_lattice, unresolved_ordered_fields, ContrastExperiment,
+    ContrastKind,
+};
 pub use engine::{
     instantiate_actions, investigate, DatasetRow, EntityPool, ExplorationCoverage,
     InvestigationConfig, InvestigationRecord, InvestigationStep, ResetSummary, ToolInfo,
@@ -65,9 +70,10 @@ pub use engine::{
 };
 pub use evidence::build_evidence;
 pub use experiments::{
-    CandidateElimination, ExperimentAccounting, ExperimentAction, ExperimentDecision,
-    ExperimentProposal, ExperimentScheduler, ExperimentStage, InteractionLedger, InteractionRecord,
-    InteractionStage, SelectionStrategy,
+    CalibrationRecord, CandidateElimination, ExperimentAccounting, ExperimentAction,
+    ExperimentDecision, ExperimentProposal, ExperimentScheduler, ExperimentStage,
+    InteractionLedger, InteractionRecord, InteractionStage, SchedulingRegression,
+    SelectionStrategy,
 };
 pub use feature::{feature_layout, FEATURE_DIM};
 pub use guidance::{EvidenceGuidance, EvidenceHint};

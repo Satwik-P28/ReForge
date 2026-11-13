@@ -1,0 +1,18 @@
+{
+  "target_id": "dbmate-2.20.0",
+  "target_name": "dbmate",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": "pristine",
+  "workdir": "../../../target/reforge-phase11-work-dbmate",
+  "state_file": "state.json",
+  "timeout_ms": 60000,
+  "actions": [
+    {"action": "apply_pending", "argv": ["apply_pending"]},
+    {"action": "rollback_one", "argv": ["rollback_one"]},
+    {"action": "status", "argv": ["status"]},
+    {"action": "create_database", "argv": ["create_database"]},
+    {"action": "drop_database", "argv": ["drop_database"]}
+  ]
+}

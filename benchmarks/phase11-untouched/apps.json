@@ -1,0 +1,8 @@
+{
+  "suite": "reforgebench-phase11-untouched",
+  "description": "Two previously unused applications evaluated under a frozen, adapter-only contract: changesets 2.27.9 (JavaScript release planner over package manifests, changeset files and a generated changelog) and dbmate 2.20.0 (Go schema-migration CLI over a SQLite migration ledger).",
+  "apps": [
+    {"spec": "benchmarks/phase11-untouched/fixtures/changesets/target.json", "split": "holdout"},
+    {"spec": "benchmarks/phase11-untouched/fixtures/dbmate/target.json", "split": "holdout"}
+  ]
+}

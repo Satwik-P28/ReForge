@@ -183,6 +183,94 @@ pub struct CandidateElimination {
     pub observed: String,
 }
 
+/// Which candidate-aware behaviours are enabled. The flag is part of the
+/// experiment policy so an ablation can remove a component by construction
+/// instead of relying on it to be inactive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchedulingRegression {
+    /// Generate competing candidate programs, attach their predictions and let
+    /// discrimination per interaction influence selection.
+    pub candidate_scheduling: bool,
+    /// Install the target action as its own setup step. The historical Phase 9
+    /// behaviour did this and therefore hid every first-use effect.
+    pub legacy_probe_setup: bool,
+    /// Build state-diverse contrast sequences from candidate differences and
+    /// let a still-discriminating experiment compete with default coverage.
+    pub state_diverse_contrasts: bool,
+}
+
+impl Default for SchedulingRegression {
+    fn default() -> Self {
+        Self {
+            candidate_scheduling: true,
+            legacy_probe_setup: false,
+            state_diverse_contrasts: false,
+        }
+    }
+}
+
+impl SchedulingRegression {
+    /// Parse `REFORGE_BENCH_CANDIDATE_SCHEDULING` and
+    /// `REFORGE_BENCH_LEGACY_PROBE_SETUP`. Unset values keep Phase 10 defaults.
+    pub fn from_env() -> Self {
+        let mut flags = Self::default();
+        if let Ok(value) = std::env::var("REFORGE_BENCH_CANDIDATE_SCHEDULING") {
+            flags.candidate_scheduling = !matches!(value.trim(), "0" | "off" | "false");
+        }
+        if let Ok(value) = std::env::var("REFORGE_BENCH_LEGACY_PROBE_SETUP") {
+            flags.legacy_probe_setup = matches!(value.trim(), "1" | "on" | "true");
+        }
+        if let Ok(value) = std::env::var("REFORGE_BENCH_STATE_DIVERSE_CONTRASTS") {
+            flags.state_diverse_contrasts = matches!(value.trim(), "1" | "on" | "true");
+        }
+        flags
+    }
+
+    pub fn ablation_arm(&self) -> &'static str {
+        match (
+            self.legacy_probe_setup,
+            self.candidate_scheduling,
+            self.state_diverse_contrasts,
+        ) {
+            (true, _, _) => "A_phase9",
+            (false, false, _) => "C_semantic_no_scheduler",
+            (false, true, true) => "P_state_diverse",
+            (false, true, false) => "D_complete",
+        }
+    }
+}
+
+/// Calibration of an experiment's expected discrimination against the
+/// information the observation actually produced. Records are retained even
+/// when nothing was learned, because an uninformative experiment is evidence
+/// about the scheduler and the candidate set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationRecord {
+    pub experiment_id: String,
+    pub stage: ExperimentStage,
+    pub predicted_discrimination: u32,
+    pub candidates_with_predictions: u32,
+    pub survivors_before: u32,
+    pub survivors_after: u32,
+    pub eliminated: u32,
+    pub base_prediction_available: bool,
+    pub base_prediction_matched: bool,
+    /// False when the prediction and the observation could not be compared, so
+    /// no elimination was justified.
+    pub resolved: bool,
+}
+
+impl CalibrationRecord {
+    /// Realized discrimination in bits: how much the surviving candidate set
+    /// shrank. Zero when the observation did not separate anything.
+    pub fn realized_bits(&self) -> f64 {
+        if self.survivors_before == 0 || self.survivors_after == 0 || self.eliminated == 0 {
+            return 0.0;
+        }
+        (f64::from(self.survivors_before) / f64::from(self.survivors_after)).log2()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InteractionStage {
@@ -269,6 +357,22 @@ pub struct ExperimentAccounting {
     pub decisions: Vec<ExperimentDecision>,
     #[serde(default)]
     pub eliminations: Vec<CandidateElimination>,
+    #[serde(default)]
+    pub calibration: Vec<CalibrationRecord>,
+    #[serde(default)]
+    pub predicted_discrimination_total: u32,
+    #[serde(default)]
+    pub realized_eliminations: u32,
+    #[serde(default)]
+    pub discriminating_experiments: u32,
+    #[serde(default)]
+    pub calibrated_experiments: u32,
+    #[serde(default)]
+    pub unresolved_experiments: u32,
+    #[serde(default)]
+    pub base_prediction_checks: u32,
+    #[serde(default)]
+    pub base_prediction_matches: u32,
 }
 
 /// A budgeted, deterministic experiment queue.
@@ -291,6 +395,10 @@ pub struct ExperimentScheduler {
     survivors: BTreeSet<String>,
     decisions: Vec<ExperimentDecision>,
     eliminations: Vec<CandidateElimination>,
+    calibration: Vec<CalibrationRecord>,
+    survivors_at_selection: BTreeMap<String, u32>,
+    candidate_priority: bool,
+    disputed_paths: BTreeMap<String, Vec<String>>,
 }
 
 impl ExperimentScheduler {
@@ -313,7 +421,22 @@ impl ExperimentScheduler {
             survivors: BTreeSet::new(),
             decisions: Vec::new(),
             eliminations: Vec::new(),
+            calibration: Vec::new(),
+            survivors_at_selection: BTreeMap::new(),
+            candidate_priority: false,
+            disputed_paths: BTreeMap::new(),
         }
+    }
+
+    /// When enabled, an experiment that still separates surviving candidates
+    /// competes with default coverage instead of losing to it by construction.
+    /// The flag keeps the historical ranking reproducible for ablation arms.
+    pub fn set_candidate_priority(&mut self, enabled: bool) {
+        self.candidate_priority = enabled;
+    }
+
+    pub fn candidate_priority(&self) -> bool {
+        self.candidate_priority
     }
 
     pub fn strategy(&self) -> SelectionStrategy {
@@ -375,6 +498,28 @@ impl ExperimentScheduler {
 
     /// Attach candidate predictions to an existing proposal. Predictions are
     /// observable signatures, not target outputs supplied by an oracle.
+    /// Paths whose values the competing candidates disagree about. An
+    /// observation only has to agree on the disputed variables to refute a
+    /// candidate; unrelated simulation error must not disable elimination.
+    pub fn disputed_paths(&self, id: &str) -> Option<&Vec<String>> {
+        self.disputed_paths.get(id)
+    }
+
+    /// Attach predictions together with the state paths they were projected
+    /// onto. The observation is projected onto the same paths before it is
+    /// compared, so a prediction and an observation are always commensurable.
+    pub fn annotate_predictions_with_paths(
+        &mut self,
+        id: &str,
+        predictions: BTreeMap<String, String>,
+        paths: Vec<String>,
+    ) -> bool {
+        if !self.disputed_paths.contains_key(id) && !paths.is_empty() {
+            self.disputed_paths.insert(id.to_string(), paths);
+        }
+        self.annotate_predictions(id, predictions)
+    }
+
     pub fn annotate_predictions(
         &mut self,
         id: &str,
@@ -425,9 +570,38 @@ impl ExperimentScheduler {
         let full_state_reliable = base.is_some_and(|prediction| prediction == observed);
         let status_reliable = base
             .is_some_and(|prediction| signature_prefix(prediction) == signature_prefix(observed));
+        let survivors_before = self.survivors_at_selection.get(id).copied().unwrap_or(0);
+        let predicted_discrimination = self
+            .decisions
+            .iter()
+            .find(|decision| decision.experiment_id == id)
+            .map(|decision| decision.expected_discrimination)
+            .unwrap_or(0);
+        let stage = proposal.stage;
+        let prediction_count = predictions.len() as u32;
+        let base_available = base.is_some();
+        let candidate_count_at_selection = self
+            .decisions
+            .iter()
+            .find(|decision| decision.experiment_id == id)
+            .map(|decision| decision.candidate_ids.len() as u32)
+            .unwrap_or(0);
         if !full_state_reliable && !status_reliable {
+            self.calibration.push(CalibrationRecord {
+                experiment_id: id.to_string(),
+                stage,
+                predicted_discrimination,
+                candidates_with_predictions: prediction_count,
+                survivors_before,
+                survivors_after: self.survivors.len() as u32,
+                eliminated: 0,
+                base_prediction_available: base_available,
+                base_prediction_matched: false,
+                resolved: false,
+            });
             return;
         }
+        let eliminated_before = self.eliminations.len();
         for (candidate, predicted) in predictions {
             let compatible = if full_state_reliable {
                 predicted == observed
@@ -445,6 +619,18 @@ impl ExperimentScheduler {
                 observed: observed.to_string(),
             });
         }
+        self.calibration.push(CalibrationRecord {
+            experiment_id: id.to_string(),
+            stage,
+            predicted_discrimination,
+            candidates_with_predictions: candidate_count_at_selection,
+            survivors_before,
+            survivors_after: self.survivors.len() as u32,
+            eliminated: (self.eliminations.len() - eliminated_before) as u32,
+            base_prediction_available: base_available,
+            base_prediction_matched: full_state_reliable,
+            resolved: true,
+        });
     }
 
     pub fn is_selected(&self, id: &str) -> bool {
@@ -518,6 +704,8 @@ impl ExperimentScheduler {
                 survivors_before: self.survivors.iter().cloned().collect(),
                 reason: proposal.reason.clone(),
             });
+            self.survivors_at_selection
+                .insert(proposal.id.clone(), self.survivors.len() as u32);
         }
     }
 
@@ -527,10 +715,21 @@ impl ExperimentScheduler {
     }
 
     fn hybrid_score(&self, proposal: &ExperimentProposal, survivors: &BTreeSet<String>) -> u64 {
-        let coverage_bonus = match proposal.stage {
-            ExperimentStage::Baseline | ExperimentStage::Coverage => 400,
-            ExperimentStage::Causal => 150,
-            _ => 0,
+        let discriminating = proposal.discrimination_gain_for(survivors) > 0;
+        if self.candidate_priority && discriminating {
+            // An experiment that can still separate live candidates is worth
+            // more than default coverage: without it the candidate set never
+            // shrinks, and every downstream rule keeps an unresolved ambiguity.
+            return 10_000 + self.causal_score_for(proposal, survivors);
+        }
+        let coverage_bonus = if self.candidate_priority && discriminating {
+            400
+        } else {
+            match proposal.stage {
+                ExperimentStage::Baseline | ExperimentStage::Coverage => 400,
+                ExperimentStage::Causal => 150,
+                _ => 0,
+            }
         };
         self.causal_score_for(proposal, survivors) + coverage_bonus
     }
@@ -583,9 +782,41 @@ impl ExperimentScheduler {
             candidate_count: self.candidates.len() as u64,
             surviving_candidates: self.survivors.len() as u64,
             eliminated_candidates: self.eliminations.len() as u64,
+            predicted_discrimination_total: self
+                .decisions
+                .iter()
+                .map(|decision| decision.expected_discrimination)
+                .sum(),
+            realized_eliminations: self.eliminations.len() as u32,
+            discriminating_experiments: self
+                .decisions
+                .iter()
+                .filter(|decision| decision.expected_discrimination > 0)
+                .count() as u32,
+            calibrated_experiments: self
+                .calibration
+                .iter()
+                .filter(|record| record.resolved)
+                .count() as u32,
+            unresolved_experiments: self
+                .calibration
+                .iter()
+                .filter(|record| !record.resolved)
+                .count() as u32,
+            base_prediction_checks: self.calibration.len() as u32,
+            base_prediction_matches: self
+                .calibration
+                .iter()
+                .filter(|record| record.base_prediction_matched)
+                .count() as u32,
+            calibration: self.calibration.clone(),
             decisions: self.decisions.clone(),
             eliminations: self.eliminations.clone(),
         }
+    }
+
+    pub fn calibration(&self) -> &[CalibrationRecord] {
+        &self.calibration
     }
 }
 
@@ -759,6 +990,121 @@ mod tests {
         let encoded = serde_json::to_string(&p).unwrap();
         let decoded: ExperimentProposal = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, p);
+    }
+
+    #[test]
+    fn calibration_records_expected_and_realized_discrimination() {
+        let mut scheduler = ExperimentScheduler::new(SelectionStrategy::Causal, 1, 100);
+        let mut proposal = proposal("calibrated", 2, 1);
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "true::{\"n\":1}".into());
+        proposal
+            .candidate_predictions
+            .insert("noop".into(), "true::{\"n\":0}".into());
+        proposal
+            .candidate_predictions
+            .insert("other".into(), "true::{\"n\":2}".into());
+        scheduler.propose(proposal);
+        scheduler.select();
+        scheduler.observe("calibrated", "true::{\"n\":1}");
+        let record = scheduler.calibration().first().expect("calibration");
+        assert_eq!(record.predicted_discrimination, 2);
+        assert_eq!(record.survivors_before, 3);
+        assert_eq!(record.survivors_after, 1);
+        assert_eq!(record.eliminated, 2);
+        assert!(record.base_prediction_matched);
+        assert!(record.realized_bits() > 1.5);
+        let accounting = scheduler.accounting();
+        assert_eq!(accounting.calibrated_experiments, 1);
+        assert_eq!(accounting.discriminating_experiments, 1);
+        assert_eq!(accounting.base_prediction_matches, 1);
+    }
+
+    #[test]
+    fn unresolved_observation_records_no_realized_gain() {
+        let mut scheduler = ExperimentScheduler::new(SelectionStrategy::Causal, 1, 100);
+        let mut proposal = proposal("unresolved", 2, 1);
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "true::{\"n\":9}".into());
+        proposal
+            .candidate_predictions
+            .insert("other".into(), "true::{\"n\":8}".into());
+        scheduler.propose(proposal);
+        scheduler.select();
+        scheduler.observe("unresolved", "rejected::missing");
+        let record = scheduler.calibration().first().expect("calibration");
+        assert!(!record.resolved);
+        assert_eq!(record.eliminated, 0);
+        assert_eq!(record.realized_bits(), 0.0);
+        assert_eq!(scheduler.accounting().unresolved_experiments, 1);
+    }
+
+    #[test]
+    fn ablation_flags_name_their_arm_and_default_to_phase10() {
+        let default = SchedulingRegression::default();
+        assert!(default.candidate_scheduling);
+        assert!(!default.legacy_probe_setup);
+        assert_eq!(default.ablation_arm(), "D_complete");
+        let no_scheduler = SchedulingRegression {
+            candidate_scheduling: false,
+            legacy_probe_setup: false,
+            state_diverse_contrasts: false,
+        };
+        assert_eq!(no_scheduler.ablation_arm(), "C_semantic_no_scheduler");
+        let phase9 = SchedulingRegression {
+            candidate_scheduling: false,
+            legacy_probe_setup: true,
+            state_diverse_contrasts: false,
+        };
+        assert_eq!(phase9.ablation_arm(), "A_phase9");
+        let phase11 = SchedulingRegression {
+            candidate_scheduling: true,
+            legacy_probe_setup: false,
+            state_diverse_contrasts: true,
+        };
+        assert_eq!(phase11.ablation_arm(), "P_state_diverse");
+    }
+
+    #[test]
+    fn candidate_priority_lets_a_discriminating_experiment_outrank_coverage() {
+        let mut proposal_set = vec![proposal("coverage", 3, 0), proposal("discriminating", 4, 0)];
+        proposal_set[0].stage = ExperimentStage::Coverage;
+        proposal_set[1].stage = ExperimentStage::Causal;
+        proposal_set[1]
+            .candidate_predictions
+            .insert("base".into(), "a".into());
+        proposal_set[1]
+            .candidate_predictions
+            .insert("other".into(), "b".into());
+
+        let mut baseline = ExperimentScheduler::new(SelectionStrategy::Hybrid, 1, 100);
+        for item in proposal_set.clone() {
+            baseline.propose(item);
+        }
+        baseline.select();
+        assert_eq!(
+            baseline.selected_ids().first().map(String::as_str),
+            Some("coverage")
+        );
+
+        let mut prioritised = ExperimentScheduler::new(SelectionStrategy::Hybrid, 1, 100);
+        prioritised.set_candidate_priority(true);
+        for item in proposal_set {
+            prioritised.propose(item);
+        }
+        prioritised.select();
+        assert_eq!(
+            prioritised.selected_ids().first().map(String::as_str),
+            Some("discriminating")
+        );
+    }
+
+    #[test]
+    fn candidate_priority_is_off_by_default() {
+        let scheduler = ExperimentScheduler::new(SelectionStrategy::Hybrid, 1, 100);
+        assert!(!scheduler.candidate_priority());
     }
 
     #[test]

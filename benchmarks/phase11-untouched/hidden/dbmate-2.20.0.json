@@ -1,0 +1,10 @@
+{
+  "app": "dbmate-2.20.0",
+  "workflows": [
+    {"name": "apply-status-rollback-status", "steps": [{"action": "apply_pending"}, {"action": "status"}, {"action": "rollback_one"}, {"action": "status"}]},
+    {"name": "drain-then-reject-then-reapply", "steps": [{"action": "apply_pending"}, {"action": "rollback_one"}, {"action": "rollback_one"}, {"action": "rollback_one"}, {"action": "apply_pending"}]},
+    {"name": "create-apply-drop-status", "steps": [{"action": "create_database"}, {"action": "apply_pending"}, {"action": "drop_database"}, {"action": "status"}]},
+    {"name": "reject-before-apply", "steps": [{"action": "rollback_one"}, {"action": "apply_pending"}, {"action": "apply_pending"}, {"action": "status"}]},
+    {"name": "rollback-pair-then-reapply", "steps": [{"action": "apply_pending"}, {"action": "rollback_one"}, {"action": "rollback_one"}, {"action": "apply_pending"}, {"action": "status"}]}
+  ]
+}

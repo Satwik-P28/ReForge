@@ -1,0 +1,10 @@
+{
+  "app": "changesets-2.27.9",
+  "workflows": [
+    {"name": "consume-then-add-then-consume", "steps": [{"action": "version"}, {"action": "add_empty"}, {"action": "version"}]},
+    {"name": "prerelease-cycle", "steps": [{"action": "pre_enter"}, {"action": "version"}, {"action": "pre_exit"}, {"action": "version"}]},
+    {"name": "add-twice-consume", "steps": [{"action": "add_empty"}, {"action": "add_empty"}, {"action": "version"}, {"action": "version"}]},
+    {"name": "invalid-prerelease-transitions", "steps": [{"action": "pre_enter"}, {"action": "pre_enter"}, {"action": "pre_exit"}, {"action": "pre_exit"}]},
+    {"name": "empty-plan-single-consume", "steps": [{"action": "version"}, {"action": "version"}, {"action": "add_empty"}]}
+  ]
+}

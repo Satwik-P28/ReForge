@@ -8,10 +8,10 @@ use super::{baseline_sample, data_sample, observable_envelope_equal};
 use anyhow::Result;
 use indexmap::IndexMap;
 use reforge_investigate::{
-    instantiate_actions, synthesize_data_program, CliTargetSpec, DataOutcome, DataSample,
-    DataStatus, EntityPool, EvidenceSource, ExperimentAccounting, ExperimentAction,
-    ExperimentProposal, ExperimentScheduler, ExperimentStage, InteractionStage,
-    InvestigationRecord, OutcomeKind, ProgramCandidate, SelectionStrategy,
+    contrast_lattice, instantiate_actions, synthesize_data_program, CliTargetSpec,
+    ContrastExperiment, DataSample, DataStatus, EntityPool, EvidenceSource, ExperimentAccounting,
+    ExperimentAction, ExperimentProposal, ExperimentScheduler, ExperimentStage, InteractionStage,
+    InvestigationRecord, OutcomeKind, ProgramCandidate, SchedulingRegression, SelectionStrategy,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_types::TypedValue;
@@ -61,20 +61,12 @@ fn observed_signature(sample: &DataSample) -> String {
     )
 }
 
-fn predicted_signature(outcome: &DataOutcome, state: &serde_json::Value) -> String {
-    format!(
-        "{}:{}:{}",
-        outcome.status == DataStatus::Success,
-        outcome.error.clone().unwrap_or_default(),
-        serde_json::to_string(state).unwrap_or_default()
-    )
-}
-
 fn candidate_sequence(proposal: &ExperimentProposal, setup_name: Option<&str>) -> Vec<String> {
     let mut names = Vec::new();
     let no_setup = proposal.id.starts_with("target:")
         || proposal.id.starts_with("missing:")
         || proposal.id.starts_with("string:")
+        || proposal.id.starts_with("contrast:")
         || proposal.id.starts_with("materialize:");
     if !no_setup {
         if let Some(name) = setup_name {
@@ -86,21 +78,99 @@ fn candidate_sequence(proposal: &ExperimentProposal, setup_name: Option<&str>) -
     names
 }
 
-/// Simulate one proposed sequence against every candidate program. The result
-/// is a prediction map, not an oracle: candidates that cannot reach the state
-/// are recorded as unresolved and therefore cannot eliminate one another.
+/// Collect the state paths on which the candidate states disagree. Arrays are
+/// compared as whole values because their element alignment is itself disputed.
+fn collect_disputed_paths(states: &[&serde_json::Value], prefix: &str, out: &mut Vec<String>) {
+    static NULL: serde_json::Value = serde_json::Value::Null;
+    if states.len() < 2 {
+        return;
+    }
+    let first = states[0];
+    if states[1..].iter().all(|state| *state == first) {
+        return;
+    }
+    match first {
+        serde_json::Value::Object(map) => {
+            let mut keys: std::collections::BTreeSet<String> = map.keys().cloned().collect();
+            for state in &states[1..] {
+                if let Some(other) = state.as_object() {
+                    keys.extend(other.keys().cloned());
+                }
+            }
+            for key in keys {
+                let children: Vec<&serde_json::Value> = states
+                    .iter()
+                    .map(|state| {
+                        state
+                            .as_object()
+                            .and_then(|map| map.get(&key))
+                            .unwrap_or(&NULL)
+                    })
+                    .collect();
+                let path = if prefix.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{prefix}.{key}")
+                };
+                collect_disputed_paths(&children, &path, out);
+            }
+        }
+        _ => out.push(prefix.to_string()),
+    }
+}
+
+fn value_at_path<'a>(state: &'a serde_json::Value, path: &str) -> &'a serde_json::Value {
+    let mut current = state;
+    for segment in path.split('.') {
+        current = match current.get(segment) {
+            Some(value) => value,
+            None => return &serde_json::Value::Null,
+        };
+    }
+    current
+}
+
+fn project_state(state: &serde_json::Value, paths: &[String]) -> serde_json::Value {
+    if paths.is_empty() {
+        return state.clone();
+    }
+    let mut out = serde_json::Map::new();
+    for path in paths {
+        out.insert(path.clone(), value_at_path(state, path).clone());
+    }
+    serde_json::Value::Object(out)
+}
+
+fn projected_signature(
+    success: bool,
+    error: Option<String>,
+    state: &serde_json::Value,
+    paths: &[String],
+) -> String {
+    format!(
+        "{}:{}:{}",
+        success,
+        error.unwrap_or_default(),
+        serde_json::to_string(&project_state(state, paths)).unwrap_or_default()
+    )
+}
+
+/// Simulate one proposed sequence against every candidate program and compare
+/// the candidates only on the variables they disagree about. Unrelated
+/// simulation error then cannot disable a legitimate elimination, while a
+/// disagreement on a disputed variable still preserves uncertainty.
 fn candidate_predictions(
     candidates: &[ProgramCandidate],
     proposal: &ExperimentProposal,
     setup_name: Option<&str>,
     record: &InvestigationRecord,
-) -> BTreeMap<String, String> {
+) -> (BTreeMap<String, String>, Vec<String>) {
     let sequence = candidate_sequence(proposal, setup_name);
-    let mut predictions = BTreeMap::new();
+    let mut outcomes: Vec<(String, bool, Option<String>, serde_json::Value)> = Vec::new();
     for candidate in candidates {
         let mut state = candidate.program.initial_state.clone();
         let mut pool = EntityPool::default();
-        let mut signature = None;
+        let mut final_outcome: Option<(bool, Option<String>)> = None;
         for name in &sequence {
             let actions = instantiate_actions(&record.alphabet, &mut pool);
             let Some(action) = actions
@@ -108,7 +178,7 @@ fn candidate_predictions(
                 .find(|action| &action.action == name)
                 .cloned()
             else {
-                signature = Some("unresolved:action_missing".to_string());
+                final_outcome = None;
                 break;
             };
             let params: BTreeMap<String, serde_json::Value> = action
@@ -137,18 +207,37 @@ fn candidate_predictions(
                 pool.add(&pool_name, &id);
             }
             state = next;
-            signature = Some(predicted_signature(&outcome, &state));
+            final_outcome = Some((outcome.status == DataStatus::Success, outcome.error.clone()));
         }
-        predictions.insert(
-            candidate.id.clone(),
-            signature.unwrap_or_else(|| "unresolved:empty_sequence".into()),
-        );
+        match final_outcome {
+            Some((success, error)) => outcomes.push((candidate.id.clone(), success, error, state)),
+            None => outcomes.push((
+                candidate.id.clone(),
+                false,
+                Some("action_missing".into()),
+                serde_json::Value::Null,
+            )),
+        }
     }
-    predictions
+    let reachable: Vec<&serde_json::Value> = outcomes
+        .iter()
+        .filter(|(_, success, error, _)| *success && error.is_none())
+        .map(|(_, _, _, state)| state)
+        .collect();
+    let mut paths = Vec::new();
+    collect_disputed_paths(&reachable, "", &mut paths);
+    paths.sort();
+    paths.dedup();
+    let mut predictions = BTreeMap::new();
+    for (id, success, error, state) in outcomes {
+        predictions.insert(id, projected_signature(success, error, &state, &paths));
+    }
+    (predictions, paths)
 }
 
 /// Execute a reset-backed sequence. Every reset, observation, setup action and
 /// target action is recorded against `experiment_id`.
+#[allow(clippy::too_many_arguments)]
 fn run_scheduled_sequence(
     target: &mut dyn InvestigationTarget,
     record: &InvestigationRecord,
@@ -157,6 +246,7 @@ fn run_scheduled_sequence(
     setup_name: Option<&str>,
     contexts: &[&str],
     target_action: &str,
+    flags: SchedulingRegression,
 ) -> Result<(Option<DataSample>, Vec<DataSample>, u32)> {
     let mut cost = 0u32;
     let reset = target.reset().map_err(|e| anyhow::anyhow!(e))?;
@@ -178,8 +268,13 @@ fn run_scheduled_sequence(
     let mut actions = instantiate_actions(&record.alphabet, &mut pool);
     // A target probe must observe the action from the reset state. Running the
     // same action as its own setup hides every first-use effect and made an
-    // empty-state install appear to be a no-op.
-    let setup_name = setup_name.filter(|name| *name != target_action);
+    // empty-state install appear to be a no-op. The legacy flag restores that
+    // historical behaviour so the ablation can measure what the fix changed.
+    let setup_name = if flags.legacy_probe_setup {
+        setup_name
+    } else {
+        setup_name.filter(|name| *name != target_action)
+    };
     let setup_sample = if let Some(setup_name) = setup_name {
         let Some(setup) = actions
             .iter()
@@ -228,7 +323,16 @@ fn run_scheduled_sequence(
         out.push(data_sample(&action, &before, &observation));
     }
     if let Some(last) = out.last() {
-        scheduler.observe(experiment_id, &observed_signature(last));
+        let signature = match scheduler.disputed_paths(experiment_id).cloned() {
+            Some(paths) => projected_signature(
+                last.outcome == OutcomeKind::Success,
+                last.error.clone(),
+                &last.after,
+                &paths,
+            ),
+            None => observed_signature(last),
+        };
+        scheduler.observe(experiment_id, &signature);
     }
     Ok((setup_sample, out, cost))
 }
@@ -340,7 +444,16 @@ fn charge_sequence(
         OutcomeKind::from_observation(&observation) == OutcomeKind::Success,
     );
     let sample = data_sample(action, &before, &observation);
-    scheduler.observe(experiment_id, &observed_signature(&sample));
+    let signature = match scheduler.disputed_paths(experiment_id).cloned() {
+        Some(paths) => projected_signature(
+            sample.outcome == OutcomeKind::Success,
+            sample.error.clone(),
+            &sample.after,
+            &paths,
+        ),
+        None => observed_signature(&sample),
+    };
+    scheduler.observe(experiment_id, &signature);
     Ok(Some(sample))
 }
 
@@ -354,6 +467,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
     strategy: SelectionStrategy,
     budget: u64,
     seed: u64,
+    flags: SchedulingRegression,
 ) -> Result<(Vec<DataSample>, ExperimentAccounting)> {
     let spec = CliTargetSpec::load(&root.join(spec_path)).map_err(|e| anyhow::anyhow!(e))?;
     let workdir = std::env::temp_dir().join(format!(
@@ -364,6 +478,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
     ));
     let mut target = spec.build(Some(&workdir)).map_err(|e| anyhow::anyhow!(e))?;
     let mut scheduler = ExperimentScheduler::new(strategy, seed, budget);
+    scheduler.set_candidate_priority(flags.state_diverse_contrasts);
 
     if !scheduler.charge(2) {
         let _ = std::fs::remove_dir_all(&workdir);
@@ -411,6 +526,23 @@ pub(super) fn collect_counterfactual_samples_scheduled(
     let setup_cost = u32::from(setup_name.is_some());
     let sequence_cost = 2 + setup_cost + 1;
 
+    // Competing programs and the state-diverse contrasts their differences
+    // imply. When candidate scheduling is ablated neither is constructed, so
+    // the arm cannot retain candidate behaviour by accident.
+    let (candidate_programs, contrasts): (Vec<ProgramCandidate>, Vec<ContrastExperiment>) =
+        if flags.candidate_scheduling {
+            let base = synthesize_data_program(record);
+            let candidates = base.candidate_programs();
+            let contrasts = if flags.state_diverse_contrasts {
+                contrast_lattice(&base, &candidates, 24)
+            } else {
+                Vec::new()
+            };
+            (candidates, contrasts)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
     let mut missing_id = "__reforge_missing_entity__".to_string();
     let empty_state = baseline.state_document.clone().unwrap_or_default();
     while json_contains_string(&empty_state, &missing_id) {
@@ -437,6 +569,27 @@ pub(super) fn collect_counterfactual_samples_scheduled(
                 "distinguish a lazy baseline from the first mutation",
             );
         }
+    }
+
+    // A candidate difference only matters if some reachable state makes the
+    // candidates disagree. Propose those states first: they are the experiments
+    // with the highest expected discrimination per interaction.
+    for contrast in &contrasts {
+        let Some(target) = contrast.target() else {
+            continue;
+        };
+        propose(
+            &mut scheduler,
+            contrast.id.clone(),
+            ExperimentStage::Causal,
+            target,
+            contrast.setup().iter().map(String::as_str).collect(),
+            2 + contrast.actions.len() as u32,
+            4,
+            &["contrast_low", "contrast_high"],
+            &["a", "b"],
+            &contrast.reason,
+        );
     }
 
     for action in &action_names {
@@ -640,7 +793,6 @@ pub(super) fn collect_counterfactual_samples_scheduled(
     // evidence, then predict each proposed sequence under every candidate.
     // Predictions are attached before selection so discrimination per unit
     // interaction cost can influence which experiments run.
-    let candidate_programs = synthesize_data_program(record).candidate_programs();
     for candidate in &candidate_programs {
         scheduler.register_candidate(candidate.id.clone(), candidate.description.clone());
     }
@@ -654,7 +806,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
         {
             continue;
         }
-        let predictions = candidate_predictions(
+        let (predictions, paths) = candidate_predictions(
             &candidate_programs,
             &proposal,
             setup_name.as_deref(),
@@ -662,7 +814,11 @@ pub(super) fn collect_counterfactual_samples_scheduled(
         );
         let distinct: std::collections::BTreeSet<&String> = predictions.values().collect();
         if distinct.len() > 1 {
-            scheduler.annotate_predictions(&proposal.id, predictions);
+            if flags.state_diverse_contrasts {
+                scheduler.annotate_predictions_with_paths(&proposal.id, predictions, paths);
+            } else {
+                scheduler.annotate_predictions(&proposal.id, predictions);
+            }
             annotated += 1;
         }
     }
@@ -739,6 +895,35 @@ pub(super) fn collect_counterfactual_samples_scheduled(
         scheduler.finish(&id, cost);
     }
 
+    // Execute the state-diverse contrasts the candidate differences imply.
+    // Each one is a full reset-backed sequence, so the final action is observed
+    // in the contrasting state the hypothesis needs.
+    for contrast in &contrasts {
+        if !scheduler.is_selected(&contrast.id) {
+            continue;
+        }
+        let Some(target_action) = contrast.target().map(str::to_string) else {
+            continue;
+        };
+        let contexts: Vec<String> = contrast.setup().to_vec();
+        let context_refs: Vec<&str> = contexts.iter().map(String::as_str).collect();
+        let (setup, executed, cost) = run_scheduled_sequence(
+            &mut target,
+            record,
+            &mut scheduler,
+            &contrast.id,
+            None,
+            &context_refs,
+            &target_action,
+            flags,
+        )?;
+        if setup_sample.is_none() {
+            setup_sample = setup;
+        }
+        samples.extend(executed);
+        scheduler.finish(&contrast.id, cost);
+    }
+
     for target_action in &action_names {
         let id = format!("target:{target_action}");
         if !scheduler.is_selected(&id) {
@@ -752,6 +937,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
             None,
             &[],
             target_action,
+            flags,
         )?;
         if setup_sample.is_none() {
             setup_sample = setup;
@@ -779,6 +965,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
             setup_name.as_deref(),
             contexts,
             target_action,
+            flags,
         )?;
         if setup_sample.is_none() {
             setup_sample = setup;
@@ -800,6 +987,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
             setup_name.as_deref(),
             &[target_action],
             target_action,
+            flags,
         )?;
         if setup_sample.is_none() {
             setup_sample = setup;
@@ -826,6 +1014,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
                 setup_name.as_deref(),
                 &[context],
                 target_action,
+                flags,
             )?;
             if setup_sample.is_none() {
                 setup_sample = setup;
@@ -859,6 +1048,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
                     setup_name.as_deref(),
                     &[first, second],
                     target_action,
+                    flags,
                 )?;
                 if setup_sample.is_none() {
                     setup_sample = setup;
@@ -893,6 +1083,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
                             setup_name.as_deref(),
                             &[first, second, third],
                             target_action,
+                            flags,
                         )?;
                         if setup_sample.is_none() {
                             setup_sample = setup;

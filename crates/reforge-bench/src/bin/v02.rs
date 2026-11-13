@@ -18,8 +18,8 @@ use reforge_investigate::{
     instantiate_actions, investigate, synthesize_data_program_with_samples, synthesize_twin,
     CliTargetSpec, DataProgram, DataSample, EntityPool, EvidenceGuidance, EvidenceKind,
     EvidenceSource, ExperimentAccounting, InvestigationConfig, InvestigationRecord,
-    ObservationProvenance, OutcomeKind, PolicyKind, PrerequisiteSummary, SelectionStrategy,
-    TwinSynthConfig,
+    ObservationProvenance, OutcomeKind, PolicyKind, PrerequisiteSummary, SchedulingRegression,
+    SelectionStrategy, TwinSynthConfig,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_rea::{ReaConfig, ReaProvider};
@@ -174,6 +174,7 @@ struct AppRun {
     counterfactual_interactions: u64,
     experiment_strategy: String,
     experiment_accounting: Option<ExperimentAccounting>,
+    collection_ms: u128,
     hidden_programs: Vec<Vec<ActionInstance>>,
     hidden_workflows: Vec<String>,
 }
@@ -853,6 +854,7 @@ fn main() -> Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(500);
+    let scheduling_flags = SchedulingRegression::from_env();
 
     let rea_started = Instant::now();
     let mut rea_guidance: Option<EvidenceGuidance> = None;
@@ -1010,6 +1012,7 @@ fn main() -> Result<()> {
                                     &record.initial_class,
                                     &TwinSynthConfig::default(),
                                 );
+                                let collection_started = Instant::now();
                                 let (probes, counterfactual_interactions, experiment_accounting) =
                                     if let Some(strategy) = experiment_strategy {
                                         match v02_experiments::collect_counterfactual_samples_scheduled(
@@ -1019,6 +1022,7 @@ fn main() -> Result<()> {
                                             strategy,
                                             experiment_budget,
                                             seed,
+                                            scheduling_flags,
                                         ) {
                                             Ok((probes, accounting)) => (
                                                 probes,
@@ -1041,6 +1045,7 @@ fn main() -> Result<()> {
                                             .unwrap_or_default();
                                         (probes, interactions, None)
                                     };
+                                let collection_ms = collection_started.elapsed().as_millis();
                                 let data = synthesize_data_program_with_samples(&record, &probes);
                                 let (programs, workflows) =
                                     load_hidden(&root, &suite_dir, &target_id);
@@ -1055,6 +1060,7 @@ fn main() -> Result<()> {
                                         .map(|strategy| strategy.as_str().to_string())
                                         .unwrap_or_else(|| "phase62".into()),
                                     experiment_accounting,
+                                    collection_ms,
                                     hidden_programs: programs,
                                     hidden_workflows: workflows,
                                 });
@@ -1185,6 +1191,8 @@ fn main() -> Result<()> {
                 "counterfactual_samples": run.counterfactual_samples,
                 "counterfactual_interactions": run.counterfactual_interactions,
                 "experiment_strategy": run.experiment_strategy,
+                "scheduling": scheduling_flags,
+                "collection_duration_ms": run.collection_ms,
                 "experiment_accounting": &run.experiment_accounting,
                 "program": run.data,
             },
@@ -1258,6 +1266,8 @@ fn main() -> Result<()> {
             .map(SelectionStrategy::as_str)
             .unwrap_or("phase62"),
         "experiment_budget": experiment_strategy.map(|_| experiment_budget),
+        "scheduling": scheduling_flags,
+        "ablation_arm": scheduling_flags.ablation_arm(),
         "rea": rea_metadata,
         "policies": summaries,
         "reconstruction": reconstruction,
