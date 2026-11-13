@@ -49,8 +49,8 @@ pub use causal::{
 pub use data::{
     synthesize_data_program, synthesize_data_program_with_samples, CollectionLayout, DataOutcome,
     DataProgram, DataRule, DataSample, DataStatus, Derived, Effect, ExecutionMemory,
-    ExecutionResult, Guard, OutputContract, OutputFieldContract, PositionDisposition, RuleBranch,
-    RuleProvenance, StateUpdateClaim, ValueExpr,
+    ExecutionResult, Guard, OutputContract, OutputFieldContract, PositionDisposition,
+    ProgramCandidate, RuleBranch, RuleProvenance, StateUpdateClaim, ValueExpr,
 };
 pub use relational::{
     classify_parameter, infer_output_semantics, CmpOp, EntityRef, ExecutionSemantics,
@@ -65,8 +65,9 @@ pub use engine::{
 };
 pub use evidence::build_evidence;
 pub use experiments::{
-    ExperimentAccounting, ExperimentAction, ExperimentProposal, ExperimentScheduler,
-    ExperimentStage, InteractionLedger, InteractionRecord, InteractionStage, SelectionStrategy,
+    CandidateElimination, ExperimentAccounting, ExperimentAction, ExperimentDecision,
+    ExperimentProposal, ExperimentScheduler, ExperimentStage, InteractionLedger, InteractionRecord,
+    InteractionStage, SelectionStrategy,
 };
 pub use feature::{feature_layout, FEATURE_DIM};
 pub use guidance::{EvidenceGuidance, EvidenceHint};

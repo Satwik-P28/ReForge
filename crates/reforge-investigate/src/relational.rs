@@ -43,6 +43,10 @@ impl ValueType {
 #[serde(rename_all = "snake_case")]
 pub enum EntityRef {
     Param(String),
+    /// A literal identity observed in evidence. Used only when an action's
+    /// parameter does not carry the target (for example an uninstall whose
+    /// request names the package only in its path).
+    Id(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -776,26 +780,32 @@ impl TypeContext<'_> {
     }
 
     fn entity_id(&self, entity: &EntityRef) -> Result<String, TypeError> {
-        let EntityRef::Param(name) = entity;
-        match self.params.get(name) {
-            Some(Value::String(value)) => Ok(value.clone()),
-            Some(_) => Err(TypeError::MissingOperand {
-                operand: format!("entity parameter '{name}' is not a string"),
-            }),
-            None => Err(TypeError::MissingOperand {
-                operand: format!("entity parameter '{name}'"),
-            }),
+        match entity {
+            EntityRef::Id(id) => Ok(id.clone()),
+            EntityRef::Param(name) => match self.params.get(name) {
+                Some(Value::String(value)) => Ok(value.clone()),
+                Some(_) => Err(TypeError::MissingOperand {
+                    operand: format!("entity parameter '{name}' is not a string"),
+                }),
+                None => Err(TypeError::MissingOperand {
+                    operand: format!("entity parameter '{name}'"),
+                }),
+            },
         }
     }
 
     fn param_entity_value(&self, entity: &EntityRef) -> Result<Value, TypeError> {
-        let EntityRef::Param(name) = entity;
-        self.params
-            .get(name)
-            .cloned()
-            .ok_or_else(|| TypeError::MissingOperand {
-                operand: format!("parameter '{name}'"),
-            })
+        match entity {
+            EntityRef::Id(id) => Ok(Value::String(id.clone())),
+            EntityRef::Param(name) => {
+                self.params
+                    .get(name)
+                    .cloned()
+                    .ok_or_else(|| TypeError::MissingOperand {
+                        operand: format!("parameter '{name}'"),
+                    })
+            }
+        }
     }
 
     fn collection_exists(&self, collection: &str) -> bool {

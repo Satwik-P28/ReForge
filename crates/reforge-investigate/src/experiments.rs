@@ -97,6 +97,12 @@ pub struct ExperimentProposal {
     /// to estimate information gain, not to score a run against a hidden oracle.
     #[serde(default)]
     pub predicted_outcomes: Vec<String>,
+    /// Predictions supplied by competing candidate programs, keyed by stable
+    /// candidate id. This is the scheduler's authoritative discrimination
+    /// signal when present; `predicted_outcomes` remains for callers that have
+    /// not yet constructed candidate programs.
+    #[serde(default)]
+    pub candidate_predictions: BTreeMap<String, String>,
     pub cost: u32,
     pub gain: u32,
     #[serde(default)]
@@ -121,6 +127,7 @@ impl ExperimentProposal {
             required_pre_state: String::new(),
             hypotheses: Vec::new(),
             predicted_outcomes: Vec::new(),
+            candidate_predictions: BTreeMap::new(),
             cost,
             gain,
             dependencies: Vec::new(),
@@ -131,9 +138,49 @@ impl ExperimentProposal {
     /// Distinct predicted outcomes minus one is a lower bound on the number of
     /// hypotheses that one observation can separate.
     pub fn discrimination_gain(&self) -> u32 {
-        let distinct: BTreeSet<&String> = self.predicted_outcomes.iter().collect();
+        let distinct: BTreeSet<&String> = if self.candidate_predictions.is_empty() {
+            self.predicted_outcomes.iter().collect()
+        } else {
+            self.candidate_predictions.values().collect()
+        };
         (distinct.len().saturating_sub(1) as u32).max(self.gain)
     }
+
+    fn discrimination_gain_for(&self, survivors: &BTreeSet<String>) -> u32 {
+        if self.candidate_predictions.is_empty() {
+            return self.discrimination_gain();
+        }
+        let distinct: BTreeSet<&String> = self
+            .candidate_predictions
+            .iter()
+            .filter(|(id, _)| survivors.is_empty() || survivors.contains(*id))
+            .map(|(_, prediction)| prediction)
+            .collect();
+        distinct.len().saturating_sub(1) as u32
+    }
+}
+
+/// A scheduler-visible decision. The record is retained even when an
+/// experiment reveals that every candidate was wrong; that outcome is evidence,
+/// not a reason to delete the hypothesis history.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentDecision {
+    pub experiment_id: String,
+    pub stage: ExperimentStage,
+    pub candidate_ids: Vec<String>,
+    pub predicted_outcomes: BTreeMap<String, String>,
+    pub expected_discrimination: u32,
+    pub cost: u32,
+    pub survivors_before: Vec<String>,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CandidateElimination {
+    pub experiment_id: String,
+    pub candidate_id: String,
+    pub predicted: String,
+    pub observed: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,6 +259,16 @@ pub struct ExperimentAccounting {
     pub spent: u64,
     pub remaining: u64,
     pub budget_exhausted: bool,
+    #[serde(default)]
+    pub candidate_count: u64,
+    #[serde(default)]
+    pub surviving_candidates: u64,
+    #[serde(default)]
+    pub eliminated_candidates: u64,
+    #[serde(default)]
+    pub decisions: Vec<ExperimentDecision>,
+    #[serde(default)]
+    pub eliminations: Vec<CandidateElimination>,
 }
 
 /// A budgeted, deterministic experiment queue.
@@ -230,6 +287,10 @@ pub struct ExperimentScheduler {
     repeated: u64,
     budget_exhausted: bool,
     ledger: InteractionLedger,
+    candidates: BTreeMap<String, String>,
+    survivors: BTreeSet<String>,
+    decisions: Vec<ExperimentDecision>,
+    eliminations: Vec<CandidateElimination>,
 }
 
 impl ExperimentScheduler {
@@ -248,6 +309,10 @@ impl ExperimentScheduler {
             repeated: 0,
             budget_exhausted: false,
             ledger: InteractionLedger::default(),
+            candidates: BTreeMap::new(),
+            survivors: BTreeSet::new(),
+            decisions: Vec::new(),
+            eliminations: Vec::new(),
         }
     }
 
@@ -291,8 +356,95 @@ impl ExperimentScheduler {
             self.repeated += 1;
             return false;
         }
+        for candidate in proposal.candidate_predictions.keys() {
+            self.register_candidate(candidate.clone(), String::new());
+        }
         self.proposals.push(proposal);
         true
+    }
+
+    /// Register a competing program. Registration is idempotent so callers can
+    /// attach the same candidate to several proposals without losing history.
+    pub fn register_candidate(&mut self, id: impl Into<String>, description: impl Into<String>) {
+        let id = id.into();
+        if !self.candidates.contains_key(&id) {
+            self.candidates.insert(id.clone(), description.into());
+            self.survivors.insert(id);
+        }
+    }
+
+    /// Attach candidate predictions to an existing proposal. Predictions are
+    /// observable signatures, not target outputs supplied by an oracle.
+    pub fn annotate_predictions(
+        &mut self,
+        id: &str,
+        predictions: BTreeMap<String, String>,
+    ) -> bool {
+        for candidate in predictions.keys() {
+            self.register_candidate(candidate.clone(), String::new());
+        }
+        let Some(proposal) = self.proposals.iter_mut().find(|item| item.id == id) else {
+            return false;
+        };
+        proposal.candidate_predictions = predictions;
+        true
+    }
+
+    pub fn candidates(&self) -> &BTreeMap<String, String> {
+        &self.candidates
+    }
+
+    pub fn surviving_candidates(&self) -> Vec<String> {
+        self.survivors.iter().cloned().collect()
+    }
+
+    pub fn decisions(&self) -> &[ExperimentDecision] {
+        &self.decisions
+    }
+
+    pub fn eliminations(&self) -> &[CandidateElimination] {
+        &self.eliminations
+    }
+
+    /// Record an observed signature for a selected experiment and eliminate
+    /// every candidate whose prediction contradicted it. Candidates without a
+    /// prediction for this experiment remain unresolved rather than being
+    /// treated as refuted.
+    pub fn observe(&mut self, id: &str, observed: &str) {
+        let Some(proposal) = self.proposals.iter().find(|item| item.id == id) else {
+            return;
+        };
+        let predictions = proposal.candidate_predictions.clone();
+        // `base` is the selected program. If its simulated state does not
+        // exactly match the observed state, the candidate simulator is not
+        // trustworthy for full-state eliminations. Fall back to the
+        // status/error prefix; if even that disagrees, retain every candidate
+        // and record the experiment as unresolved rather than refuting them
+        // with a known-bad simulation.
+        let base = predictions.get("base");
+        let full_state_reliable = base.is_some_and(|prediction| prediction == observed);
+        let status_reliable = base
+            .is_some_and(|prediction| signature_prefix(prediction) == signature_prefix(observed));
+        if !full_state_reliable && !status_reliable {
+            return;
+        }
+        for (candidate, predicted) in predictions {
+            let compatible = if full_state_reliable {
+                predicted == observed
+            } else {
+                signature_prefix(&predicted) == signature_prefix(observed)
+            };
+            if compatible || !self.survivors.contains(&candidate) {
+                continue;
+            }
+            self.survivors.remove(&candidate);
+            self.eliminations.push(CandidateElimination {
+                experiment_id: id.to_string(),
+                candidate_id: candidate,
+                predicted,
+                observed: observed.to_string(),
+            });
+        }
     }
 
     pub fn is_selected(&self, id: &str) -> bool {
@@ -324,15 +476,15 @@ impl ExperimentScheduler {
                 r.cmp(&l).then_with(|| left.0.cmp(&right.0))
             }),
             SelectionStrategy::Causal => indexed.sort_by(|left, right| {
-                let l = self.causal_score(left.1);
-                let r = self.causal_score(right.1);
+                let l = self.causal_score_for(left.1, &self.survivors);
+                let r = self.causal_score_for(right.1, &self.survivors);
                 r.cmp(&l)
                     .then_with(|| right.1.gain.cmp(&left.1.gain))
                     .then_with(|| left.0.cmp(&right.0))
             }),
             SelectionStrategy::Hybrid => indexed.sort_by(|left, right| {
-                let l = self.hybrid_score(left.1);
-                let r = self.hybrid_score(right.1);
+                let l = self.hybrid_score(left.1, &self.survivors);
+                let r = self.hybrid_score(right.1, &self.survivors);
                 r.cmp(&l)
                     .then_with(|| left.1.cost.cmp(&right.1.cost))
                     .then_with(|| left.0.cmp(&right.0))
@@ -353,21 +505,34 @@ impl ExperimentScheduler {
             self.spent += cost;
             self.selected.insert(proposal.id.clone(), proposal.cost);
             self.selected_order.push(proposal.id.clone());
+            let mut candidate_ids: Vec<String> =
+                proposal.candidate_predictions.keys().cloned().collect();
+            candidate_ids.sort();
+            self.decisions.push(ExperimentDecision {
+                experiment_id: proposal.id.clone(),
+                stage: proposal.stage,
+                candidate_ids,
+                predicted_outcomes: proposal.candidate_predictions.clone(),
+                expected_discrimination: proposal.discrimination_gain_for(&self.survivors),
+                cost: proposal.cost,
+                survivors_before: self.survivors.iter().cloned().collect(),
+                reason: proposal.reason.clone(),
+            });
         }
     }
 
-    fn causal_score(&self, proposal: &ExperimentProposal) -> u64 {
+    fn causal_score_for(&self, proposal: &ExperimentProposal, survivors: &BTreeSet<String>) -> u64 {
         let cost = u64::from(proposal.cost.max(1));
-        u64::from(proposal.discrimination_gain()) * 1_000 / cost
+        u64::from(proposal.discrimination_gain_for(survivors)) * 1_000 / cost
     }
 
-    fn hybrid_score(&self, proposal: &ExperimentProposal) -> u64 {
+    fn hybrid_score(&self, proposal: &ExperimentProposal, survivors: &BTreeSet<String>) -> u64 {
         let coverage_bonus = match proposal.stage {
             ExperimentStage::Baseline | ExperimentStage::Coverage => 400,
             ExperimentStage::Causal => 150,
             _ => 0,
         };
-        self.causal_score(proposal) + coverage_bonus
+        self.causal_score_for(proposal, survivors) + coverage_bonus
     }
 
     fn random_rank(&self, id: &str) -> u64 {
@@ -415,8 +580,23 @@ impl ExperimentScheduler {
             spent: self.spent,
             remaining: self.remaining(),
             budget_exhausted: self.budget_exhausted,
+            candidate_count: self.candidates.len() as u64,
+            surviving_candidates: self.survivors.len() as u64,
+            eliminated_candidates: self.eliminations.len() as u64,
+            decisions: self.decisions.clone(),
+            eliminations: self.eliminations.clone(),
         }
     }
+}
+
+fn signature_prefix(signature: &str) -> &str {
+    let mut parts = signature.splitn(3, ':');
+    let status = parts.next().unwrap_or_default();
+    let error = parts.next().unwrap_or_default();
+    // The returned slice borrows from the input, so find the offset instead of
+    // allocating a formatted string.
+    let end = status.len() + 1 + error.len();
+    &signature[..end.min(signature.len())]
 }
 
 fn fnv1a(bytes: &[u8]) -> u64 {
@@ -441,6 +621,80 @@ mod tests {
             gain,
             "test",
         )
+    }
+
+    #[test]
+    fn candidate_disagreement_increases_expected_discrimination() {
+        let mut proposal = proposal("candidate-gain", 4, 1);
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "success".into());
+        proposal
+            .candidate_predictions
+            .insert("noop".into(), "rejected".into());
+        proposal.predicted_outcomes = vec!["success".into()];
+        assert_eq!(proposal.discrimination_gain(), 1);
+    }
+
+    #[test]
+    fn observation_eliminates_only_contradicted_candidates() {
+        let mut scheduler = ExperimentScheduler::new(SelectionStrategy::Causal, 1, 100);
+        let mut proposal = proposal("discriminate", 2, 1);
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "success::{}".into());
+        proposal
+            .candidate_predictions
+            .insert("appends".into(), "success::{\"items\":[1]}".into());
+        proposal
+            .candidate_predictions
+            .insert("unresolved".into(), "unresolved:action_missing".into());
+        scheduler.propose(proposal);
+        scheduler.select();
+        scheduler.observe("discriminate", "success::{}");
+        assert!(scheduler.surviving_candidates().contains(&"base".into()));
+        assert!(!scheduler.surviving_candidates().contains(&"appends".into()));
+        assert!(!scheduler
+            .surviving_candidates()
+            .contains(&"unresolved".into()));
+        assert_eq!(scheduler.eliminations().len(), 2);
+    }
+
+    #[test]
+    fn unreliable_full_state_prediction_preserves_status_uncertainty() {
+        let mut scheduler = ExperimentScheduler::new(SelectionStrategy::Causal, 1, 100);
+        let mut proposal = proposal("uncertain", 2, 1);
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "success::{\"items\":[2]}".into());
+        proposal
+            .candidate_predictions
+            .insert("other".into(), "success::{\"items\":[3]}".into());
+        scheduler.propose(proposal);
+        scheduler.select();
+        scheduler.observe("uncertain", "success::{\"items\":[1]}");
+        assert_eq!(scheduler.eliminations().len(), 0);
+        assert_eq!(scheduler.surviving_candidates().len(), 2);
+    }
+
+    #[test]
+    fn decisions_record_selection_reason_and_candidates() {
+        let mut scheduler = ExperimentScheduler::new(SelectionStrategy::Causal, 1, 100);
+        let mut proposal = proposal("logged", 3, 1);
+        proposal.reason = "separate replace from append".into();
+        proposal
+            .candidate_predictions
+            .insert("base".into(), "same".into());
+        proposal
+            .candidate_predictions
+            .insert("replace".into(), "different".into());
+        scheduler.propose(proposal);
+        scheduler.select();
+        let decision = scheduler.decisions().first().expect("decision");
+        assert_eq!(decision.experiment_id, "logged");
+        assert_eq!(decision.reason, "separate replace from append");
+        assert_eq!(decision.candidate_ids, vec!["base", "replace"]);
+        assert_eq!(decision.expected_discrimination, 1);
     }
 
     #[test]

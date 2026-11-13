@@ -8,9 +8,10 @@ use super::{baseline_sample, data_sample, observable_envelope_equal};
 use anyhow::Result;
 use indexmap::IndexMap;
 use reforge_investigate::{
-    instantiate_actions, CliTargetSpec, DataSample, EntityPool, EvidenceSource,
-    ExperimentAccounting, ExperimentAction, ExperimentProposal, ExperimentScheduler,
-    ExperimentStage, InteractionStage, InvestigationRecord, OutcomeKind, SelectionStrategy,
+    instantiate_actions, synthesize_data_program, CliTargetSpec, DataOutcome, DataSample,
+    DataStatus, EntityPool, EvidenceSource, ExperimentAccounting, ExperimentAction,
+    ExperimentProposal, ExperimentScheduler, ExperimentStage, InteractionStage,
+    InvestigationRecord, OutcomeKind, ProgramCandidate, SelectionStrategy,
 };
 use reforge_observe::{ActionInstance, InvestigationTarget, Observation};
 use reforge_types::TypedValue;
@@ -51,6 +52,101 @@ fn propose(
     let _ = scheduler.propose(proposal);
 }
 
+fn observed_signature(sample: &DataSample) -> String {
+    format!(
+        "{}:{}:{}",
+        sample.outcome == OutcomeKind::Success,
+        sample.error.clone().unwrap_or_default(),
+        serde_json::to_string(&sample.after).unwrap_or_default()
+    )
+}
+
+fn predicted_signature(outcome: &DataOutcome, state: &serde_json::Value) -> String {
+    format!(
+        "{}:{}:{}",
+        outcome.status == DataStatus::Success,
+        outcome.error.clone().unwrap_or_default(),
+        serde_json::to_string(state).unwrap_or_default()
+    )
+}
+
+fn candidate_sequence(proposal: &ExperimentProposal, setup_name: Option<&str>) -> Vec<String> {
+    let mut names = Vec::new();
+    let no_setup = proposal.id.starts_with("target:")
+        || proposal.id.starts_with("missing:")
+        || proposal.id.starts_with("string:")
+        || proposal.id.starts_with("materialize:");
+    if !no_setup {
+        if let Some(name) = setup_name {
+            names.push(name.to_string());
+        }
+    }
+    names.extend(proposal.setup.iter().map(|action| action.action.clone()));
+    names.push(proposal.target.action.clone());
+    names
+}
+
+/// Simulate one proposed sequence against every candidate program. The result
+/// is a prediction map, not an oracle: candidates that cannot reach the state
+/// are recorded as unresolved and therefore cannot eliminate one another.
+fn candidate_predictions(
+    candidates: &[ProgramCandidate],
+    proposal: &ExperimentProposal,
+    setup_name: Option<&str>,
+    record: &InvestigationRecord,
+) -> BTreeMap<String, String> {
+    let sequence = candidate_sequence(proposal, setup_name);
+    let mut predictions = BTreeMap::new();
+    for candidate in candidates {
+        let mut state = candidate.program.initial_state.clone();
+        let mut pool = EntityPool::default();
+        let mut signature = None;
+        for name in &sequence {
+            let actions = instantiate_actions(&record.alphabet, &mut pool);
+            let Some(action) = actions
+                .iter()
+                .find(|action| &action.action == name)
+                .cloned()
+            else {
+                signature = Some("unresolved:action_missing".to_string());
+                break;
+            };
+            let params: BTreeMap<String, serde_json::Value> = action
+                .params
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        serde_json::to_value(value).unwrap_or(serde_json::Value::Null),
+                    )
+                })
+                .collect();
+            let (next, outcome) = candidate.program.execute(&state, &action.action, &params);
+            if let Some(id) = outcome.outputs.get("created_id").and_then(|value| {
+                value
+                    .as_str()
+                    .map(str::to_string)
+                    .or_else(|| value.as_i64().map(|value| value.to_string()))
+            }) {
+                let pool_name = outcome
+                    .outputs
+                    .get("created_pool")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("entity")
+                    .to_string();
+                pool.add(&pool_name, &id);
+            }
+            state = next;
+            signature = Some(predicted_signature(&outcome, &state));
+        }
+        predictions.insert(
+            candidate.id.clone(),
+            signature.unwrap_or_else(|| "unresolved:empty_sequence".into()),
+        );
+    }
+    predictions
+}
+
 /// Execute a reset-backed sequence. Every reset, observation, setup action and
 /// target action is recorded against `experiment_id`.
 fn run_scheduled_sequence(
@@ -80,6 +176,10 @@ fn run_scheduled_sequence(
     let mut current = baseline.state_document.unwrap_or_default();
     let mut pool = EntityPool::default();
     let mut actions = instantiate_actions(&record.alphabet, &mut pool);
+    // A target probe must observe the action from the reset state. Running the
+    // same action as its own setup hides every first-use effect and made an
+    // empty-state install appear to be a no-op.
+    let setup_name = setup_name.filter(|name| *name != target_action);
     let setup_sample = if let Some(setup_name) = setup_name {
         let Some(setup) = actions
             .iter()
@@ -126,6 +226,9 @@ fn run_scheduled_sequence(
         pool.observe_outputs(&observation.outputs);
         pool.observe_created_entity(&observation.outputs, &current);
         out.push(data_sample(&action, &before, &observation));
+    }
+    if let Some(last) = out.last() {
+        scheduler.observe(experiment_id, &observed_signature(last));
     }
     Ok((setup_sample, out, cost))
 }
@@ -236,7 +339,9 @@ fn charge_sequence(
         InteractionStage::Action,
         OutcomeKind::from_observation(&observation) == OutcomeKind::Success,
     );
-    Ok(Some(data_sample(action, &before, &observation)))
+    let sample = data_sample(action, &before, &observation);
+    scheduler.observe(experiment_id, &observed_signature(&sample));
+    Ok(Some(sample))
 }
 
 /// Cost-aware collection. The caller supplies the strategy and the global
@@ -531,6 +636,37 @@ pub(super) fn collect_counterfactual_samples_scheduled(
         string_actions.insert(entry.action.clone(), variants);
     }
 
+    // Build competing DataProgram candidates from the already collected
+    // evidence, then predict each proposed sequence under every candidate.
+    // Predictions are attached before selection so discrimination per unit
+    // interaction cost can influence which experiments run.
+    let candidate_programs = synthesize_data_program(record).candidate_programs();
+    for candidate in &candidate_programs {
+        scheduler.register_candidate(candidate.id.clone(), candidate.description.clone());
+    }
+    let mut annotated = 0usize;
+    for proposal in scheduler.proposals().to_vec() {
+        if annotated >= 512
+            || !matches!(
+                proposal.stage,
+                ExperimentStage::Coverage | ExperimentStage::Causal | ExperimentStage::Prerequisite
+            )
+        {
+            continue;
+        }
+        let predictions = candidate_predictions(
+            &candidate_programs,
+            &proposal,
+            setup_name.as_deref(),
+            record,
+        );
+        let distinct: std::collections::BTreeSet<&String> = predictions.values().collect();
+        if distinct.len() > 1 {
+            scheduler.annotate_predictions(&proposal.id, predictions);
+            annotated += 1;
+        }
+    }
+
     scheduler.select();
 
     let mut setup_sample: Option<DataSample> = None;
@@ -613,7 +749,7 @@ pub(super) fn collect_counterfactual_samples_scheduled(
             record,
             &mut scheduler,
             &id,
-            setup_name.as_deref(),
+            None,
             &[],
             target_action,
         )?;

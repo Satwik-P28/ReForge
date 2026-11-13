@@ -666,6 +666,30 @@ fn check_expr_in_record(
             }
             Ok(OutputType::List)
         }
+        ValueExpr::CollectionFieldValues {
+            collection,
+            field,
+            sort_by: _,
+            filter,
+        } => {
+            ensure_collection(collection, collections)?;
+            if let Some(filter) = filter {
+                if !schema.has_record_field(collection, &filter.field) {
+                    return Err(OutputTypeError::UnknownRecordField {
+                        collection: collection.clone(),
+                        field: filter.field.clone(),
+                    });
+                }
+                check_expr_in_record(&filter.value, schema, collections, Some(collection))?;
+            }
+            if !schema.has_record_field(collection, field) {
+                return Err(OutputTypeError::UnknownRecordField {
+                    collection: collection.clone(),
+                    field: field.clone(),
+                });
+            }
+            Ok(OutputType::List)
+        }
     }
 }
 
@@ -917,9 +941,16 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
                 records(context.state, definition)
                     .iter()
                     .filter(|(_, record)| {
-                        wanted
-                            .as_ref()
-                            .is_some_and(|wanted| record.get(&filter.field) == Some(wanted))
+                        wanted.as_ref().is_some_and(|wanted| {
+                            if filter.member {
+                                record
+                                    .get(&filter.field)
+                                    .and_then(Value::as_array)
+                                    .is_some_and(|members| members.contains(wanted))
+                            } else {
+                                record.get(&filter.field) == Some(wanted)
+                            }
+                        })
                     })
                     .count() as u64,
             ))
@@ -1020,9 +1051,16 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
             if let Some(filter) = filter {
                 let wanted = eval_expr(&filter.value, context);
                 selected.retain(|(_, record)| {
-                    wanted
-                        .as_ref()
-                        .is_some_and(|wanted| record.get(&filter.field) == Some(wanted))
+                    wanted.as_ref().is_some_and(|wanted| {
+                        if filter.member {
+                            record
+                                .get(&filter.field)
+                                .and_then(Value::as_array)
+                                .is_some_and(|members| members.contains(wanted))
+                        } else {
+                            record.get(&filter.field) == Some(wanted)
+                        }
+                    })
                 });
             }
             let mut items: Vec<Value> = Vec::new();
@@ -1056,6 +1094,53 @@ pub fn eval_expr(expression: &ValueExpr, context: &EvalContext<'_>) -> Option<Va
                 });
             }
             Some(Value::Array(items))
+        }
+        ValueExpr::CollectionFieldValues {
+            collection,
+            field,
+            sort_by,
+            filter,
+        } => {
+            let definition = find_collection(context.collections, collection)?;
+            let mut selected = records(context.state, definition);
+            if let Some(filter) = filter {
+                let wanted = eval_expr(&filter.value, context);
+                selected.retain(|(_, record)| {
+                    wanted.as_ref().is_some_and(|wanted| {
+                        if filter.member {
+                            record
+                                .get(&filter.field)
+                                .and_then(Value::as_array)
+                                .is_some_and(|members| members.contains(wanted))
+                        } else {
+                            record.get(&filter.field) == Some(wanted)
+                        }
+                    })
+                });
+            }
+            if let Some(sort_by) = sort_by {
+                selected.sort_by_key(|(id, record)| {
+                    record
+                        .get(sort_by)
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| id.clone())
+                });
+            }
+            Some(Value::Array(
+                selected
+                    .into_iter()
+                    .filter_map(|(id, record)| {
+                        if field == &definition.id_field {
+                            record
+                                .get(field)
+                                .cloned()
+                                .or_else(|| Some(definition.id_kind.coerce(&id)))
+                        } else {
+                            record.get(field).cloned()
+                        }
+                    })
+                    .collect(),
+            ))
         }
     }
 }

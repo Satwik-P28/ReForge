@@ -224,6 +224,17 @@ impl ExecutionMemory {
         disposition: PositionDisposition,
     ) {
         if !matches!(collection.id_strategy, IdentityStrategy::Positional { .. }) {
+            // Persistent integer rows may expose compact positions after a
+            // deletion, but only when no explicit allocator counter preserves
+            // the vacated identity. A visible next-id counter is evidence that
+            // the target keeps stable identities.
+            if disposition == PositionDisposition::Compact
+                && collection.layout == CollectionLayout::List
+                && collection.id_kind == IdentityKind::Integer
+                && !has_identity_counter(state, collection)
+            {
+                compact_integer_state(state, collection);
+            }
             return;
         }
         self.ensure(state, collection);
@@ -572,12 +583,26 @@ pub enum ValueExpr {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filter: Option<CollectionFilter>,
     },
+    /// Project one scalar field from every record in a collection. This covers
+    /// read APIs that return a names/ids array rather than full records.
+    CollectionFieldValues {
+        collection: String,
+        field: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sort_by: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filter: Option<CollectionFilter>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CollectionFilter {
     pub field: String,
     pub value: Box<ValueExpr>,
+    /// When true, the record field is a list and the filter matches a member
+    /// of that list rather than the whole field.
+    #[serde(default)]
+    pub member: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1155,6 +1180,13 @@ pub struct StateSchema {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProgramCandidate {
+    pub id: String,
+    pub description: String,
+    pub program: DataProgram,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DataProgram {
     pub schema_version: String,
     pub target_id: String,
@@ -1338,7 +1370,7 @@ pub fn synthesize_data_program_with_samples(
                 })
                 .cloned()
                 .collect();
-            let hypotheses = select_error_guard_hypotheses(&candidates, &all, &code);
+            let hypotheses = select_error_guard_hypotheses(&candidates, &all, &code, &collections);
             if hypotheses.is_empty() {
                 unsupported.push(format!(
                     "action '{action}' rejection '{code}' has {} observation(s) but no guard separates it from success; condition left unknown",
@@ -1624,7 +1656,9 @@ pub fn synthesize_data_program_with_samples(
             ))
     });
 
+    refine_stateful_delete_dispositions(&mut rules, &collections);
     refine_positional_dispositions(&mut rules, &samples, &collections);
+    refine_secondary_updates(&mut rules, &samples, &collections);
 
     DataProgram {
         schema_version: DATA_PROGRAM_VERSION.into(),
@@ -2252,6 +2286,76 @@ impl DataProgram {
         } else {
             reproduced as f64 / support as f64
         }
+    }
+
+    /// Enumerate a small, deterministic set of competing programs derived from
+    /// the observed program. These are hypotheses, not target guesses: every
+    /// variant changes one ambiguity that the evidence itself leaves open.
+    pub fn candidate_programs(&self) -> Vec<ProgramCandidate> {
+        let mut out = vec![ProgramCandidate {
+            id: "base".into(),
+            description: "selected synthesis with current evidence".into(),
+            program: self.clone(),
+        }];
+        for (rule_index, rule) in self.rules.iter().enumerate() {
+            if rule.branch != RuleBranch::Success {
+                continue;
+            }
+            if !rule.effects.is_empty() {
+                let mut program = self.clone();
+                program.rules[rule_index].effects.clear();
+                out.push(ProgramCandidate {
+                    id: format!("noop:{}", rule.id),
+                    description: format!("treat '{}' as a state no-op", rule.action),
+                    program,
+                });
+            }
+            for (effect_index, effect) in rule.effects.iter().enumerate() {
+                let Effect::UpdateEntity { fields, .. } = effect else {
+                    continue;
+                };
+                for (field_index, update) in fields.iter().enumerate() {
+                    let FieldUpdate::AppendItem { field, value } = update else {
+                        continue;
+                    };
+                    let mut program = self.clone();
+                    if let Effect::UpdateEntity { fields, .. } =
+                        &mut program.rules[rule_index].effects[effect_index]
+                    {
+                        fields[field_index] = FieldUpdate::Set {
+                            field: field.clone(),
+                            value: ValueExpr::Array {
+                                items: vec![value.clone()],
+                            },
+                        };
+                    }
+                    out.push(ProgramCandidate {
+                        id: format!("replace:{}:{}", rule.id, field),
+                        description: format!("replace '{}' instead of appending to it", field),
+                        program,
+                    });
+                }
+            }
+        }
+        for (index, collection) in self.collections.iter().enumerate() {
+            if collection.layout == CollectionLayout::List
+                && collection.id_kind == IdentityKind::Integer
+                && matches!(collection.id_strategy, IdentityStrategy::Persistent)
+            {
+                let mut program = self.clone();
+                program.collections[index].id_strategy = IdentityStrategy::Positional { start: 1 };
+                out.push(ProgramCandidate {
+                    id: format!("positional:{}", collection.name),
+                    description: format!(
+                        "treat '{}' integer identities as compact display positions",
+                        collection.name
+                    ),
+                    program,
+                });
+            }
+        }
+        out.truncate(48);
+        out
     }
 }
 
@@ -3376,7 +3480,7 @@ fn counter_field(field: &str) -> bool {
 
 #[cfg(test)]
 fn select_error_guards(candidates: &[Candidate], all: &[Sample], code: &str) -> Option<Vec<Guard>> {
-    select_error_guard_hypotheses(candidates, all, code)
+    select_error_guard_hypotheses(candidates, all, code, &[])
         .into_iter()
         .next()
 }
@@ -3583,11 +3687,13 @@ fn guard_holds(guard: &Guard, state: &Value, params: &BTreeMap<String, Value>) -
 }
 
 fn entity_id(params: &BTreeMap<String, Value>, entity: &EntityRef) -> Option<String> {
-    let EntityRef::Param(param) = entity;
-    params
-        .get(param)
-        .and_then(|value| value.as_str())
-        .map(str::to_string)
+    match entity {
+        EntityRef::Param(param) => params
+            .get(param)
+            .and_then(|value| value.as_str())
+            .map(str::to_string),
+        EntityRef::Id(id) => Some(id.clone()),
+    }
 }
 
 fn entity_field(
@@ -3710,6 +3816,7 @@ fn select_error_guard_hypotheses(
     candidates: &[Candidate],
     all: &[Sample],
     code: &str,
+    collections: &[Collection],
 ) -> Vec<Vec<Guard>> {
     // A guard that separates this rejection from successes but also matches a
     // different rejection is not a discriminator between error rules; whichever
@@ -3836,9 +3943,226 @@ fn select_error_guard_hypotheses(
         }
     }
 
+    if hypotheses.is_empty() {
+        hypotheses = specific_error_guards(all, code, collections);
+    }
+
     let mut seen: BTreeSet<String> = BTreeSet::new();
     hypotheses.retain(|hypothesis| seen.insert(format!("{hypothesis:?}")));
     hypotheses
+}
+
+/// A rejection can be identified by a record that is present in every rejection
+/// pre-state and absent from every success pre-state. This supplies the missing
+/// duplicate/constant-record contrast without hard-coding an action or field.
+fn specific_error_guards(
+    all: &[Sample],
+    code: &str,
+    collections: &[Collection],
+) -> Vec<Vec<Guard>> {
+    let errors: Vec<&Sample> = all
+        .iter()
+        .filter(|sample| {
+            sample.outcome != OutcomeKind::Success && sample.error.as_deref() == Some(code)
+        })
+        .collect();
+    if errors.is_empty() {
+        return Vec::new();
+    }
+    let successes: Vec<&Sample> = all
+        .iter()
+        .filter(|sample| sample.outcome == OutcomeKind::Success)
+        .collect();
+    let mut out = Vec::new();
+    for collection in collections {
+        if collection.layout == CollectionLayout::Set {
+            continue;
+        }
+        let mut candidates: BTreeMap<(String, String), (Value, usize)> = BTreeMap::new();
+        for error in &errors {
+            for (_, record) in records(&error.before, collection) {
+                for (field, value) in &record {
+                    if field == &collection.id_field {
+                        continue;
+                    }
+                    if !(value.is_string() || value.is_number() || value.as_bool().is_some()) {
+                        continue;
+                    }
+                    let key = (field.clone(), value.to_string());
+                    let entry = candidates.entry(key).or_insert((value.clone(), 0));
+                    entry.1 += 1;
+                }
+            }
+        }
+        let mut candidates: Vec<((String, String), (Value, usize))> =
+            candidates.into_iter().collect();
+        candidates.sort_by(|((left, _), _), ((right, _), _)| {
+            code.split('_')
+                .filter(|part| left.contains(part))
+                .count()
+                .cmp(&code.split('_').filter(|part| right.contains(part)).count())
+                .reverse()
+                .then_with(|| left.cmp(right))
+        });
+        for ((field, _), (value, count)) in candidates {
+            if count != errors.len() {
+                continue;
+            }
+            if successes.iter().any(|success| {
+                records(&success.before, collection)
+                    .iter()
+                    .any(|(_, record)| record.get(&field) == Some(&value))
+            }) {
+                continue;
+            }
+            let created_by_success = successes.iter().any(|success| {
+                records(&success.after, collection)
+                    .iter()
+                    .any(|(_, record)| record.get(&field) == Some(&value))
+            });
+            if field_cardinality(&collection.name, &field, all) > 4 && !created_by_success {
+                continue;
+            }
+            out.push(vec![Guard::AnyEntityFieldCmp {
+                collection: collection.name.clone(),
+                field,
+                op: CmpOp::Eq,
+                value,
+            }]);
+            if out.len() >= 4 {
+                return out;
+            }
+        }
+    }
+    out
+}
+
+/// Preserve cross-record updates that a single representative success sample
+/// does not contain. For example, a second action can re-resolve an existing
+/// dependency record without creating anything new. The update is keyed by the
+/// observed identity, so it is only applied when that record is present.
+fn refine_secondary_updates(
+    rules: &mut [DataRule],
+    samples: &[Sample],
+    collections: &[Collection],
+) {
+    for rule in rules
+        .iter_mut()
+        .filter(|rule| rule.branch == RuleBranch::Success)
+    {
+        for collection in collections {
+            if collection.layout != CollectionLayout::List {
+                continue;
+            }
+            let already_updates = rule.effects.iter().any(|effect| match effect {
+                Effect::UpdateEntity {
+                    collection: name, ..
+                }
+                | Effect::UpdateWhere {
+                    collection: name, ..
+                } => name == &collection.name,
+                _ => false,
+            });
+            if already_updates {
+                continue;
+            }
+            let action_samples: Vec<&Sample> = samples
+                .iter()
+                .filter(|sample| {
+                    sample.action == rule.action
+                        && sample.outcome == OutcomeKind::Success
+                        && sample.evidence == EvidenceKind::Transition
+                })
+                .collect();
+            let action_samples: Vec<&Sample> = action_samples;
+            let already_deletes = rule.effects.iter().any(|effect| {
+                matches!(
+                    effect,
+                    Effect::DeleteEntity { collection: name, .. } if name == &collection.name
+                )
+            });
+            if !already_deletes {
+                for sample in &action_samples {
+                    let before = records(&sample.before, collection);
+                    let after = records(&sample.after, collection);
+                    for (id, _) in before {
+                        if after.iter().any(|(after_id, _)| after_id == &id) {
+                            continue;
+                        }
+                        let effect = Effect::DeleteEntity {
+                            collection: collection.name.clone(),
+                            entity: EntityRef::Id(id),
+                            disposition: PositionDisposition::Preserve,
+                        };
+                        if !rule.effects.contains(&effect) {
+                            rule.effects.push(effect);
+                        }
+                    }
+                }
+            }
+            for sample in &action_samples {
+                let before = records(&sample.before, collection);
+                let after = records(&sample.after, collection);
+                for (id, before_record) in &before {
+                    let Some(after_record) = after
+                        .iter()
+                        .find(|(after_id, _)| after_id == id)
+                        .map(|(_, record)| record)
+                    else {
+                        continue;
+                    };
+                    if rule.effects.iter().any(|effect| {
+                        matches!(
+                            effect,
+                            Effect::DeleteEntity { collection: name, entity: EntityRef::Id(target), .. }
+                                if name == &collection.name && target == id
+                        )
+                    }) {
+                        continue;
+                    }
+                    let created_here = rule.effects.iter().any(|effect| {
+                        matches!(
+                            effect,
+                            Effect::CreateEntity { collection: name, id: IdExpr::Expr { value: ValueExpr::Literal { value: Value::String(literal) } }, .. }
+                                if name == &collection.name && literal == id
+                        )
+                    });
+                    if created_here {
+                        continue;
+                    }
+                    let fields: Vec<FieldUpdate> = after_record
+                        .iter()
+                        .filter_map(|(field, value)| {
+                            if before_record.get(field) == Some(value) {
+                                None
+                            } else {
+                                Some(FieldUpdate::Set {
+                                    field: field.clone(),
+                                    value: ValueExpr::Literal {
+                                        value: value.clone(),
+                                    },
+                                })
+                            }
+                        })
+                        .collect();
+                    if fields.is_empty() {
+                        continue;
+                    }
+                    let mut filter = BTreeMap::new();
+                    filter.insert(collection.id_field.clone(), Value::String(id.clone()));
+                    let effect = Effect::UpdateWhere {
+                        collection: collection.name.clone(),
+                        filter,
+                        fields,
+                        first_only: true,
+                    };
+                    if !rule.effects.contains(&effect) {
+                        rule.effects.push(effect);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Use the next create after a deletion to distinguish a retained storage gap
@@ -4461,17 +4785,19 @@ fn update_fields(
             }
             (Some(Value::Array(previous)), Value::Array(next)) => {
                 let prefix = next.len() >= previous.len() && next[..previous.len()] == previous[..];
-                let appended: Vec<&Value> = if prefix {
-                    next[previous.len()..].iter().collect()
+                if prefix {
+                    for value in &next[previous.len()..] {
+                        updates.push(FieldUpdate::AppendItem {
+                            field: field.clone(),
+                            value: value_expr(value, sample, created),
+                        });
+                    }
                 } else {
-                    next.iter()
-                        .filter(|value| !previous.contains(value))
-                        .collect()
-                };
-                for value in appended {
-                    updates.push(FieldUpdate::AppendItem {
+                    // A non-prefix array change is not an append: elements were
+                    // removed or replaced. Keep the observed replacement array.
+                    updates.push(FieldUpdate::Set {
                         field: field.clone(),
-                        value: value_expr(value, sample, created),
+                        value: value_expr(&Value::Array(next.clone()), sample, created),
                     });
                 }
             }
@@ -5156,10 +5482,10 @@ fn guard_parameter_names(guard: &Guard) -> Vec<String> {
         | Guard::EntityFieldListEmpty { entity, .. }
         | Guard::EntityFieldListNonEmpty { entity, .. }
         | Guard::ParamCmpEntityField { entity, .. }
-        | Guard::ParamCmpDiff { entity, .. } => {
-            let EntityRef::Param(name) = entity;
-            names.push(name.clone());
-        }
+        | Guard::ParamCmpDiff { entity, .. } => match entity {
+            EntityRef::Param(name) => names.push(name.clone()),
+            EntityRef::Id(_) => {}
+        },
         _ => {}
     }
     match guard {
@@ -5192,8 +5518,9 @@ fn guard_parameter_names(guard: &Guard) -> Vec<String> {
             }
             TypedPredicate::OptionalParameter { param, .. } => names.push(param.clone()),
             TypedPredicate::Exists { entity, .. } | TypedPredicate::MemberOf { entity, .. } => {
-                let EntityRef::Param(name) = entity;
-                names.push(name.clone());
+                if let EntityRef::Param(name) = entity {
+                    names.push(name.clone());
+                }
             }
             _ => {}
         },
@@ -6151,6 +6478,20 @@ fn infer_outputs(
                 continue;
             }
         }
+        if let Some(expression) = infer_constant_selection(&key, successes, snapshot, collections) {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
+        if let Some(expression) =
+            infer_collection_field_values(&key, successes, snapshot, collections)
+        {
+            if output_matches_all(&key, &expression, successes, snapshot, collections) {
+                outputs.insert(key.clone(), expression);
+                continue;
+            }
+        }
         if let Some(expression) = infer_projection(&key, successes, snapshot, collections, &schema)
         {
             if output_matches_all(&key, &expression, successes, snapshot, collections) {
@@ -6368,6 +6709,7 @@ fn infer_filtered_count_output(
                     filter: CollectionFilter {
                         field: field.clone(),
                         value: Box::new(value),
+                        member: false,
                     },
                 };
                 if output_matches_all(key, &expression, successes, snapshot, collections) {
@@ -6618,6 +6960,203 @@ fn infer_state_shape_output(
 
 type ProjectionFieldSamples = BTreeMap<String, Vec<(String, Map<String, Value>, Value)>>;
 
+/// Infer a read API whose array output is the identities of records matching a
+/// constant predicate, and whose numeric sibling is the size of that selection.
+/// The predicate is induced from record values, including membership in a list
+/// field; no output key or action name is special-cased.
+fn infer_constant_selection(
+    key: &str,
+    successes: &[Sample],
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty() {
+        return None;
+    }
+    let array_output = carriers
+        .iter()
+        .all(|sample| sample.outputs.get(key).and_then(Value::as_array).is_some());
+    let numeric_output = carriers
+        .iter()
+        .all(|sample| sample.outputs.get(key).and_then(Value::as_u64).is_some());
+    if !array_output && !numeric_output {
+        return None;
+    }
+    for collection in collections {
+        if collection.layout == CollectionLayout::Set {
+            continue;
+        }
+        let mut predicates: Vec<(String, Value, bool)> = Vec::new();
+        for sample in &carriers {
+            for (_, record) in records(output_source(sample, snapshot), collection) {
+                for (field, value) in &record {
+                    if field == &collection.id_field {
+                        continue;
+                    }
+                    if let Some(members) = value.as_array() {
+                        for member in members {
+                            if member.is_string() || member.as_bool().is_some() {
+                                predicates.push((field.clone(), member.clone(), true));
+                            }
+                        }
+                    } else if value.is_string() || value.as_bool().is_some() {
+                        predicates.push((field.clone(), value.clone(), false));
+                    }
+                }
+            }
+        }
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        predicates
+            .retain(|(field, value, member)| seen.insert(format!("{field}:{value}:{member}")));
+        for (field, value, member) in predicates {
+            let mut matched = true;
+            let mut saw_selection = false;
+            for sample in &carriers {
+                let selected: Vec<(String, Map<String, Value>)> =
+                    records(output_source(sample, snapshot), collection)
+                        .into_iter()
+                        .filter(|(_, record)| {
+                            if member {
+                                record
+                                    .get(&field)
+                                    .and_then(Value::as_array)
+                                    .is_some_and(|members| members.contains(&value))
+                            } else {
+                                record.get(&field) == Some(&value)
+                            }
+                        })
+                        .collect();
+                if array_output {
+                    let Some(observed) = sample.outputs.get(key).and_then(Value::as_array) else {
+                        matched = false;
+                        break;
+                    };
+                    let ids: Vec<Value> = selected
+                        .iter()
+                        .map(|(id, _)| collection.id_kind.coerce(id))
+                        .collect();
+                    if &ids != observed {
+                        matched = false;
+                        break;
+                    }
+                } else {
+                    let Some(observed) = sample.outputs.get(key).and_then(Value::as_u64) else {
+                        matched = false;
+                        break;
+                    };
+                    if selected.len() as u64 != observed {
+                        matched = false;
+                        break;
+                    }
+                }
+                saw_selection |= !selected.is_empty();
+            }
+            if !matched || !saw_selection {
+                continue;
+            }
+            let filter = CollectionFilter {
+                field,
+                value: Box::new(ValueExpr::Literal { value }),
+                member,
+            };
+            if array_output {
+                return Some(ValueExpr::CollectionFieldValues {
+                    collection: collection.name.clone(),
+                    field: collection.id_field.clone(),
+                    sort_by: None,
+                    filter: Some(filter),
+                });
+            }
+            return Some(ValueExpr::FilteredCount {
+                collection: collection.name.clone(),
+                filter,
+            });
+        }
+    }
+    None
+}
+
+/// Infer a read API that returns one scalar field from every record (for
+/// example a package-name list). This is deliberately narrower than a full
+/// record projection: every observed array element must equal the corresponding
+/// record field in collection order.
+fn infer_collection_field_values(
+    key: &str,
+    successes: &[Sample],
+    snapshot: OutputSnapshot,
+    collections: &[Collection],
+) -> Option<ValueExpr> {
+    let carriers: Vec<&Sample> = successes
+        .iter()
+        .filter(|sample| sample.outputs.contains_key(key))
+        .collect();
+    if carriers.is_empty()
+        || carriers
+            .iter()
+            .any(|sample| sample.outputs.get(key).and_then(Value::as_array).is_none())
+    {
+        return None;
+    }
+    for collection in collections {
+        if collection.layout == CollectionLayout::Set {
+            continue;
+        }
+        let mut fields: BTreeSet<String> = BTreeSet::new();
+        for sample in &carriers {
+            for (_, record) in records(output_source(sample, snapshot), collection) {
+                fields.extend(record.keys().cloned());
+            }
+        }
+        fields.insert(collection.id_field.clone());
+        for field in fields {
+            if field.is_empty() {
+                continue;
+            }
+            let mut matched = true;
+            let mut saw_nonempty = false;
+            for sample in &carriers {
+                let Some(observed) = sample.outputs.get(key).and_then(Value::as_array) else {
+                    matched = false;
+                    break;
+                };
+                let values: Vec<Value> = records(output_source(sample, snapshot), collection)
+                    .into_iter()
+                    .filter_map(|(id, record)| {
+                        if field == collection.id_field {
+                            record
+                                .get(&field)
+                                .cloned()
+                                .or_else(|| Some(collection.id_kind.coerce(&id)))
+                        } else {
+                            record.get(&field).cloned()
+                        }
+                    })
+                    .collect();
+                if &values != observed {
+                    matched = false;
+                    break;
+                }
+                if !observed.is_empty() {
+                    saw_nonempty = true;
+                }
+            }
+            if matched && saw_nonempty {
+                return Some(ValueExpr::CollectionFieldValues {
+                    collection: collection.name.clone(),
+                    field,
+                    sort_by: None,
+                    filter: None,
+                });
+            }
+        }
+    }
+    None
+}
+
 fn infer_projection(
     key: &str,
     successes: &[Sample],
@@ -6861,6 +7400,7 @@ fn infer_projection(
             CollectionFilter {
                 field,
                 value: Box::new(value),
+                member: false,
             }
         });
         return Some(ValueExpr::CollectionProjection {
@@ -7765,6 +8305,80 @@ fn deletion_disposition(collection: &Collection, after: &Value) -> PositionDispo
     }
 }
 
+/// A deletion that also recomputes a scalar aggregate is evidence that the
+/// collection keeps stable row identities; do not infer display compaction for
+/// that rule merely because one post-delete sample happened to look dense.
+fn refine_stateful_delete_dispositions(rules: &mut [DataRule], collections: &[Collection]) {
+    for rule in rules
+        .iter_mut()
+        .filter(|rule| rule.branch == RuleBranch::Success)
+    {
+        let updates_state = rule.effects.iter().any(|effect| {
+            matches!(
+                effect,
+                Effect::SetState { .. } | Effect::IncrementState { .. }
+            )
+        });
+        if !updates_state {
+            continue;
+        }
+        for effect in &mut rule.effects {
+            let Effect::DeleteEntity {
+                collection,
+                disposition,
+                ..
+            } = effect
+            else {
+                continue;
+            };
+            let Some(definition) = collections.iter().find(|item| &item.name == collection) else {
+                continue;
+            };
+            if definition.layout == CollectionLayout::List
+                && definition.id_kind == IdentityKind::Integer
+                && matches!(definition.id_strategy, IdentityStrategy::Persistent)
+            {
+                *disposition = PositionDisposition::Preserve;
+            }
+        }
+    }
+}
+
+fn has_identity_counter(state: &Value, collection: &Collection) -> bool {
+    let Some(object) = state.as_object() else {
+        return false;
+    };
+    let singular = collection
+        .name
+        .strip_suffix('s')
+        .unwrap_or(&collection.name);
+    object.keys().any(|key| {
+        key == "next_id"
+            || key == &format!("next_{singular}")
+            || key == &format!("next_{}", collection.name)
+            || key == &format!("{singular}_next_id")
+            || key == &format!("{}_next_id", collection.name)
+    })
+}
+
+fn compact_integer_state(state: &mut Value, collection: &Collection) {
+    if collection.layout != CollectionLayout::List || collection.id_kind != IdentityKind::Integer {
+        return;
+    }
+    let Some(items) = state
+        .get_mut(&collection.name)
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    for (offset, item) in items.iter_mut().enumerate() {
+        let Some(record) = item.as_object_mut() else {
+            continue;
+        };
+        record.insert(collection.id_field.clone(), Value::from(offset as i64 + 1));
+    }
+}
+
 fn compact_positional_state(state: &mut Value, collection: &Collection) {
     let IdentityStrategy::Positional { start } = collection.id_strategy else {
         return;
@@ -7785,6 +8399,15 @@ fn compact_positional_state(state: &mut Value, collection: &Collection) {
             collection.id_kind.coerce(&identity.to_string()),
         );
     }
+}
+
+fn identity_order(left: &str, right: &str, kind: IdentityKind) -> std::cmp::Ordering {
+    if kind == IdentityKind::Integer {
+        if let (Ok(left), Ok(right)) = (left.parse::<i64>(), right.parse::<i64>()) {
+            return left.cmp(&right);
+        }
+    }
+    left.cmp(right)
 }
 
 fn apply_effect(
@@ -7869,7 +8492,29 @@ fn apply_effect(
                         object.insert(definition.id_field.clone(), definition.id_kind.coerce(&id));
                     }
                     if let Some(items) = state.get_mut(collection).and_then(Value::as_array_mut) {
-                        items.push(record);
+                        // Identities are unique. Re-creating an existing one
+                        // updates that record in place instead of appending a
+                        // duplicate (which would also reorder a list).
+                        if let Some(existing) = items.iter_mut().find(|item| {
+                            item.get(&definition.id_field)
+                                .and_then(identity_string)
+                                .is_some_and(|existing| existing == id)
+                        }) {
+                            *existing = record;
+                        } else {
+                            let position = items
+                                .iter()
+                                .position(|item| {
+                                    item.get(&definition.id_field)
+                                        .and_then(identity_string)
+                                        .is_some_and(|existing| {
+                                            identity_order(&existing, &id, definition.id_kind)
+                                                == std::cmp::Ordering::Greater
+                                        })
+                                })
+                                .unwrap_or(items.len());
+                            items.insert(position, record);
+                        }
                     }
                 }
                 CollectionLayout::Set => {}
@@ -8825,18 +9470,6 @@ mod tests {
             .iter()
             .any(|c| c.name == "contacts" && c.layout == CollectionLayout::Map));
         let candidates = guard_candidates(&tag_all, &cols);
-        eprintln!(
-            "COLS {:?} RECORDS {:?}",
-            cols,
-            records(&tag_all[0].before, &cols[0])
-        );
-        eprintln!(
-            "TAG ALL {:?}",
-            candidates
-                .iter()
-                .map(|c| format!("{:?} T{:?}", c.guard, c.truth))
-                .collect::<Vec<_>>()
-        );
         let guards =
             select_error_guards(&candidates, &tag_all, "duplicate_tag").expect("tag guard");
         assert!(format!("{guards:?}").contains("tags"));
@@ -9186,7 +9819,6 @@ mod tests {
             id_strategy: IdentityStrategy::Persistent,
         }];
         let outputs = infer_outputs(&[s], OutputSnapshot::Post, &collections);
-        eprintln!("OUTPUTS {:?}", outputs);
         assert!(matches!(
             outputs.get("tasks"),
             Some(ValueExpr::CollectionProjection { .. })
@@ -9481,7 +10113,7 @@ mod tests {
             ),
         ];
         let candidates = guard_candidates(&all, &[]);
-        let hypotheses = select_error_guard_hypotheses(&candidates, &all, "wrong_step");
+        let hypotheses = select_error_guard_hypotheses(&candidates, &all, "wrong_step", &[]);
         assert!(
             !hypotheses.is_empty(),
             "multi-stage view guard was filtered out"
@@ -10453,6 +11085,7 @@ mod tests {
                     name: name.into(),
                     identity,
                 }),
+                member: false,
             }),
         }
     }
