@@ -30,6 +30,22 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | BENCH-102 | verified-under-test | Counterfactual cost accounting includes candidate phase and every reset/setup/action/observation | `phase10-dev-final4.json`: 94 and 108 reference interactions, `step_accounting_complete=true` | verified-under-test | No analysis-provider cost in this cell |
 | OPS-014 | implemented | Negative and blocked external checks retained | External v3 restored from pinned tools and passed 49/49; Phase 6.6 rerun at 26/39 retained | implemented | Must keep reporting blockers explicitly |
 
+## Phase 11 change table
+
+| Requirement ID | Status before | What changed | Verification evidence | Status after | Remaining gap |
+| --- | --- | --- | --- | --- | --- |
+| ACT-004 | verified-under-test | Isolated the Phase 10 semantic repairs from the scheduler with a controlled five-arm ablation; repairs account for the entire 11→30 step gain | Arms A/B/C/D/P on the frozen development suite; `docs/benchmarks/phase11/summary.json` | verified-under-test | Repairs do not transfer: untouched 8/40, 1/10 |
+| ACT-006 | verified-under-test | Added candidate calibration records (predicted vs realized discrimination, resolution state) and path projection; ablation shows scheduling adds zero matching steps | `experiments::tests`, 5 contrast tests; arm C 30/37 vs arm D 30/37; base predictions matched 2/26 (D) and 0/27 (P) | verified-under-test | Scheduler orders on a signal that is mostly wrong; no measured benefit |
+| BENCH-02 | verified-under-test | Frozen untouched suite built and run on two never-used targets; transfer measured as zero | `benchmarks/phase11-untouched/FREEZE.json` (19 files, source `17606a4`), preflight `ok`, arms A/D/P each 8/40 steps and 1/10 workflows | verified-under-test | No transfer; untouched generalization unproven |
+| BENCH-03 | verified-under-test | Historical regressions re-run against the Phase 11 binary and unchanged from Phase 10 | final2 82/84, final3 25/25, final4 11/11, final5 19/19, final8 21/21, Phase 6.3 34/34, notecli 23/23, Phase 6.6 26/39, External v3 49/49 | verified-under-test | Coverage still narrow |
+| BENCH-105 | verified-under-test | Freeze and preflight repeated for a new untouched suite before execution, with no retuning after freeze | `preflight.py ok: true`; `FREEZE.json` hashes 19 files, both target binaries and contracts | verified-under-test | Freeze covers this phase only |
+| BENCH-106 | verified-under-test | Two applications never used in any prior suite or example evaluated exactly as frozen | `SELECTION.md`, `TARGET_EXCLUSION.json`, registry audit | verified-under-test | Must not tune these targets later |
+| BENCH-107 | verified-under-test | Negative transfer preserved and reported as the headline result | `docs/research/phase11-causal-ablation-and-untouched-transfer.md` §8 | verified-under-test | Must keep reporting |
+| BENCH-111 | implemented | Untouched scores labelled as untouched and not as generalization; scheduler benefit explicitly reported as zero | Phase 11 report and summary | implemented | Must keep labels |
+| CAP-002 | verified-under-test | Extracted a capability from an untouched target, validated provenance, composed it with an authored capability, removed the reference binary, ran unseen sequences, restarted, exported and executed independently | `capability.extracted.756a986d`, digest `5f6cd88b…`, 33 evidence payloads; exported runner rebuilt and ran | verified-under-test | Package is partial: rollback and rejection behavior unfaithful |
+| OPS-007 | verified-under-test | Full workspace gate re-run on the Phase 11 tree | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `git diff --check` | verified-under-test | Browser tests unprovisioned; no CI |
+| OPS-012 | blocked | Phase 11 commits carry no co-author or generated-by trailer | `git log 17606a4` and the Phase 11 artifact commit | implemented for this phase | Earlier trailer cannot be removed without rewriting history |
+
 ## Requirement matrix
 
 ### User journeys (USR)
@@ -105,7 +121,7 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | ACT-003 | implemented | Baseline/pre/post/reset epochs and absent-persistence handling | Lazy initialization is only partially modeled |
 | ACT-004 | verified-under-test | Causal deltas and competing effects, plus Phase 10 replacement, duplicate, filtered-projection, secondary-update and identity semantics | Some nested/conditional cases remain ambiguous or unsupported |
 | ACT-005 | implemented | Typed parameter identity; integer/string/null/generated distinctions | No exhaustive parameter-class coverage |
-| ACT-006 | verified-under-test | Phase 10 candidate-aware scheduler: competing `DataProgram` candidates, candidate disagreement, selection by discrimination per interaction cost, decision/elimination logs, uncertainty fallback; four scheduler unit tests and frozen npm/buku development run | No proof of optimal distinguishing experiments; full-state candidate simulation sometimes falls back to status/error discrimination |
+| ACT-006 | verified-under-test | Phase 10 candidate-aware scheduler: competing `DataProgram` candidates, candidate disagreement, selection by discrimination per interaction cost, decision/elimination logs, uncertainty fallback; four scheduler unit tests and frozen npm/buku development run. Phase 11 ablation measures its contribution at zero matching steps over the semantic repairs, and adds predicted-vs-realized calibration records | No proof of optimal distinguishing experiments; predictions match realized state in only 2/26 and 0/27 scored cases; full-state candidate simulation falls back to status/error discrimination |
 | ACT-007 | verified-under-test | Repeated proposals counted as zero in benchmark accounting | Deduplication is heuristic, not formally complete |
 | ACT-008 | verified-under-test | Benchmark counts resets, setup, actions, observations, verification | Analysis-provider cost is recorded but not uniformly in every suite |
 | ACT-009 | verified-under-test | Global budget exhaustion yields partial results with accounting | No repair strategy after exhaustion |
@@ -239,7 +255,7 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | ID | Status | Evidence | Remaining acceptance gap |
 | --- | --- | --- | --- |
 | BENCH-01 | prototype | Coverage/policy transition metrics on frozen CLI suites | No hidden-feature recall under a fixed total interaction budget across domains |
-| BENCH-02 | verified-under-test | Phase 8 frozen development suite improved from 11/37 to 30/37 steps and 0/8 to 6/8 workflows under untouched scoring; candidate scheduler accounting recorded | Development result only; no fresh external freeze or broad independent generalization |
+| BENCH-02 | verified-under-test | Phase 8 frozen development suite improved from 11/37 to 30/37 steps and 0/8 to 6/8 workflows under untouched scoring; Phase 11 frozen untouched suite (changesets 2.27.9, dbmate 2.20.0) measured 8/40 steps and 1/10 workflows for Phase 9, Phase 10 and Phase 11 alike | Development gain is real but does not transfer; no broad independent generalization |
 | BENCH-03 | verified-under-test | Frozen development: 6/8 npm/buku workflows, 0 divergences. Historical reruns: final2 82/84, final3 25/25, final4 11/11, final5 19/19, final8 21/21, Phase 6.3 34/34, notecli 23/23, Phase 6.6 26/39, External v3 49/49 after pinned-tool restoration | No fresh external suite frozen; no new external transfer claim |
 | BENCH-04 | not-started | No visual fidelity benchmark | Viewports/screenshots absent |
 | BENCH-05 | prototype | Composition e2e tests | No benchmark track for cross-feature correctness/invariants |
@@ -256,7 +272,7 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | BENCH-108 | prototype | Standalone exported programs and raw local artifacts exist | Raw artifacts are gitignored; licensing/reproducibility incomplete |
 | BENCH-109 | verified-under-test | State/status/error/output/event/persistence/workflow metrics separated | Visual channels absent |
 | BENCH-110 | verified-under-test | npm/buku and External v3 are third-party software | Coverage remains narrow |
-| BENCH-111 | implemented | Phase 10 report labels 30/37 and 6/8 as development scores only, not generalization | Must keep labels |
+| BENCH-111 | implemented | Phase 10 report labels 30/37 and 6/8 as development scores only; Phase 11 reports untouched 8/40 as untouched and states the scheduler benefit as zero | Must keep labels |
 | BENCH-112 | verified-under-test | Phase 7 REA source-assisted arm measured a neutral/negative benefit | Guidance remains unproven |
 
 ### Security and rights (SEC)
@@ -301,7 +317,7 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | --- | --- | --- | --- |
 | M0 Preserve/consolidate | prototype | HEAD/tree verified; build/tests pass; Phase 8 freeze intact | No remote backup; clean-checkout reproduction not yet recorded |
 | M1 REA-powered investigation | prototype | Real REA 6.7.0 analysis, raw evidence and matched arms | No measured reconstruction benefit |
-| M2 Verified functional extraction | prototype | Phase 7 Taskbook capability; Phase 10 development 30/37 npm/buku and 6/8 workflows; independent extraction/export tests still pass | Development suite only; no fully matching unfamiliar external workflow |
+| M2 Verified functional extraction | prototype | Phase 7 Taskbook capability; Phase 10 development 30/37 npm/buku and 6/8 workflows; Phase 11 extracted a dbmate capability, ran it without the reference binary, exported and executed it; independent extraction/export tests still pass | Untouched reconstruction 8/40; the extracted package is partial and unfaithful on rollback/rejection |
 | M3 Portable Capability Package | prototype | Extracted package loads/runs independently; import/export tests | Partial abstract machine; broad package acceptance not met |
 | M4 First behavior-aware composition | verified-under-test | Notes+Tasks and Inventory+Tasks e2e, persistence/restart | Authored capabilities, not two unfamiliar extracted ones |
 | M5 Studio/Evidence Inspector | not-started | Studio Lite has only composition/package/verify/export endpoints | No Explorer/Evidence Inspector |
@@ -315,7 +331,7 @@ Status vocabulary follows RFM-001 §0.2: `not-started`, `research`, `prototype`,
 | --- | --- | --- | --- |
 | A. REA structured evidence enters graph | partial / verified-under-test for Taskbook | Phase 7 REA raw/projection/graph | No broad target coverage; no measurable benefit |
 | B. Structural evidence informs hypothesis | partial | REA guidance recorded; matched arms neutral | No demonstrated causal influence on final rules |
-| C. New-input stateful reconstruction | partial | Phase 7/8/9 independent execution tests; Phase 10 development 30/37, 6/8 workflows | Development suite only; no fresh untouched external evaluation |
+| C. New-input stateful reconstruction | partial | Phase 7/8/9 independent execution tests; Phase 10 development 30/37, 6/8 workflows; Phase 11 untouched 8/40, 1/10 with zero transfer from the development repairs | Fresh untouched evaluation exists and fails; generalization not demonstrated |
 | D. Importable executable capability | partial | Extraction/package tests; Taskbook package | Partial abstract machine; broad package gate unmet |
 | E. Two-capability composition | verified-under-test | Notes+Tasks and Inventory+Tasks e2e | Authored fixtures, not arbitrary extracted capabilities |
 | F. Honest evidence/capability/verification UI | not-started | Studio Lite limited endpoints | No Evidence Inspector/Verification Center |
