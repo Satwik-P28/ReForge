@@ -1,0 +1,89 @@
+{
+  "target_id": "cli-desk",
+  "target_name": "desk",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/desk.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase63-work-desk",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "open",
+      "argv": [
+        "open",
+        "$subject"
+      ],
+      "params": {
+        "subject": {
+          "kind": "fresh_id",
+          "prefix": "topic"
+        }
+      }
+    },
+    {
+      "action": "assign",
+      "argv": [
+        "assign",
+        "$ticket_id",
+        "$agent"
+      ],
+      "params": {
+        "ticket_id": {
+          "kind": "last_entity",
+          "pool": "ticket"
+        },
+        "agent": {
+          "kind": "literal",
+          "value": {
+            "kind": "string",
+            "value": "ada"
+          }
+        }
+      }
+    },
+    {
+      "action": "escalate",
+      "argv": [
+        "escalate",
+        "$ticket_id"
+      ],
+      "params": {
+        "ticket_id": {
+          "kind": "last_entity",
+          "pool": "ticket"
+        }
+      }
+    },
+    {
+      "action": "close",
+      "argv": [
+        "close",
+        "$ticket_id"
+      ],
+      "params": {
+        "ticket_id": {
+          "kind": "last_entity",
+          "pool": "ticket"
+        }
+      }
+    },
+    {
+      "action": "list",
+      "argv": [
+        "list"
+      ]
+    },
+    {
+      "action": "stats",
+      "argv": [
+        "stats"
+      ]
+    }
+  ]
+}

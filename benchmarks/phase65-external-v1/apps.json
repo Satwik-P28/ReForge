@@ -1,0 +1,5 @@
+{
+  "suite": "reforgebench-phase65-external",
+  "description": "Independently authored note-management application with numeric allocators, nested tags, derived counters and referential guards.",
+  "apps": [{"spec": "benchmarks/phase65-external-v1/fixtures/notecli/target.json", "split": "holdout"}]
+}

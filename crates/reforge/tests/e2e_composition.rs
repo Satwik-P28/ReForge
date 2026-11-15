@@ -203,8 +203,10 @@ fn independent_expectation_with_counterexample() {
 fn inventory_tasks_second_composition() {
     let path = root().join("examples/compositions/inventory-tasks/composition.json");
     let compiled = compile_file(&path).expect("compile inventory-tasks");
+    let tmp = tempfile::tempdir().unwrap();
+    let db = tmp.path().join("inventory.sqlite");
     let mut rt = AppRuntime::from_compile(compiled).unwrap();
-    rt.attach_memory_db().unwrap();
+    rt.attach_sqlite(&db).unwrap();
     rt.dispatch(
         "inventory",
         "add_item",
@@ -226,10 +228,40 @@ fn inventory_tasks_second_composition() {
         )
         .unwrap();
     assert!(matches!(reserved.step.result, StepResult::Success));
-    // Binding should have attempted create_task; may succeed via propagated.
+    assert_eq!(
+        reserved.propagated.len(),
+        1,
+        "reserve must emit exactly one bound event"
+    );
+    let child = &reserved.propagated[0];
+    assert_eq!(child.instance, "tasks");
+    assert_eq!(child.action, "create_task");
     assert!(
-        !reserved.propagated.is_empty()
-            || rt.dispatch("tasks", "query_tasks", IndexMap::new()).is_ok()
+        matches!(child.step.result, StepResult::Success),
+        "the bound fulfillment command must execute: {:?}",
+        child.step.result
+    );
+    let query = rt
+        .dispatch("tasks", "query_tasks", IndexMap::new())
+        .unwrap();
+    assert!(
+        format!("{:?}", query.step.outputs).contains("SKU-1"),
+        "reservation event must create a task keyed by the reserved sku: {:?}",
+        query.step.outputs
+    );
+
+    // The composed effect and both instance states must survive a restart.
+    drop(rt);
+    let compiled = compile_file(&path).unwrap();
+    let mut rt2 = AppRuntime::from_compile(compiled).unwrap();
+    rt2.attach_sqlite(&db).unwrap();
+    let query = rt2
+        .dispatch("tasks", "query_tasks", IndexMap::new())
+        .unwrap();
+    assert!(
+        format!("{:?}", query.step.outputs).contains("SKU-1"),
+        "the fulfillment task must persist across restart: {:?}",
+        query.step.outputs
     );
 }
 

@@ -1,0 +1,21 @@
+{
+  "target_id": "cli-vault",
+  "target_name": "vault",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase66-work-vault-v1",
+  "state_file": "state.json",
+  "timeout_ms": 15000,
+  "actions": [
+    {"action": "create", "argv": ["create", "$label"], "params": {"label": {"kind": "fresh_id", "prefix": "bucket"}}},
+    {"action": "put", "argv": ["put", "$bucket_id", "$key"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}, "key": {"kind": "fresh_id", "prefix": "entry"}}},
+    {"action": "publish", "argv": ["publish", "$bucket_id"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}}},
+    {"action": "archive", "argv": ["archive", "$bucket_id"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}}},
+    {"action": "drop", "argv": ["drop", "$bucket_id"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}}},
+    {"action": "show", "argv": ["show", "$bucket_id"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}}},
+    {"action": "set_owner", "argv": ["set_owner", "$bucket_id", "$owner"], "params": {"bucket_id": {"kind": "last_entity", "pool": "bucket"}, "owner": {"kind": "fresh_id", "prefix": "owner"}}},
+    {"action": "stats", "argv": ["stats"]}
+  ]
+}

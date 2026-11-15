@@ -1,0 +1,10 @@
+account Assets:Cash
+account Equity:Opening
+account Expenses:Food
+account Expenses:Rent
+account Income:Salary
+
+2026-01-01 Opening balance
+    Assets:Cash        100.00
+    Equity:Opening
+

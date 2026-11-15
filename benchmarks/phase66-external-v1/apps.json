@@ -1,0 +1,14 @@
+{
+  "suite": "reforgebench-phase66-external",
+  "description": "Internally authored two-application holdout authored after Phase 6.6: numeric-ID list storage with nesting and string-ID map storage with nullable outputs. Not third-party independent.",
+  "apps": [
+    {
+      "spec": "benchmarks/phase66-external-v1/fixtures/parcel/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "benchmarks/phase66-external-v1/fixtures/vault/target.json",
+      "split": "holdout"
+    }
+  ]
+}

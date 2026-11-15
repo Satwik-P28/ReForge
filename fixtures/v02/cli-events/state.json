@@ -1,0 +1,8 @@
+{
+  "acked": 0,
+  "next_event": 1,
+  "processed": 0,
+  "queue": [],
+  "subscribers": [],
+  "view": "idle"
+}

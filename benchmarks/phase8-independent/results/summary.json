@@ -1,0 +1,251 @@
+{
+  "phase": 8,
+  "evaluation": "independent_generalization_audit",
+  "generated_utc": "2026-11-11",
+  "source": {
+    "branch": "develop/neural-symbolic",
+    "initial_head": "b10e7307fdb8346d74893aa3d48683e8448bfe35",
+    "harness_head": "321dececf973a3bb2528ba1b872beaea5c0ad258",
+    "harness_tree": "642c5c6abfed1b896cf4d11fd604af320b2dcfe5",
+    "local_checkpoint_branch": "phase8-source-checkpoint",
+    "pushed": false,
+    "main_modified": false
+  },
+  "master_spec": {
+    "status": "blocked",
+    "requested_ref": "docs/reforge-master-spec-v1",
+    "requested_commit": "411a81af305afa69d7e5ee67e14408e976f3ab8e",
+    "reason": "The authenticated fetch exposed only main; the requested branch/ref and source commit are absent locally. No substitute was created and no compliance matrix is claimed."
+  },
+  "targets": {
+    "exclusion_registry": "benchmarks/phase8-independent/TARGET_EXCLUSION.json",
+    "selection_record": "benchmarks/phase8-independent/SELECTION.md",
+    "selected": [
+      {
+        "id": "npm-cli-11.20.0",
+        "family": "JavaScript/Node CLI",
+        "persistence": "local package files, package-lock.json and node_modules",
+        "why_unfamiliar": "Never used in ReForge development or tuning; not a version variant of a prior target."
+      },
+      {
+        "id": "buku-5.1",
+        "family": "Python/SQLite CLI",
+        "persistence": "SQLite bookmark database under isolated XDG_DATA_HOME",
+        "why_unfamiliar": "Never used in ReForge development or tuning; different language, persistence and record model."
+      }
+    ]
+  },
+  "freeze": {
+    "path": "benchmarks/phase8-independent/FREEZE.json",
+    "sha256": "b23160658c422a48ae43d6d8335e44561969a9d130a8b9adc498274b97c489b5",
+    "frozen_before_first_evaluation": true,
+    "budgets": [32, 64, 128],
+    "seeds": [1, 2, 3],
+    "policy": "coverage",
+    "experiment_strategy": "hybrid",
+    "experiment_budget": 128,
+    "scoring": "state, status, error, outputs, events, persistence and restart; excluded steps are not passes"
+  },
+  "preflight": {
+    "status": "passed_before_freeze",
+    "checks": [
+      "pinned executable and source hashes",
+      "launch and termination",
+      "valid and invalid action encoding",
+      "typed parameter schemas",
+      "reference output schemas",
+      "state observation consistency",
+      "asynchronous persistence completion",
+      "reset isolation",
+      "restart persistence",
+      "multiple independent work directories",
+      "hidden workflow executability",
+      "REA compatibility",
+      "black-box source separation",
+      "scoring semantics",
+      "artifact hashing"
+    ]
+  },
+  "interaction_accounting": {
+    "black_box_32_seed1_npm": {"reference_interactions": 100, "action_executions": 35, "state_observations": 23, "resets": 23, "setup_actions": 19, "verification_operations": 3, "failed_experiments": 0, "repeated_proposals": 0, "selected_experiments": 28, "completed_experiments": 28, "budget": 128, "spent": 100, "remaining": 28},
+    "black_box_32_seed1_buku": {"reference_interactions": 118, "action_executions": 46, "state_observations": 26, "resets": 26, "setup_actions": 20, "verification_operations": 3, "failed_experiments": 0, "repeated_proposals": 0, "selected_experiments": 27, "completed_experiments": 27, "budget": 128, "spent": 118, "remaining": 10},
+    "rea_analysis_ms": 156104,
+    "rea_total_runtime_ms": 191228,
+    "note": "The REA arm used the same benchmark investigation accounting; its additional cost is source analysis."
+  },
+  "black_box": {
+    "denominator": {
+      "hidden_steps": 37,
+      "workflows": 8,
+      "note": "The 32/2 and 32/3 JSON files accumulate prior seed records; the per-seed increments below are derived from those preserved files and are not presented as single-cell file totals."
+    },
+    "runs": [
+      {
+        "budget": 32,
+        "seed": 1,
+        "steps_attempted": 37,
+        "matching_steps": 1,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "unverified_steps": 1,
+        "excluded_steps": 28,
+        "divergences": 7,
+        "runtime_ms": 29289,
+        "artifact": "bench-results/phase8-blackbox-32-s1.json",
+        "sha256": "9a1bdd98846a4447d7d5f8846859ba00d823932ac7274d8a4fcb78506fd2ee04"
+      },
+      {
+        "budget": 32,
+        "seed": 2,
+        "steps_attempted": 37,
+        "matching_steps": 1,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "unverified_steps": 1,
+        "excluded_steps": 28,
+        "divergences": 7,
+        "note": "Incremental result; preserved file contains cumulative seed 1 + seed 2 totals (2/74).",
+        "artifact": "bench-results/phase8-blackbox-32-s2.json",
+        "sha256": "9004ffd5b5bff881bf845e01e7cb7fe31591a87de34ec772a4b8186bbbb38110"
+      },
+      {
+        "budget": 32,
+        "seed": 3,
+        "steps_attempted": 37,
+        "matching_steps": 1,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "unverified_steps": 1,
+        "excluded_steps": 28,
+        "divergences": 7,
+        "note": "Incremental result; preserved file contains cumulative seed 1 + seed 2 + seed 3 totals (3/111).",
+        "artifact": "bench-results/phase8-blackbox-32-s3.json",
+        "sha256": "4ffe1d86f6dbd77f8fa7aea8c4edd353a144a02a29e70673337e8aea0efc8407"
+      },
+      {
+        "budget": 64,
+        "seed": 1,
+        "steps_attempted": 37,
+        "matching_steps": 1,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "unverified_steps": 1,
+        "excluded_steps": 28,
+        "divergences": 7,
+        "runtime_ms": 58299,
+        "artifact": "bench-results/phase8-blackbox-64-s1.json",
+        "sha256": "3e87204cd345a1cb9d4346b5f10c8ef65c574ac379014594beeb501af4d226f9"
+      },
+      {
+        "budget": 128,
+        "seed": 1,
+        "steps_attempted": 37,
+        "matching_steps": 1,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "unverified_steps": 1,
+        "excluded_steps": 28,
+        "divergences": 7,
+        "runtime_ms": 116170,
+        "artifact": "bench-results/phase8-blackbox-128-s1.json",
+        "sha256": "34fda68ebb1a70b270f066e83538383a36bfc208f879154bceba61ca59f0e01b"
+      }
+    ]
+  },
+  "rea_guided": {
+    "budget": 32,
+    "seed": 1,
+    "steps_attempted": 37,
+    "matching_steps": 1,
+    "workflows_fully_matching": 0,
+    "workflows_attempted": 8,
+    "unverified_steps": 1,
+    "excluded_steps": 28,
+    "divergences": 7,
+    "rea_version": "6.7.0",
+    "rea_source": "target/phase8-tools/npm-src/package",
+    "rea_evidence_id": "ev_5902ce8684ae452a8c7a6d61d99bc67208a3c0322cb586c1eb07489b8b383415",
+    "rea_hint_count": 6,
+    "rea_hint_categories": ["identity", "derived", "mutation", "retrieval", "validation", "persistence"],
+    "rea_analysis_ms": 156104,
+    "reconstruction_runtime_ms": 35124,
+    "total_runtime_ms": 191228,
+    "artifact": "bench-results/phase8-rea-32-s1.json",
+    "sha256": "9dbab4ad81b95e7a18b07048491fde9759a149f42196f569a8bfe45cebe5f6cf",
+    "comparison_to_black_box": "No gain in matching steps, workflows, identities, relationships, divergences or unverified steps. REA cost 156.1 s of analysis and produced fewer abstract classes (7 npm / 12 buku) than black-box (8 / 13).",
+    "interpretation": "The six hints did not translate into different synthesized effects, guards or outputs. The likely bottleneck is either a lossy hint projection or the behavioral synthesizer not consuming the useful relationships; hint volume alone is not evidence of value."
+  },
+  "failure_taxonomy": [
+    {
+      "target": "npm-cli-11.20.0",
+      "earliest_stage": "effect_synthesis",
+      "observable": "install_alpha and install_beta succeed but leave direct_dependencies, packages, lock_packages, package_count and relationship_count unchanged; reference creates package records and lock entries.",
+      "secondary_stage": "output_synthesis",
+      "secondary_observable": "created_id is absent from the model output while created_pool and version are present.",
+      "classification": "The records and identities exist in the observed schema, but no mutation effect was selected; this is a synthesis gap, not an IR impossibility demonstrated by this run. Nested dependency edges compound the problem.",
+      "unverified": "install_missing is unverified because no successful contrast supports an enabling guard; the rejection is not counted as a pass."
+    },
+    {
+      "target": "buku-5.1",
+      "earliest_stage": "derived_state_synthesis",
+      "observable": "tag_count is 0 in the model while the reference has 1; tags, bookmark_count and the bookmark record match.",
+      "classification": "The existing sum_length-style derived collection mechanism could express a tag count, but the candidate was not selected. This is a candidate/derived-state omission rather than a demonstrated expressiveness limit.",
+      "consequence": "All four buku workflows inherit the derived-state mismatch and are excluded downstream."
+    },
+    {
+      "target": "shared_verification",
+      "earliest_stage": "verification_normalization",
+      "observable": "The data-aware notes report reference initial state null versus the program initial state for npm sequences.",
+      "classification": "Infrastructure caveat discovered after freeze; preserved rather than repaired. It is not the primary semantic divergence because post-action comparisons still expose the missing effects, but it should be eliminated in a new suite version."
+    }
+  ],
+  "historical_regressions": [
+    {"suite": "External v3", "matching": "49/49", "workflows": "12/12", "divergences": 0, "artifact": "bench-results/phase8-reg-externalv3.json"},
+    {"suite": "notecli", "matching": "23/23", "workflows": "4/4", "divergences": 0, "artifact": "bench-results/phase8-reg-notecli.json"},
+    {"suite": "final2", "matching": "82/84", "workflows": "13/14", "divergences": 0, "unverified": 1, "artifact": "bench-results/phase8-reg-final2.json"},
+    {"suite": "final3", "matching": "25/25", "workflows": "4/4", "divergences": 0, "artifact": "bench-results/phase8-reg-final3.json"},
+    {"suite": "final4", "matching": "11/11", "workflows": "2/2", "divergences": 0, "artifact": "bench-results/phase8-reg-final4.json"},
+    {"suite": "final5", "matching": "19/19", "workflows": "3/3", "divergences": 0, "artifact": "bench-results/phase8-reg-final5.json"},
+    {"suite": "final8", "matching": "21/21", "workflows": "6/6", "divergences": 0, "artifact": "bench-results/phase8-reg-final8.json"},
+    {"suite": "Phase 6.3 holdout", "matching": "34/34", "workflows": "6/6", "divergences": 0, "artifact": "bench-results/phase8-reg-phase63.json"},
+    {"suite": "Phase 6.6 external", "matching": "17/39", "workflows": "1/6", "divergences": 5, "artifact": "bench-results/phase8-reg-phase66.json"}
+  ],
+  "taskbook_regeneration": {
+    "source": ".phase7-audit/taskbook-source",
+    "target_spec": "benchmarks/phase7rea/taskbook/target.json",
+    "pipeline": "target/debug/rea_pipeline",
+    "budget": 128,
+    "package_id": "capability.extracted.5d49fcbc",
+    "package_path": ".phase8-taskbook/packages/capability.extracted.5d49fcbc",
+    "manifest_sha256": "9b4bf460ac00cedeca229423aca161f95c8b42e3d3aa49befb75f946bf9a46e4",
+    "rea_version": "6.7.0",
+    "rea_analysis_ms": 4094,
+    "rules": 5,
+    "exact_rules": 3,
+    "support": 102,
+    "reproduced": 102,
+    "modeled_transitions": 101,
+    "abstract_states": 42,
+    "unexercised_cells": 128,
+    "hypothesis_conflicts": 3,
+    "observed_replay": "18/128",
+    "composition": ".phase8-taskbook/composition.json",
+    "composition_id": "app.phase8-notes-taskbook",
+    "export": ".phase8-taskbook/exported",
+    "export_workflow": "create note, create task, two bidirectional links, check task, read note, read task, links_for; all reported success",
+    "restart_workflow": "fresh process read the persisted note and task; both reported success",
+    "limitation": "This is a regenerated composition/export smoke workflow, not the hidden Taskbook evaluation workflow; the package is explicitly partial."
+  },
+  "quality_gates": {
+    "cargo_fmt_check": "pass",
+    "cargo_clippy_workspace_all_targets": "pass",
+    "cargo_test_workspace_all_targets": "pass",
+    "git_diff_check": "pass",
+    "test_failures": 0
+  },
+  "evidence": {
+    "raw_results_location": "bench-results/ (ignored by Git; retained in the working tree for this checkpoint)",
+    "tracked_report": "docs/research/phase8-independent-generalization.md",
+    "reproduction": "benchmarks/phase8-independent/RESULTS.md"
+  }
+}

@@ -1,0 +1,3374 @@
+{
+  "benchmark": "reforgebench",
+  "suite_name": "reforgebench-phase65-external",
+  "suite_description": "Independently authored note-management application with numeric allocators, nested tags, derived counters and referential guards.",
+  "suite_dir": "/workspace/chats/7ae21eea6bf9eccd51b62a68/benchmarks/phase65-external-v1",
+  "apps": [
+    {
+      "spec": "benchmarks/phase65-external-v1/fixtures/notecli/target.json",
+      "split": "holdout"
+    }
+  ],
+  "budgets": [
+    100
+  ],
+  "seeds": [
+    1
+  ],
+  "experiment_strategy": "hybrid",
+  "experiment_budget": 100,
+  "policies": [
+    {
+      "policy": "coverage",
+      "split": "train",
+      "runs": 0,
+      "failed_runs": 0,
+      "mean_transitions": 0.0,
+      "sd_transitions": 0.0,
+      "mean_classes": 0.0,
+      "mean_new_behaviors_per_step": 0.0,
+      "mean_duration_ms": 0.0
+    },
+    {
+      "policy": "coverage",
+      "split": "holdout",
+      "runs": 1,
+      "failed_runs": 0,
+      "mean_transitions": 65.0,
+      "sd_transitions": 0.0,
+      "mean_classes": 19.0,
+      "mean_new_behaviors_per_step": 0.65,
+      "mean_duration_ms": 7689.0
+    }
+  ],
+  "reconstruction": [
+    {
+      "app": "benchmarks/phase65-external-v1/fixtures/notecli/target.json",
+      "split": "holdout",
+      "workflows": 4,
+      "workflow_names": [
+        "create-pin-tag-list",
+        "delete-then-create-keeps-allocator",
+        "guards-and-duplicate-tag",
+        "rename-tag-delete"
+      ],
+      "twin_transitions": 65,
+      "prerequisites": {
+        "initial_class": "s0",
+        "nodes": [
+          "",
+          "s0",
+          "s1",
+          "s10",
+          "s11",
+          "s12",
+          "s13",
+          "s14",
+          "s15",
+          "s16",
+          "s17",
+          "s18",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7",
+          "s8",
+          "s9"
+        ],
+        "edges": [
+          {
+            "from": "s0",
+            "action": "add",
+            "to": "s1",
+            "samples": 1
+          },
+          {
+            "from": "s0",
+            "action": "list",
+            "to": "s0",
+            "samples": 1
+          },
+          {
+            "from": "s0",
+            "action": "stats",
+            "to": "s0",
+            "samples": 1
+          },
+          {
+            "from": "s1",
+            "action": "add",
+            "to": "s4",
+            "samples": 1
+          },
+          {
+            "from": "s1",
+            "action": "list",
+            "to": "s1",
+            "samples": 1
+          },
+          {
+            "from": "s1",
+            "action": "pin",
+            "to": "s2",
+            "samples": 1
+          },
+          {
+            "from": "s1",
+            "action": "stats",
+            "to": "s1",
+            "samples": 1
+          },
+          {
+            "from": "s1",
+            "action": "tag",
+            "to": "s3",
+            "samples": 1
+          },
+          {
+            "from": "s10",
+            "action": "add",
+            "to": "s18",
+            "samples": 1
+          },
+          {
+            "from": "s10",
+            "action": "list",
+            "to": "s10",
+            "samples": 1
+          },
+          {
+            "from": "s10",
+            "action": "stats",
+            "to": "s10",
+            "samples": 1
+          },
+          {
+            "from": "s10",
+            "action": "tag",
+            "to": "s11",
+            "samples": 1
+          },
+          {
+            "from": "s11",
+            "action": "pin",
+            "to": "s12",
+            "samples": 1
+          },
+          {
+            "from": "s11",
+            "action": "stats",
+            "to": "s11",
+            "samples": 1
+          },
+          {
+            "from": "s12",
+            "action": "add",
+            "to": "s13",
+            "samples": 1
+          },
+          {
+            "from": "s12",
+            "action": "list",
+            "to": "s12",
+            "samples": 1
+          },
+          {
+            "from": "s13",
+            "action": "rename",
+            "to": "s13",
+            "samples": 1
+          },
+          {
+            "from": "s13",
+            "action": "stats",
+            "to": "s13",
+            "samples": 1
+          },
+          {
+            "from": "s13",
+            "action": "tag",
+            "to": "s14",
+            "samples": 1
+          },
+          {
+            "from": "s14",
+            "action": "delete",
+            "to": "s12",
+            "samples": 1
+          },
+          {
+            "from": "s15",
+            "action": "add",
+            "to": "s4",
+            "samples": 1
+          },
+          {
+            "from": "s15",
+            "action": "stats",
+            "to": "s15",
+            "samples": 1
+          },
+          {
+            "from": "s16",
+            "action": "add",
+            "to": "s4",
+            "samples": 1
+          },
+          {
+            "from": "s16",
+            "action": "list",
+            "to": "s16",
+            "samples": 1
+          },
+          {
+            "from": "s17",
+            "action": "add",
+            "to": "s10",
+            "samples": 1
+          },
+          {
+            "from": "s18",
+            "action": "stats",
+            "to": "s18",
+            "samples": 1
+          },
+          {
+            "from": "s2",
+            "action": "delete",
+            "to": "s0",
+            "samples": 1
+          },
+          {
+            "from": "s3",
+            "action": "delete",
+            "to": "s0",
+            "samples": 1
+          },
+          {
+            "from": "s3",
+            "action": "rename",
+            "to": "s3",
+            "samples": 1
+          },
+          {
+            "from": "s4",
+            "action": "add",
+            "to": "s10",
+            "samples": 1
+          },
+          {
+            "from": "s4",
+            "action": "list",
+            "to": "s4",
+            "samples": 1
+          },
+          {
+            "from": "s4",
+            "action": "pin",
+            "to": "s5",
+            "samples": 1
+          },
+          {
+            "from": "s4",
+            "action": "stats",
+            "to": "s4",
+            "samples": 1
+          },
+          {
+            "from": "s5",
+            "action": "rename",
+            "to": "s5",
+            "samples": 1
+          },
+          {
+            "from": "s5",
+            "action": "tag",
+            "to": "s6",
+            "samples": 1
+          },
+          {
+            "from": "s6",
+            "action": "list",
+            "to": "s6",
+            "samples": 1
+          },
+          {
+            "from": "s6",
+            "action": "stats",
+            "to": "s6",
+            "samples": 1
+          },
+          {
+            "from": "s6",
+            "action": "tag",
+            "to": "s7",
+            "samples": 1
+          },
+          {
+            "from": "s7",
+            "action": "add",
+            "to": "s8",
+            "samples": 1
+          },
+          {
+            "from": "s7",
+            "action": "list",
+            "to": "s7",
+            "samples": 1
+          },
+          {
+            "from": "s7",
+            "action": "stats",
+            "to": "s7",
+            "samples": 1
+          },
+          {
+            "from": "s8",
+            "action": "pin",
+            "to": "s9",
+            "samples": 1
+          },
+          {
+            "from": "s8",
+            "action": "rename",
+            "to": "s8",
+            "samples": 1
+          },
+          {
+            "from": "s9",
+            "action": "delete",
+            "to": "s7",
+            "samples": 1
+          }
+        ],
+        "reachable_classes": [
+          "s0",
+          "s1",
+          "s10",
+          "s11",
+          "s12",
+          "s13",
+          "s14",
+          "s18",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7",
+          "s8",
+          "s9"
+        ],
+        "unreachable_classes": [
+          "",
+          "s15",
+          "s16",
+          "s17"
+        ],
+        "unknown_preconditions": [
+          {
+            "class": "s0",
+            "action": "delete",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'delete' from 's0'; the enabling condition is unknown"
+          },
+          {
+            "class": "s0",
+            "action": "pin",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'pin' from 's0'; the enabling condition is unknown"
+          },
+          {
+            "class": "s0",
+            "action": "rename",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'rename' from 's0'; the enabling condition is unknown"
+          },
+          {
+            "class": "s0",
+            "action": "tag",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'tag' from 's0'; the enabling condition is unknown"
+          },
+          {
+            "class": "s1",
+            "action": "delete",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'delete' from 's1'; the enabling condition is unknown"
+          },
+          {
+            "class": "s1",
+            "action": "rename",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'rename' from 's1'; the enabling condition is unknown"
+          },
+          {
+            "class": "s10",
+            "action": "rename",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'rename' from 's10'; the enabling condition is unknown"
+          },
+          {
+            "class": "s12",
+            "action": "delete",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'delete' from 's12'; the enabling condition is unknown"
+          },
+          {
+            "class": "s12",
+            "action": "pin",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'pin' from 's12'; the enabling condition is unknown"
+          },
+          {
+            "class": "s12",
+            "action": "tag",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'tag' from 's12'; the enabling condition is unknown"
+          },
+          {
+            "class": "s17",
+            "action": "pin",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'pin' from 's17'; the enabling condition is unknown"
+          },
+          {
+            "class": "s4",
+            "action": "delete",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'delete' from 's4'; the enabling condition is unknown"
+          },
+          {
+            "class": "s4",
+            "action": "rename",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'rename' from 's4'; the enabling condition is unknown"
+          },
+          {
+            "class": "s4",
+            "action": "tag",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'tag' from 's4'; the enabling condition is unknown"
+          },
+          {
+            "class": "s7",
+            "action": "delete",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'delete' from 's7'; the enabling condition is unknown"
+          },
+          {
+            "class": "s7",
+            "action": "pin",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'pin' from 's7'; the enabling condition is unknown"
+          },
+          {
+            "class": "s7",
+            "action": "rename",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'rename' from 's7'; the enabling condition is unknown"
+          },
+          {
+            "class": "s7",
+            "action": "tag",
+            "error_codes": [
+              "note_not_found"
+            ],
+            "detail": "only non-success outcomes observed for 'tag' from 's7'; the enabling condition is unknown"
+          }
+        ],
+        "enabling_actions": {
+          "add": [
+            "delete",
+            "list",
+            "pin",
+            "stats",
+            "tag"
+          ],
+          "delete": [
+            "pin",
+            "rename",
+            "tag"
+          ],
+          "list": [
+            "add",
+            "delete",
+            "pin",
+            "stats",
+            "tag"
+          ],
+          "pin": [
+            "add",
+            "list",
+            "rename",
+            "stats",
+            "tag"
+          ],
+          "rename": [
+            "add",
+            "pin",
+            "stats",
+            "tag"
+          ],
+          "stats": [
+            "add",
+            "delete",
+            "list",
+            "rename",
+            "tag"
+          ],
+          "tag": [
+            "add",
+            "list",
+            "pin",
+            "rename",
+            "stats"
+          ]
+        }
+      },
+      "sequences": 4,
+      "steps_attempted": 23,
+      "steps_executed": 9,
+      "steps_verifiable": 8,
+      "matching_steps": 5,
+      "unverified_steps": 1,
+      "unverified_details": [
+        {
+          "sequence": 0,
+          "step": 2,
+          "action": "tag",
+          "cause": "unknown_abstract_state",
+          "reference_class": "",
+          "reference_projection": "view=absent|behavior=note_count=positive;notes#2[{pinned=false,tags#1[tags=intro],title=present}|{pinned=true,tags#1[tags=dairy],title=present}];pinned_count=positive;tag_count=positive",
+          "trace": [
+            "add(title=buy milk)",
+            "pin(note_id=2)",
+            "tag(note_id=2,tag=dairy)"
+          ],
+          "detail": "reference landed in a state absent from the abstraction after 'tag'"
+        }
+      ],
+      "excluded_steps": 14,
+      "divergences": 3,
+      "divergence_details": [
+        {
+          "sequence": 1,
+          "step": 2,
+          "original_step": 2,
+          "class": "outcome_mismatch",
+          "reference": {
+            "action": "delete",
+            "outcome": "success",
+            "class": "s1",
+            "events": [],
+            "outputs": {}
+          },
+          "twin": {
+            "action": "delete",
+            "outcome": "rejected",
+            "error_code": "note_not_found",
+            "class": "s4",
+            "events": [],
+            "outputs": {}
+          },
+          "detail": "reference reports Success but the twin reports Rejected"
+        },
+        {
+          "sequence": 2,
+          "step": 0,
+          "original_step": 0,
+          "class": "error_code_mismatch",
+          "reference": {
+            "action": "tag",
+            "outcome": "rejected",
+            "error_code": "duplicate_tag",
+            "class": "s0",
+            "events": [],
+            "outputs": {}
+          },
+          "twin": {
+            "action": "tag",
+            "outcome": "rejected",
+            "error_code": "note_not_found",
+            "class": "s0",
+            "events": [],
+            "outputs": {}
+          },
+          "detail": "reference error Some(\"duplicate_tag\") but the twin error Some(\"note_not_found\")"
+        },
+        {
+          "sequence": 3,
+          "step": 1,
+          "original_step": 1,
+          "class": "outcome_mismatch",
+          "reference": {
+            "action": "rename",
+            "outcome": "success",
+            "class": "s1",
+            "events": [],
+            "outputs": {}
+          },
+          "twin": {
+            "action": "rename",
+            "outcome": "rejected",
+            "error_code": "note_not_found",
+            "class": "s1",
+            "events": [],
+            "outputs": {}
+          },
+          "detail": "reference reports Success but the twin reports Rejected"
+        }
+      ],
+      "agreement": 0.625,
+      "full_step_agreement": 0.21739130434782608,
+      "diverged": true,
+      "data_program": {
+        "rules": 13,
+        "collections": [
+          {
+            "name": "notes",
+            "layout": "list",
+            "id_field": "id",
+            "id_kind": "integer"
+          }
+        ],
+        "derived": [
+          {
+            "kind": "count",
+            "field": "note_count",
+            "collection": "notes"
+          },
+          {
+            "kind": "count_where",
+            "field": "pinned_count",
+            "collection": "notes",
+            "source": "pinned",
+            "value": true
+          },
+          {
+            "kind": "sum_length",
+            "field": "tag_count",
+            "collection": "notes",
+            "source": "tags"
+          }
+        ],
+        "exact_rule_ratio": 1.0,
+        "observed_step_ratio": 1.0,
+        "unsupported": [],
+        "steps_attempted": 23,
+        "steps_executed": 23,
+        "matching_steps": 23,
+        "state_matching_steps": 23,
+        "status_matching_steps": 23,
+        "error_matching_steps": 23,
+        "output_matching_steps": 23,
+        "event_matching_steps": 23,
+        "persistence_matching_steps": 23,
+        "outputs_compared_steps": 23,
+        "workflows_attempted": 4,
+        "workflows_fully_matching": 4,
+        "unverified_steps": 0,
+        "excluded_steps": 0,
+        "divergences": 0,
+        "initial_state_matches": true,
+        "step_accounting_complete": true,
+        "full_state_agreement": 1.0,
+        "divergence_details": [],
+        "ledger": [
+          {
+            "sequence": 0,
+            "step": 0,
+            "action": "add(title=buy milk)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 0,
+            "step": 1,
+            "action": "pin(note_id=2)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 0,
+            "step": 2,
+            "action": "tag(note_id=2,tag=dairy)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 0,
+            "step": 3,
+            "action": "list",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 0,
+            "step": 4,
+            "action": "stats",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 0,
+            "action": "add(title=alpha)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 1,
+            "action": "add(title=beta)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 2,
+            "action": "delete(note_id=2)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 3,
+            "action": "add(title=gamma)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 4,
+            "action": "list",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 1,
+            "step": 5,
+            "action": "stats",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 0,
+            "action": "tag(note_id=1,tag=intro)",
+            "module_status": "rejected",
+            "reference_status": "rejected",
+            "module_error": "duplicate_tag",
+            "reference_error": "duplicate_tag",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 1,
+            "action": "pin(note_id=99)",
+            "module_status": "rejected",
+            "reference_status": "rejected",
+            "module_error": "note_not_found",
+            "reference_error": "note_not_found",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 2,
+            "action": "add(title=   )",
+            "module_status": "rejected",
+            "reference_status": "rejected",
+            "module_error": "title_required",
+            "reference_error": "title_required",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 3,
+            "action": "rename(note_id=1,title=renamed welcome)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 4,
+            "action": "tag(note_id=1,tag=work)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 2,
+            "step": 5,
+            "action": "stats",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 0,
+            "action": "add(title=zeta)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 1,
+            "action": "rename(note_id=2,title=renamed zeta)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 2,
+            "action": "tag(note_id=2,tag=work)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 3,
+            "action": "delete(note_id=1)",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 4,
+            "action": "list",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          },
+          {
+            "sequence": 3,
+            "step": 5,
+            "action": "stats",
+            "module_status": "success",
+            "reference_status": "success",
+            "state_match": true
+          }
+        ],
+        "notes": [
+          "comparison set: hidden-workflows-data-aware",
+          "compares outcome, error, events, and the complete adapter-visible state document",
+          "unknown model steps are unverified, not divergent; later steps in that sequence are excluded"
+        ],
+        "counterfactual_samples": 22,
+        "counterfactual_interactions": 98,
+        "experiment_strategy": "hybrid",
+        "experiment_accounting": {
+          "reference_interactions": 98,
+          "action_executions": 35,
+          "state_observations": 23,
+          "resets": 23,
+          "setup_actions": 17,
+          "verification_operations": 0,
+          "failed_experiments": 0,
+          "repeated_proposals": 0,
+          "selected_experiments": 22,
+          "completed_experiments": 22,
+          "budget": 100,
+          "spent": 98,
+          "remaining": 2,
+          "budget_exhausted": true
+        },
+        "program": {
+          "schema_version": "1.1.0",
+          "target_id": "cli-notecli",
+          "initial_state": {
+            "note_count": 1,
+            "next_id": 2,
+            "notes": [
+              {
+                "id": 1,
+                "pinned": false,
+                "tags": [
+                  "intro"
+                ],
+                "title": "welcome"
+              }
+            ],
+            "pinned_count": 0,
+            "tag_count": 1
+          },
+          "state_schema": {
+            "fields": {
+              "next_id": {
+                "kind": "int",
+                "presence": "present",
+                "present": 261,
+                "missing": 0,
+                "nulls": 0,
+                "initial": 2,
+                "candidate_defaults": [
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "evidence": [
+                  "initial-state materialization observed this value"
+                ],
+                "contradictions": [],
+                "nested": {}
+              },
+              "note_count": {
+                "kind": "int",
+                "presence": "present",
+                "present": 261,
+                "missing": 0,
+                "nulls": 0,
+                "initial": 1,
+                "candidate_defaults": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "evidence": [
+                  "initial-state materialization observed this value"
+                ],
+                "contradictions": [],
+                "nested": {}
+              },
+              "notes": {
+                "kind": "array",
+                "presence": "present",
+                "present": 261,
+                "missing": 0,
+                "nulls": 0,
+                "initial": [
+                  {
+                    "id": 1,
+                    "pinned": false,
+                    "tags": [
+                      "intro"
+                    ],
+                    "title": "welcome"
+                  }
+                ],
+                "candidate_defaults": [
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [],
+                      "title": "note3"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": true,
+                      "tags": [],
+                      "title": "note3"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [],
+                      "title": "note11"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [
+                        "tag10"
+                      ],
+                      "title": "note11"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [
+                        "tag10"
+                      ],
+                      "title": "renamed11"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [],
+                      "title": "note21"
+                    }
+                  ],
+                  [
+                    {
+                      "id": 1,
+                      "pinned": false,
+                      "tags": [
+                        "intro"
+                      ],
+                      "title": "welcome"
+                    },
+                    {
+                      "id": 2,
+                      "pinned": false,
+                      "tags": [],
+                      "title": "note21"
+                    },
+                    {
+                      "id": 3,
+                      "pinned": false,
+                      "tags": [],
+                      "title": "note23"
+                    }
+                  ]
+                ],
+                "evidence": [
+                  "initial-state materialization observed this value"
+                ],
+                "contradictions": [],
+                "nested": {},
+                "elements": {
+                  "kind": "object",
+                  "presence": "present",
+                  "present": 567,
+                  "missing": 0,
+                  "nulls": 0,
+                  "initial": null,
+                  "candidate_defaults": [],
+                  "evidence": [],
+                  "contradictions": [],
+                  "nested": {
+                    "id": {
+                      "kind": "int",
+                      "presence": "present",
+                      "present": 567,
+                      "missing": 0,
+                      "nulls": 0,
+                      "initial": null,
+                      "candidate_defaults": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5
+                      ],
+                      "evidence": [],
+                      "contradictions": [],
+                      "nested": {}
+                    },
+                    "pinned": {
+                      "kind": "bool",
+                      "presence": "present",
+                      "present": 567,
+                      "missing": 0,
+                      "nulls": 0,
+                      "initial": null,
+                      "candidate_defaults": [
+                        false,
+                        true
+                      ],
+                      "evidence": [],
+                      "contradictions": [],
+                      "nested": {}
+                    },
+                    "tags": {
+                      "kind": "array",
+                      "presence": "present",
+                      "present": 567,
+                      "missing": 0,
+                      "nulls": 0,
+                      "initial": null,
+                      "candidate_defaults": [
+                        [
+                          "intro"
+                        ],
+                        [],
+                        [
+                          "tag10"
+                        ],
+                        [
+                          "tag24"
+                        ],
+                        [
+                          "tag24",
+                          "tag27"
+                        ],
+                        [
+                          "tag50"
+                        ],
+                        [
+                          "tag57"
+                        ],
+                        [
+                          "tag1"
+                        ]
+                      ],
+                      "evidence": [],
+                      "contradictions": [],
+                      "nested": {}
+                    },
+                    "title": {
+                      "kind": "string",
+                      "presence": "present",
+                      "present": 567,
+                      "missing": 0,
+                      "nulls": 0,
+                      "initial": null,
+                      "candidate_defaults": [
+                        "welcome",
+                        "note3",
+                        "note11",
+                        "renamed11",
+                        "note21",
+                        "note23",
+                        "renamed23",
+                        "note31"
+                      ],
+                      "evidence": [],
+                      "contradictions": [],
+                      "nested": {}
+                    }
+                  }
+                }
+              },
+              "pinned_count": {
+                "kind": "int",
+                "presence": "present",
+                "present": 261,
+                "missing": 0,
+                "nulls": 0,
+                "initial": 0,
+                "candidate_defaults": [
+                  0,
+                  1,
+                  2
+                ],
+                "evidence": [
+                  "initial-state materialization observed this value"
+                ],
+                "contradictions": [],
+                "nested": {}
+              },
+              "tag_count": {
+                "kind": "int",
+                "presence": "present",
+                "present": 261,
+                "missing": 0,
+                "nulls": 0,
+                "initial": 1,
+                "candidate_defaults": [
+                  1,
+                  2,
+                  3
+                ],
+                "evidence": [
+                  "initial-state materialization observed this value"
+                ],
+                "contradictions": [],
+                "nested": {}
+              }
+            },
+            "observations": 261,
+            "notes": []
+          },
+          "collections": [
+            {
+              "name": "notes",
+              "layout": "list",
+              "id_field": "id",
+              "id_kind": "integer"
+            }
+          ],
+          "derived": [
+            {
+              "kind": "count",
+              "field": "note_count",
+              "collection": "notes"
+            },
+            {
+              "kind": "count_where",
+              "field": "pinned_count",
+              "collection": "notes",
+              "source": "pinned",
+              "value": true
+            },
+            {
+              "kind": "sum_length",
+              "field": "tag_count",
+              "collection": "notes",
+              "source": "tags"
+            }
+          ],
+          "rules": [
+            {
+              "id": "rule.add.error.title_required",
+              "action": "add",
+              "branch": "error",
+              "error": "title_required",
+              "guards": [
+                {
+                  "kind": "param_blank",
+                  "param": "title"
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 1,
+              "reproduced": 1,
+              "provenance": {
+                "origin": "counterfactual-supported",
+                "supporting_observations": [
+                  "step 0 (counterfactual) add -> title_required [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [
+                  [
+                    {
+                      "kind": "param_string_length",
+                      "param": "title",
+                      "op": "le",
+                      "length": 0,
+                      "unit": "unicode_scalar"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "param_string_length",
+                      "param": "title",
+                      "op": "lt",
+                      "length": 1,
+                      "unit": "unicode_scalar"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "param_string_length",
+                      "param": "title",
+                      "op": "le",
+                      "length": 1,
+                      "unit": "unicode_scalar"
+                    }
+                  ]
+                ],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "param_blank",
+                      "param": "title"
+                    },
+                    "support": 1,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "title"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "title",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 1,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 1,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 1,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 1,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "4 guard sets separate the same evidence; the first is executed"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 1,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 1,
+                "output_reproduced": 1
+              }
+            },
+            {
+              "id": "rule.add.success",
+              "action": "add",
+              "branch": "success",
+              "guards": [],
+              "effects": [
+                {
+                  "kind": "create_entity",
+                  "collection": "notes",
+                  "id": {
+                    "kind": "next_identity",
+                    "prefix": ""
+                  },
+                  "fields": {
+                    "pinned": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "tags": {
+                      "kind": "array",
+                      "items": []
+                    },
+                    "title": {
+                      "kind": "param",
+                      "name": "title"
+                    }
+                  }
+                },
+                {
+                  "kind": "increment_state",
+                  "field": "next_id",
+                  "by": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              ],
+              "events": [],
+              "outputs": {
+                "created_id": {
+                  "kind": "created_id",
+                  "identity": "integer"
+                }
+              },
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 18,
+              "reproduced": 18,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 3 (observed) add -> success [state changed]",
+                  "step 11 (observed) add -> success [state changed]",
+                  "step 21 (observed) add -> success [state changed]",
+                  "step 23 (observed) add -> success [state changed]",
+                  "step 31 (observed) add -> success [state changed]",
+                  "step 47 (observed) add -> success [state changed]",
+                  "step 50 (observed) add -> success [state changed]",
+                  "step 52 (observed) add -> success [state changed]",
+                  "step 57 (observed) add -> success [state changed]",
+                  "step 72 (observed) add -> success [state changed]",
+                  "step 77 (observed) add -> success [state changed]",
+                  "step 86 (observed) add -> success [state changed]",
+                  "step 91 (observed) add -> success [state changed]",
+                  "step 95 (observed) add -> success [state changed]",
+                  "step 99 (observed) add -> success [state changed]",
+                  "step 0 (counterfactual) add -> success [state changed]",
+                  "step 0 (counterfactual) add -> success [state changed]",
+                  "step 0 (counterfactual) add -> success [state changed]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [
+                  {
+                    "kind": "param_string_length",
+                    "param": "title",
+                    "op": "ge",
+                    "length": 0,
+                    "unit": "bytes"
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "title"
+                  }
+                ],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [],
+                "parameters": [
+                  {
+                    "name": "title",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 18,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 18,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "next_id",
+                    "status": "causal_relation_observed",
+                    "observed_before": [
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "observed_after": [
+                      3,
+                      4,
+                      5,
+                      6
+                    ],
+                    "evidence_count": 18,
+                    "note": "field changed, but the observed postcondition is not a single constant; the relation is not fully identified"
+                  },
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 18,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 18,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "2 positive-only condition(s) are recorded but not used as sufficient guards"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 3,
+                "output_contract": {
+                  "observations": 18,
+                  "fields": {
+                    "created_id": {
+                      "observed": 18,
+                      "absent": 0,
+                      "nulls": 0,
+                      "kinds": [
+                        "int"
+                      ],
+                      "always_present": true,
+                      "resolved": true
+                    }
+                  },
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 18,
+                "output_reproduced": 18
+              }
+            },
+            {
+              "id": "rule.delete.error.note_not_found",
+              "action": "delete",
+              "branch": "error",
+              "error": "note_not_found",
+              "guards": [
+                {
+                  "kind": "not_exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 12,
+              "reproduced": 12,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 9 (observed) delete -> note_not_found [unchanged]",
+                  "step 20 (observed) delete -> note_not_found [unchanged]",
+                  "step 39 (observed) delete -> note_not_found [unchanged]",
+                  "step 46 (observed) delete -> note_not_found [unchanged]",
+                  "step 49 (observed) delete -> note_not_found [unchanged]",
+                  "step 63 (observed) delete -> note_not_found [unchanged]",
+                  "step 69 (observed) delete -> note_not_found [unchanged]",
+                  "step 79 (observed) delete -> note_not_found [unchanged]",
+                  "step 84 (observed) delete -> note_not_found [unchanged]",
+                  "step 88 (observed) delete -> note_not_found [unchanged]",
+                  "step 0 (counterfactual) delete -> note_not_found [unchanged]",
+                  "step 0 (counterfactual) delete -> note_not_found [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "not_exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 12,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 12,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 12,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 12,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 12,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 2,
+                "output_contract": {
+                  "observations": 12,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 12,
+                "output_reproduced": 12
+              }
+            },
+            {
+              "id": "rule.delete.success",
+              "action": "delete",
+              "branch": "success",
+              "guards": [
+                {
+                  "kind": "exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "delete_entity",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 6,
+              "reproduced": 6,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 5 (observed) delete -> success [state changed]",
+                  "step 15 (observed) delete -> success [state changed]",
+                  "step 34 (observed) delete -> success [state changed]",
+                  "step 61 (observed) delete -> success [state changed]",
+                  "step 0 (counterfactual) delete -> success [state changed]",
+                  "step 0 (counterfactual) delete -> success [state changed]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [
+                  {
+                    "kind": "exists",
+                    "collection": "notes",
+                    "entity": {
+                      "param": "note_id"
+                    }
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "note_id"
+                  }
+                ],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 6,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 6,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 6,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 6,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 6,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "2 positive-only condition(s) are recorded but not used as sufficient guards"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 2,
+                "output_contract": {
+                  "observations": 6,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 6,
+                "output_reproduced": 6
+              }
+            },
+            {
+              "id": "rule.list.success",
+              "action": "list",
+              "branch": "success",
+              "guards": [],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 15,
+              "reproduced": 15,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 2 (observed) list -> success [unchanged]",
+                  "step 12 (observed) list -> success [unchanged]",
+                  "step 19 (observed) list -> success [unchanged]",
+                  "step 28 (observed) list -> success [unchanged]",
+                  "step 35 (observed) list -> success [unchanged]",
+                  "step 41 (observed) list -> success [unchanged]",
+                  "step 51 (observed) list -> success [unchanged]",
+                  "step 56 (observed) list -> success [unchanged]",
+                  "step 65 (observed) list -> success [unchanged]",
+                  "step 71 (observed) list -> success [unchanged]",
+                  "step 73 (observed) list -> success [unchanged]",
+                  "step 90 (observed) list -> success [unchanged]",
+                  "step 92 (observed) list -> success [unchanged]",
+                  "step 98 (observed) list -> success [unchanged]",
+                  "step 0 (counterfactual) list -> success [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [],
+                "parameters": [],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 15,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 15,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 15,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 15,
+                "output_reproduced": 15
+              }
+            },
+            {
+              "id": "rule.pin.error.note_not_found",
+              "action": "pin",
+              "branch": "error",
+              "error": "note_not_found",
+              "guards": [
+                {
+                  "kind": "not_exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 11,
+              "reproduced": 11,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 8 (observed) pin -> note_not_found [unchanged]",
+                  "step 18 (observed) pin -> note_not_found [unchanged]",
+                  "step 38 (observed) pin -> note_not_found [unchanged]",
+                  "step 42 (observed) pin -> note_not_found [unchanged]",
+                  "step 62 (observed) pin -> note_not_found [unchanged]",
+                  "step 68 (observed) pin -> note_not_found [unchanged]",
+                  "step 75 (observed) pin -> note_not_found [unchanged]",
+                  "step 82 (observed) pin -> note_not_found [unchanged]",
+                  "step 93 (observed) pin -> note_not_found [unchanged]",
+                  "step 94 (observed) pin -> note_not_found [unchanged]",
+                  "step 0 (counterfactual) pin -> note_not_found [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "not_exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 11,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 11,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 11,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 11,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 11,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 11,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 11,
+                "output_reproduced": 11
+              }
+            },
+            {
+              "id": "rule.pin.success",
+              "action": "pin",
+              "branch": "success",
+              "guards": [
+                {
+                  "kind": "exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "update_entity",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  },
+                  "fields": [
+                    {
+                      "kind": "set",
+                      "field": "pinned",
+                      "value": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    }
+                  ]
+                }
+              ],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 6,
+              "reproduced": 6,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 4 (observed) pin -> success [state changed]",
+                  "step 25 (observed) pin -> success [state changed]",
+                  "step 33 (observed) pin -> success [state changed]",
+                  "step 55 (observed) pin -> success [state changed]",
+                  "step 0 (counterfactual) pin -> success [state changed]",
+                  "step 0 (counterfactual) pin -> success [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [
+                  {
+                    "kind": "exists",
+                    "collection": "notes",
+                    "entity": {
+                      "param": "note_id"
+                    }
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "note_id"
+                  }
+                ],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 6,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 6,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 6,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 6,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 6,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "2 positive-only condition(s) are recorded but not used as sufficient guards"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 2,
+                "output_contract": {
+                  "observations": 6,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 6,
+                "output_reproduced": 6
+              }
+            },
+            {
+              "id": "rule.rename.error.note_not_found",
+              "action": "rename",
+              "branch": "error",
+              "error": "note_not_found",
+              "guards": [
+                {
+                  "kind": "not_exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 11,
+              "reproduced": 11,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 6 (observed) rename -> note_not_found [unchanged]",
+                  "step 17 (observed) rename -> note_not_found [unchanged]",
+                  "step 36 (observed) rename -> note_not_found [unchanged]",
+                  "step 44 (observed) rename -> note_not_found [unchanged]",
+                  "step 48 (observed) rename -> note_not_found [unchanged]",
+                  "step 67 (observed) rename -> note_not_found [unchanged]",
+                  "step 74 (observed) rename -> note_not_found [unchanged]",
+                  "step 80 (observed) rename -> note_not_found [unchanged]",
+                  "step 83 (observed) rename -> note_not_found [unchanged]",
+                  "step 97 (observed) rename -> note_not_found [unchanged]",
+                  "step 0 (counterfactual) rename -> note_not_found [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "not_exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 11,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 11,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 11,
+                    "present_invalid": 0,
+                    "optional": false
+                  },
+                  {
+                    "name": "title",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 11,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 11,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 11,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 11,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 11,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 11,
+                "output_reproduced": 11
+              }
+            },
+            {
+              "id": "rule.rename.success",
+              "action": "rename",
+              "branch": "success",
+              "guards": [
+                {
+                  "kind": "exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "update_entity",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  },
+                  "fields": [
+                    {
+                      "kind": "set",
+                      "field": "title",
+                      "value": {
+                        "kind": "param",
+                        "name": "title"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 7,
+              "reproduced": 7,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 14 (observed) rename -> success [state changed]",
+                  "step 26 (observed) rename -> success [state changed]",
+                  "step 32 (observed) rename -> success [state changed]",
+                  "step 59 (observed) rename -> success [state changed]",
+                  "step 0 (counterfactual) rename -> success [state changed]",
+                  "step 0 (counterfactual) rename -> success [state changed]",
+                  "step 0 (counterfactual) rename -> success [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [
+                  {
+                    "kind": "param_string_length",
+                    "param": "title",
+                    "op": "ge",
+                    "length": 7,
+                    "unit": "bytes"
+                  },
+                  {
+                    "kind": "exists",
+                    "collection": "notes",
+                    "entity": {
+                      "param": "note_id"
+                    }
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "note_id"
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "title"
+                  }
+                ],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 7,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 7,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 7,
+                    "present_invalid": 0,
+                    "optional": false
+                  },
+                  {
+                    "name": "title",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 7,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 7,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 7,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 7,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "4 positive-only condition(s) are recorded but not used as sufficient guards"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 3,
+                "output_contract": {
+                  "observations": 7,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 7,
+                "output_reproduced": 7
+              }
+            },
+            {
+              "id": "rule.stats.success",
+              "action": "stats",
+              "branch": "success",
+              "guards": [],
+              "effects": [],
+              "events": [],
+              "outputs": {
+                "note_count": {
+                  "kind": "state",
+                  "field": "note_count"
+                },
+                "pinned_count": {
+                  "kind": "state",
+                  "field": "pinned_count"
+                },
+                "tag_count": {
+                  "kind": "state",
+                  "field": "tag_count"
+                }
+              },
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "the observed outputs are identical before and after mutation; pre- and post-state ordering are indistinguishable"
+              },
+              "support": 16,
+              "reproduced": 16,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 1 (observed) stats -> success [unchanged]",
+                  "step 10 (observed) stats -> success [unchanged]",
+                  "step 22 (observed) stats -> success [unchanged]",
+                  "step 24 (observed) stats -> success [unchanged]",
+                  "step 29 (observed) stats -> success [unchanged]",
+                  "step 37 (observed) stats -> success [unchanged]",
+                  "step 45 (observed) stats -> success [unchanged]",
+                  "step 54 (observed) stats -> success [unchanged]",
+                  "step 58 (observed) stats -> success [unchanged]",
+                  "step 66 (observed) stats -> success [unchanged]",
+                  "step 76 (observed) stats -> success [unchanged]",
+                  "step 81 (observed) stats -> success [unchanged]",
+                  "step 87 (observed) stats -> success [unchanged]",
+                  "step 96 (observed) stats -> success [unchanged]",
+                  "step 100 (observed) stats -> success [unchanged]",
+                  "step 0 (counterfactual) stats -> success [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [],
+                "parameters": [],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 16,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 16,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 16,
+                  "fields": {
+                    "note_count": {
+                      "observed": 16,
+                      "absent": 0,
+                      "nulls": 0,
+                      "kinds": [
+                        "int"
+                      ],
+                      "always_present": true,
+                      "resolved": true
+                    },
+                    "pinned_count": {
+                      "observed": 16,
+                      "absent": 0,
+                      "nulls": 0,
+                      "kinds": [
+                        "int"
+                      ],
+                      "always_present": true,
+                      "resolved": true
+                    },
+                    "tag_count": {
+                      "observed": 16,
+                      "absent": 0,
+                      "nulls": 0,
+                      "kinds": [
+                        "int"
+                      ],
+                      "always_present": true,
+                      "resolved": true
+                    }
+                  },
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 16,
+                "output_reproduced": 16
+              }
+            },
+            {
+              "id": "rule.tag.error.duplicate_tag",
+              "action": "tag",
+              "branch": "error",
+              "error": "duplicate_tag",
+              "guards": [
+                {
+                  "kind": "entity_list_contains",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  },
+                  "field": "tags",
+                  "param": "tag"
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 1,
+              "reproduced": 1,
+              "provenance": {
+                "origin": "counterfactual-supported",
+                "supporting_observations": [
+                  "step 0 (counterfactual) tag -> duplicate_tag [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "entity_list_contains",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      },
+                      "field": "tags",
+                      "param": "tag"
+                    },
+                    "support": 1,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id",
+                      "tag"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 1,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 1,
+                    "present_invalid": 0,
+                    "optional": false
+                  },
+                  {
+                    "name": "tag",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 1,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 1,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 1,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 1,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 1,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 1,
+                "output_reproduced": 1
+              }
+            },
+            {
+              "id": "rule.tag.error.note_not_found",
+              "action": "tag",
+              "branch": "error",
+              "error": "note_not_found",
+              "guards": [
+                {
+                  "kind": "not_exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 10,
+              "reproduced": 10,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 7 (observed) tag -> note_not_found [unchanged]",
+                  "step 16 (observed) tag -> note_not_found [unchanged]",
+                  "step 40 (observed) tag -> note_not_found [unchanged]",
+                  "step 43 (observed) tag -> note_not_found [unchanged]",
+                  "step 64 (observed) tag -> note_not_found [unchanged]",
+                  "step 70 (observed) tag -> note_not_found [unchanged]",
+                  "step 78 (observed) tag -> note_not_found [unchanged]",
+                  "step 85 (observed) tag -> note_not_found [unchanged]",
+                  "step 89 (observed) tag -> note_not_found [unchanged]",
+                  "step 0 (counterfactual) tag -> note_not_found [unchanged]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "not_exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 10,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 10,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 10,
+                    "present_invalid": 0,
+                    "optional": false
+                  },
+                  {
+                    "name": "tag",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 10,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 10,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 10,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 10,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [],
+                "source_assisted": false,
+                "counterfactual_support": 1,
+                "output_contract": {
+                  "observations": 10,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 10,
+                "output_reproduced": 10
+              }
+            },
+            {
+              "id": "rule.tag.success",
+              "action": "tag",
+              "branch": "success",
+              "guards": [
+                {
+                  "kind": "exists",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  }
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "update_entity",
+                  "collection": "notes",
+                  "entity": {
+                    "param": "note_id"
+                  },
+                  "fields": [
+                    {
+                      "kind": "append_item",
+                      "field": "tags",
+                      "value": {
+                        "kind": "param",
+                        "name": "tag"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "events": [],
+              "outputs": {},
+              "execution": {
+                "output_snapshot": "ambiguous",
+                "stages": [
+                  "preconditions",
+                  "mutation",
+                  "post_state_evaluation",
+                  "output_construction",
+                  "event_emission",
+                  "persistence"
+                ],
+                "alternatives": [
+                  [
+                    "preconditions",
+                    "pre_state_capture",
+                    "output_construction",
+                    "mutation",
+                    "post_state_evaluation",
+                    "event_emission",
+                    "persistence"
+                  ]
+                ],
+                "note": "no output key occurred in both the pre- and post-state documents; output ordering is unidentified"
+              },
+              "support": 7,
+              "reproduced": 7,
+              "provenance": {
+                "origin": "mixed",
+                "supporting_observations": [
+                  "step 13 (observed) tag -> success [state changed]",
+                  "step 27 (observed) tag -> success [state changed]",
+                  "step 30 (observed) tag -> success [state changed]",
+                  "step 53 (observed) tag -> success [state changed]",
+                  "step 60 (observed) tag -> success [state changed]",
+                  "step 0 (counterfactual) tag -> success [state changed]",
+                  "step 0 (counterfactual) tag -> success [state changed]"
+                ],
+                "contradictory_observations": [],
+                "necessary_conditions": [
+                  {
+                    "kind": "param_string_length",
+                    "param": "tag",
+                    "op": "ge",
+                    "length": 3,
+                    "unit": "bytes"
+                  },
+                  {
+                    "kind": "exists",
+                    "collection": "notes",
+                    "entity": {
+                      "param": "note_id"
+                    }
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "note_id"
+                  },
+                  {
+                    "kind": "param_non_empty",
+                    "param": "tag"
+                  }
+                ],
+                "guard_alternatives": [],
+                "effect_alternatives": [],
+                "selected_guards": [
+                  {
+                    "guard": {
+                      "kind": "exists",
+                      "collection": "notes",
+                      "entity": {
+                        "param": "note_id"
+                      }
+                    },
+                    "support": 7,
+                    "contradictions": 0,
+                    "parameter_dependencies": [
+                      "note_id"
+                    ],
+                    "operand_types": [],
+                    "identifiable": true
+                  }
+                ],
+                "parameters": [
+                  {
+                    "name": "note_id",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 7,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 7,
+                    "present_invalid": 0,
+                    "optional": false
+                  },
+                  {
+                    "name": "tag",
+                    "types": [
+                      "string"
+                    ],
+                    "present": 7,
+                    "absent": 0,
+                    "missing": 0,
+                    "explicit_null": 0,
+                    "defaulted": 0,
+                    "present_valid": 7,
+                    "present_invalid": 0,
+                    "optional": false
+                  }
+                ],
+                "state_updates": [
+                  {
+                    "field": "selected",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 7,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  },
+                  {
+                    "field": "view",
+                    "status": "preserved",
+                    "observed_before": [
+                      null
+                    ],
+                    "observed_after": [
+                      null
+                    ],
+                    "evidence_count": 7,
+                    "note": "the postcondition equals the prior value in every observation; an unconditional assignment is not identified from this evidence"
+                  }
+                ],
+                "untested_assumptions": [
+                  "4 positive-only condition(s) are recorded but not used as sufficient guards"
+                ],
+                "source_assisted": false,
+                "counterfactual_support": 2,
+                "output_contract": {
+                  "observations": 7,
+                  "fields": {},
+                  "unresolved": [],
+                  "unexpected": [],
+                  "notes": []
+                },
+                "output_support": 7,
+                "output_reproduced": 7
+              }
+            }
+          ],
+          "unsupported": [],
+          "notes": [
+            "initial state selected from ResetCapture evidence across 9 independent reset(s); reset_verified=true",
+            "Guards and effects are selected from observations and checked against every observation of the same branch; insufficient evidence leaves conditions unknown.",
+            "Every rule carries provenance: supporting and contradictory observations, competing guard/effect hypotheses, and state-update identifiability claims.",
+            "Positive-only properties are recorded as candidate necessary conditions, not treated as proof of sufficiency.",
+            "Identifiers are replaced by entity references and allocators; literal values remain only when no relationship explains them."
+          ]
+        }
+      }
+    }
+  ],
+  "reconstruction_totals": {
+    "sequences": 4,
+    "steps_attempted": 23,
+    "steps_executed": 9,
+    "steps_verifiable": 8,
+    "matching_steps": 5,
+    "unverified_steps": 1,
+    "excluded_steps": 14,
+    "divergences": 3,
+    "diverged_apps": 1
+  },
+  "data_reconstruction_totals": {
+    "steps_attempted": 23,
+    "steps_executed": 23,
+    "matching_steps": 23,
+    "state_matching_steps": 23,
+    "status_matching_steps": 23,
+    "error_matching_steps": 23,
+    "output_matching_steps": 23,
+    "event_matching_steps": 23,
+    "persistence_matching_steps": 23,
+    "outputs_compared_steps": 23,
+    "workflows_attempted": 4,
+    "workflows_fully_matching": 4,
+    "unverified_steps": 0,
+    "excluded_steps": 0,
+    "divergences": 0,
+    "apps_with_divergence": 0,
+    "step_accounting_complete": true
+  },
+  "runs": [
+    {
+      "app": "cli-notecli",
+      "split": "holdout",
+      "policy": "coverage",
+      "policy_used": "coverage",
+      "budget": 100,
+      "seed": 1,
+      "steps": 100,
+      "transitions": 65,
+      "classes": 19,
+      "new_behaviors": 65,
+      "unknowns": 71,
+      "conflicts": 3,
+      "duration_ms": 7689
+    }
+  ],
+  "methodology": {
+    "engine": "reforge-investigate deterministic exploration engine",
+    "reset": "verified copy of the pristine fixture before each episode",
+    "metrics": "distinct observed transitions, abstract states, new behaviors, failures",
+    "holdout": "applications marked holdout contribute no training rows and are reported separately",
+    "reconstruction": "hidden workflows replayed against a twin synthesized from held-out training episodes",
+    "notes": [
+      "Every run executes a real Python CLI application in a temporary work directory.",
+      "Budget is the number of action invocations, identical for every policy and seed.",
+      "Policy only ranks actions; all recorded behavior comes from observation.",
+      "A failed run is reported as failed and excluded from means, never scored as zero."
+    ]
+  }
+}

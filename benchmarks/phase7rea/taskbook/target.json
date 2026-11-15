@@ -1,0 +1,41 @@
+{
+  "target_id": "taskbook-0.3.0",
+  "target_name": "Taskbook",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "{spec_dir}/runtime/node_modules/taskbook/cli.js"],
+  "pristine_dir": "pristine",
+  "workdir": "work",
+  "state_file": "state.json",
+  "timeout_ms": 30000,
+  "actions": [
+    {
+      "action": "create_task",
+      "argv": ["create_task", "$title"],
+      "params": { "title": { "kind": "fresh_id", "prefix": "Task" } },
+      "parameters": {
+        "title": { "kind": "string" }
+      }
+    },
+    {
+      "action": "read_task",
+      "argv": ["read_task", "$id"],
+      "params": { "id": { "kind": "last_entity", "pool": "task" } },
+      "parameters": { "id": { "kind": "string" } }
+    },
+    {
+      "action": "check_task",
+      "argv": ["check_task", "$id"],
+      "params": { "id": { "kind": "last_entity", "pool": "task" } },
+      "parameters": { "id": { "kind": "string" } }
+    },
+    {
+      "action": "delete_task",
+      "argv": ["delete_task", "$id"],
+      "params": { "id": { "kind": "last_entity", "pool": "task" } },
+      "parameters": { "id": { "kind": "string" } }
+    },
+    { "action": "stats", "argv": ["stats"] },
+    { "action": "missing_task", "argv": ["missing_task", "999"] }
+  ]
+}

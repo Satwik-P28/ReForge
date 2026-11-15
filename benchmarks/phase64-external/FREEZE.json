@@ -1,0 +1,155 @@
+{
+  "access_boundary": {
+    "action_schema": "manually specified in target.json; not automatic discovery",
+    "adapter_role": "benchmark harness; target source is not inspected or imported",
+    "hidden_workflows_visible_to_investigator": false,
+    "investigator_source_access": "none"
+  },
+  "created_utc": "2026-11-09T15:31:20.215874+00:00",
+  "evaluation": {
+    "apps": [
+      "cli-hledger",
+      "cli-topydo",
+      "cli-sqlite"
+    ],
+    "budget": 100,
+    "experiment_budget": 100,
+    "policy": "coverage",
+    "seed": 1,
+    "strategy": "hybrid"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "aafd7becafe34c29547505777d18309c9aeab40a41630533f0761ddb29e75639"
+    },
+    {
+      "path": "apps.json",
+      "sha256": "599b7a345e2aa231cbd1ad3d8ca11eb9067284be62eb83a3bd2863417ea9f71e"
+    },
+    {
+      "path": "fixtures/hledger/adapter.py",
+      "sha256": "4ce374a1967843498bbc779237cac61dbe5eaed9f7e917fdfbac087350407919"
+    },
+    {
+      "path": "fixtures/hledger/ledger.journal",
+      "sha256": "51c4ea7667869537ebe7da8b03f73368921246181b26c039af2d80d88000523c"
+    },
+    {
+      "path": "fixtures/hledger/state.json",
+      "sha256": "dd0f2a8c409332fbe0580666f70ee329b1492661c40d5043cc1dc302a50b166a"
+    },
+    {
+      "path": "fixtures/hledger/target.json",
+      "sha256": "5a28d853fd3d69c762c7525f56a34feef5c346ef48c4309e735829dd66479de9"
+    },
+    {
+      "path": "fixtures/sqlite/adapter.py",
+      "sha256": "5ab8892690915b83ae6d62374bb01d55d0ca2f47d2b572dc466c7b065650286d"
+    },
+    {
+      "path": "fixtures/sqlite/state.json",
+      "sha256": "1f0e4e4e580da6b487c011aa77caa80d49bf09ea48bd6651eaa281733b99689b"
+    },
+    {
+      "path": "fixtures/sqlite/target.json",
+      "sha256": "cba000d407794376c4d08125cd675907d0c60410f0bd4779ab24b311a30c9bab"
+    },
+    {
+      "path": "fixtures/topydo/adapter.py",
+      "sha256": "273f4733c5bfe63769a77d8470330183dde723ee10809573808bab9ef8c2686e"
+    },
+    {
+      "path": "fixtures/topydo/done.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "fixtures/topydo/state.json",
+      "sha256": "43044464ebd93c52ccd53b51f347a9cb19e8bf76097a6f67eb53bda16d238383"
+    },
+    {
+      "path": "fixtures/topydo/target.json",
+      "sha256": "3a0c56d2539dc6760b715212424363c531427b38e0e3b09663771615ed53bf64"
+    },
+    {
+      "path": "fixtures/topydo/todo.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "aa6335bbcd7fc6d6e571083561494118fd8605bf35b8fa4887f967f90ce84fc6"
+    },
+    {
+      "path": "hidden/cli-hledger.json",
+      "sha256": "7d88ae75ef85eef296a413fe43b12bff16735720595a32d3abfdb8eb3f3ee1e9"
+    },
+    {
+      "path": "hidden/cli-sqlite.json",
+      "sha256": "45d52bfbd45b7fefa87cc6629b10c8bde58925e9d14e97b868549fb01b631375"
+    },
+    {
+      "path": "hidden/cli-topydo.json",
+      "sha256": "e1fcf38cf10d39e2d388a4f333ee109afaeac0ff35b537de701f402bf434b4da"
+    },
+    {
+      "path": "install.sh",
+      "sha256": "f2c2b0643e06ea3acc4b8217a74b21540faa7f472f3ee2ee1272995b4744d214"
+    },
+    {
+      "path": "preflight-smoke.json",
+      "sha256": "620691d164a936c8384a75f68f2eda8195784f5775c34220d936c1fdb026a4cb"
+    },
+    {
+      "path": "preflight.py",
+      "sha256": "5cf6c3e96cf2cc5742791585b2920fe6311d0bff08503e0a9263a99865bed40f"
+    },
+    {
+      "path": "targets.lock.json",
+      "sha256": "73307293ee10a5cbfdd3a2bd52b21661d4eb4d49116f780afe3bb307d9b92ad6"
+    }
+  ],
+  "frozen_before_first_evaluation": true,
+  "notes": [
+    "The suite was preflighted before this freeze.",
+    "Any fixture, hidden-workflow or normalization change after this freeze requires a new suite version.",
+    "Hidden workflows exercise new values and sequences; they were not used to tune synthesis."
+  ],
+  "source_commit": "3048b2b4bf481a3ccbc7b5efa37205eae2de04f4",
+  "source_tree": "555a4aa1e70051ed5bc2dcba5a4783d39b3d15f2",
+  "suite": "reforgebench-phase64-external",
+  "targets": {
+    "hledger": {
+      "archive_sha256": "13f851833344fc0f0458aa42d1bab35911c7c0c1fa071dab1ba078a466080b5c",
+      "distribution": "https://github.com/simonmichael/hledger/releases/download/1.32.3/hledger-linux-x64.zip",
+      "executable": "target/phase64-tools/hledger/hledger",
+      "executable_sha256": "9eb0b8eeabb5c92ad0f4cae4d2c7a11d7eaf56027f5290faf9a3f2cc0b998e38",
+      "license": "GPL-3.0-or-later",
+      "repository": "https://github.com/simonmichael/hledger",
+      "reset": "copy fixture directory; no user config or external data directory",
+      "runtime": "static x86_64 Linux binary; glibc host",
+      "version": "1.32.3"
+    },
+    "sqlite": {
+      "archive_sha256": "2c61fe3f6bfcf4ab0cad6c4edf1fa1cae93bbb816b744bef52a4bdde5bf7bf38",
+      "distribution": "https://www.sqlite.org/2025/sqlite-tools-linux-x64-3500400.zip",
+      "executable": "target/phase64-tools/sqlite/sqlite3",
+      "executable_sha256": "6aea93eb9110639f48816fc5d518874521e74adc8a4f3da4c757a9a9fc17a8d4",
+      "license": "Public Domain",
+      "repository": "https://www.sqlite.org/",
+      "reset": "copy fixture directory; database file lives inside the workdir",
+      "runtime": "x86_64 Linux CLI binary; no server",
+      "version": "3.50.4"
+    },
+    "topydo": {
+      "distribution": "https://pypi.org/project/topydo/0.16/",
+      "executable": "target/phase64-tools/topydo/venv/bin/topydo",
+      "executable_sha256": "f76f7b8c3a3dfedd1bd4e9029f5871ec30e6d671c80b640e42a00f7b083a4048",
+      "license": "GPL-3.0-or-later",
+      "repository": "https://github.com/topydo/topydo",
+      "reset": "copy todo.txt, done.txt and state.json; HOME is isolated per run",
+      "runtime": "Python 3.12 venv; arrow 1.4.0 and python-dateutil 4.0.0",
+      "version": "0.16",
+      "wheel_sha256": "8d70eec6210f41a857d387d79cf9a8f157b9628ffc145ac6239e3ab0ced5a0bc"
+    }
+  }
+}

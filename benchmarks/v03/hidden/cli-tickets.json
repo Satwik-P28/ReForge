@@ -1,0 +1,28 @@
+{
+  "app": "cli-tickets",
+  "workflows": [
+    {
+      "name": "assign-escalate-close-purge",
+      "steps": [
+        { "action": "create", "params": { "title": "alpha" } },
+        { "action": "assign", "params": { "ticket_id": "t1" } },
+        { "action": "escalate", "params": { "ticket_id": "t1" } },
+        { "action": "comment", "params": { "ticket_id": "t1", "text": "triage" } },
+        { "action": "close", "params": { "ticket_id": "t1" } },
+        { "action": "purge", "params": {} }
+      ]
+    },
+    {
+      "name": "invalid-before-assignment",
+      "steps": [
+        { "action": "assign", "params": { "ticket_id": "t1" } },
+        { "action": "create", "params": { "title": "beta" } },
+        { "action": "close", "params": { "ticket_id": "t1" } },
+        { "action": "assign", "params": { "ticket_id": "t1" } },
+        { "action": "comment", "params": { "ticket_id": "t1", "text": "note" } },
+        { "action": "close", "params": { "ticket_id": "t1" } },
+        { "action": "reopen", "params": { "ticket_id": "t1" } }
+      ]
+    }
+  ]
+}

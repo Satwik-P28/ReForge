@@ -39,6 +39,10 @@ pub struct IrCapabilityInstance {
     pub queries: Vec<String>,
     pub events: Vec<String>,
     pub has_twin: bool,
+    /// A typed data-aware implementation is available for actions the twin
+    /// cannot represent (identity allocation, derived fields, persistence).
+    #[serde(default)]
+    pub has_data_program: bool,
     #[serde(default)]
     pub contracts: Vec<Id>,
 }
@@ -62,10 +66,10 @@ impl ApplicationIr {
             ));
         }
         for (name, inst) in &self.instances {
-            if !inst.has_twin {
+            if !inst.has_twin && !inst.has_data_program {
                 diags.push(Diagnostic::warning(
                     "ir.no_twin",
-                    format!("instance '{name}' has no behavioral twin; runtime execution limited"),
+                    format!("instance '{name}' has no executable implementation; runtime execution limited"),
                 ));
             }
         }

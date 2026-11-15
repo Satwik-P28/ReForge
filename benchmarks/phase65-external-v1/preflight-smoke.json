@@ -1,0 +1,5 @@
+{"notecli": [
+  {"action": "add", "params": {"title": "smoke note"}},
+  {"action": "tag", "params": {"note_id": "2", "tag": "smoke"}},
+  {"action": "stats", "params": {}}
+]}

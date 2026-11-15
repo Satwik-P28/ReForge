@@ -19,6 +19,7 @@ reforge-compose = { workspace = true }
 reforge-runtime = { workspace = true }
 reforge-verify = { workspace = true }
 reforge-export = { workspace = true }
+reforge-rea = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

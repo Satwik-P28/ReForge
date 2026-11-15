@@ -1,0 +1,9 @@
+{
+  "notecli": {
+    "kind": "independently-authored-python-cli",
+    "version": "1.0.0",
+    "license": "MIT",
+    "executable_sha256": "6b32fc46e22c73688836f8db8e1c35580cada178afc7988855a92af4915ba770",
+    "exposed_subset": "add, pin, tag, rename, delete, list, stats"
+  }
+}

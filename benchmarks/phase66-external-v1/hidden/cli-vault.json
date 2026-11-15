@@ -1,0 +1,31 @@
+{
+  "app": "cli-vault",
+  "workflows": [
+    {"name": "string-create-nested-owner-publish", "steps": [
+      {"action": "create", "params": {"label": "beta"}},
+      {"action": "put", "params": {"bucket_id": "b2", "key": "token"}},
+      {"action": "set_owner", "params": {"bucket_id": "b2", "owner": "ana"}},
+      {"action": "show", "params": {"bucket_id": "b2"}},
+      {"action": "publish", "params": {"bucket_id": "b2"}},
+      {"action": "stats", "params": {}}
+    ]},
+    {"name": "delete-guard-recreate-archive", "steps": [
+      {"action": "drop", "params": {"bucket_id": "b1"}},
+      {"action": "show", "params": {"bucket_id": "b1"}},
+      {"action": "put", "params": {"bucket_id": "b1", "key": "key"}},
+      {"action": "create", "params": {"label": "gamma"}},
+      {"action": "archive", "params": {"bucket_id": "b3"}},
+      {"action": "show", "params": {"bucket_id": "b3"}}
+    ]},
+    {"name": "publish-duplicate-nonempty", "steps": [
+      {"action": "create", "params": {"label": "delta"}},
+      {"action": "publish", "params": {"bucket_id": "b2"}},
+      {"action": "publish", "params": {"bucket_id": "b2"}},
+      {"action": "put", "params": {"bucket_id": "b2", "key": "key"}},
+      {"action": "archive", "params": {"bucket_id": "b2"}},
+      {"action": "show", "params": {"bucket_id": "b2"}},
+      {"action": "drop", "params": {"bucket_id": "b2"}},
+      {"action": "stats", "params": {}}
+    ]}
+  ]
+}

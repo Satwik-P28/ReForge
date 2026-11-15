@@ -1,0 +1,26 @@
+{
+  "app": "cli-events",
+  "workflows": [
+    {
+      "name": "publish-process-status",
+      "steps": [
+        { "action": "subscribe", "params": { "channel": "ops" } },
+        { "action": "publish", "params": { "channel": "ops", "payload": "e1" } },
+        { "action": "process", "params": {} },
+        { "action": "status", "params": {} }
+      ]
+    },
+    {
+      "name": "late-subscribe-purge",
+      "steps": [
+        { "action": "publish", "params": { "channel": "ops", "payload": "e2" } },
+        { "action": "subscribe", "params": { "channel": "ops" } },
+        { "action": "subscribe", "params": { "channel": "ops" } },
+        { "action": "ack", "params": {} },
+        { "action": "process", "params": {} },
+        { "action": "purge", "params": {} },
+        { "action": "status", "params": {} }
+      ]
+    }
+  ]
+}

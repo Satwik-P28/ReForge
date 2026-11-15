@@ -1,0 +1,31 @@
+{
+  "target_id": "cli-foundry",
+  "target_name": "foundry",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/foundry.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v07-work-foundry",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "label",
+      "argv": ["label", "$text"],
+      "params": {
+        "text": {
+          "kind": "fresh_id",
+          "prefix": "tag"
+        }
+      }
+    },
+    {
+      "action": "status",
+      "argv": ["status"]
+    }
+  ]
+}

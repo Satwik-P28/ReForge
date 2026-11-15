@@ -1,0 +1,142 @@
+{
+  "access_boundary": {
+    "action_schema": "manually specified in target.json; parameter-free",
+    "adapter_role": "benchmark harness; target source is not imported by the adapter",
+    "hidden_workflows_visible_to_investigator": false,
+    "investigator_source_access": "none (black-box only)",
+    "rea_source": "not used"
+  },
+  "created_utc": "2026-11-13T19:14:07.242462+00:00",
+  "evaluation": {
+    "apps": [
+      "changesets-2.27.9",
+      "dbmate-2.20.0"
+    ],
+    "arms": [
+      "black_box"
+    ],
+    "budgets": [
+      32
+    ],
+    "configurations": [
+      "A_phase9",
+      "D_complete",
+      "P_state_diverse"
+    ],
+    "experiment_budget": 128,
+    "policy": "coverage",
+    "seeds": [
+      1
+    ],
+    "strategy": "hybrid"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "9cf398bee5f0d100a7970277bc060a1eedd61f31a8af8691801c16f695602824"
+    },
+    {
+      "path": "SELECTION.md",
+      "sha256": "9fefc9a942f9e7664dc0e3bb4553163886339d7ffa852a58567d7c075ad4170b"
+    },
+    {
+      "path": "TARGET_EXCLUSION.json",
+      "sha256": "f6b6657c446c2c9abb85cac8ca8739b1e2b8e76cd1c23d39efcafb932faea85f"
+    },
+    {
+      "path": "apps.json",
+      "sha256": "374bf5e6b2f687cab84c257cedd4f88379eb0a314b8cadf975e5f894cfc93532"
+    },
+    {
+      "path": "fixtures/changesets/adapter.py",
+      "sha256": "f86fa4a8a13c1686d14a73d95aa80266c01963b8277d7bcd9286afd49a8b8400"
+    },
+    {
+      "path": "fixtures/changesets/pristine/.changeset/000-scaffold.md",
+      "sha256": "ec27253fa3459aa64f6d5077e5d8a136946be4761c91b0a76e35e89c15057e35"
+    },
+    {
+      "path": "fixtures/changesets/pristine/.changeset/config.json",
+      "sha256": "f05d2ef5c5a96c606b09dd8a174b8c0235c95746424c7a01b2b6dd17d6f86295"
+    },
+    {
+      "path": "fixtures/changesets/pristine/package.json",
+      "sha256": "bb656a77f733bc97ddcda8291071d5e552c5f379ffe2305438ff908e9a5bef0b"
+    },
+    {
+      "path": "fixtures/changesets/target.json",
+      "sha256": "0dc6259ffcd33adbdc9f6faf4be000156f63c44320cd8e7d8eb45e3728253547"
+    },
+    {
+      "path": "fixtures/dbmate/adapter.py",
+      "sha256": "715a1c1e0fa4604ee2b7db13d4a1388e1e35f57a014a5a77747c0614f658ff1d"
+    },
+    {
+      "path": "fixtures/dbmate/pristine/README.txt",
+      "sha256": "d0f2e258ad9864da054234824c82b479b410d32b09bfafa3d2ace09563b43a96"
+    },
+    {
+      "path": "fixtures/dbmate/pristine/db/migrations/20240101000000_create_items.sql",
+      "sha256": "fec9443deaf864d369a49a894bb1562105be0dd3eb644170bd3496c16358c15e"
+    },
+    {
+      "path": "fixtures/dbmate/pristine/db/migrations/20240102000000_add_tags.sql",
+      "sha256": "675b79f093e4a42df6335094460795b794ce276fb974d09529c5a312a3665b39"
+    },
+    {
+      "path": "fixtures/dbmate/pristine/db/migrations/20240103000000_seed_items.sql",
+      "sha256": "746b733a3243ad7fb52fc17f763787d42723311a87d76e81a03a239ff14d7f92"
+    },
+    {
+      "path": "fixtures/dbmate/target.json",
+      "sha256": "b952104c34eedbd7448c2480626bf2ef673b1ccca6efb2fa7e6561cdc966e7ef"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "08c1b5d27d9118c199c5e10acb1c8b24acb041d2afeadf54c7de7730af9596ed"
+    },
+    {
+      "path": "hidden/changesets-2.27.9.json",
+      "sha256": "95292d432d3aa21a1e8c50644d5151a589e195029cde473d4b92fbd6015c7c54"
+    },
+    {
+      "path": "hidden/dbmate-2.20.0.json",
+      "sha256": "470f41b16ac133541d23b4d170ca077ff83c2cead9ff9abe10f3313be604ed9b"
+    },
+    {
+      "path": "preflight.py",
+      "sha256": "2e7aeaf5431571b558c660f7bbd4ed33dbf2577942fb158af8a8f157e0bf31de"
+    }
+  ],
+  "frozen_before_first_evaluation": true,
+  "notes": [
+    "Neither application or version was used in ReForge development or tuning before this freeze.",
+    "The adapters were validated against public CLI behavior and persisted state by preflight.py.",
+    "Any source, adapter, workflow, normalization or configuration change after this freeze requires a new suite version.",
+    "The three evaluation configurations were fixed at freeze time; none was retuned after a result was observed."
+  ],
+  "scoring": {
+    "comparison": "state, status, error, outputs, events, persistence and restart",
+    "engine": "reforgebench_v02 data-aware totals",
+    "excluded_steps_are_not_passes": true
+  },
+  "source_commit": "17606a4d8abd1918a5b615651a7002db5032e862",
+  "source_tree": "792be67a85067636164960c32c7de2865acf9c02",
+  "source_worktree_clean_at_freeze": true,
+  "suite": "reforgebench-phase11-untouched",
+  "tools": {
+    "changesets": {
+      "distribution": "npm @changesets/cli@2.27.9",
+      "exposed_subset": "add empty changeset, version, pre enter, pre exit",
+      "kind": "external-node-cli",
+      "launcher_sha256": "c17dddb4b7cf4733109a995caa33f2a9bdb01ffdfe71bce6f2d184dc52276a29",
+      "node_version": "26.13.0"
+    },
+    "dbmate": {
+      "binary_sha256": "5b4953d6a9e8fdd269abde9fccbc562d65d7c1441b073c7ac7ca4b5df1d7af28",
+      "distribution": "github.com/amacneil/dbmate v2.20.0 linux-amd64",
+      "exposed_subset": "apply pending, rollback one, status, create database, drop database",
+      "kind": "external-go-cli"
+    }
+  }
+}

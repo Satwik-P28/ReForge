@@ -1,0 +1,81 @@
+{
+  "target_id": "cli-notes",
+  "target_name": "notes",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/notes.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase63-work-notes",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    {
+      "action": "add",
+      "argv": [
+        "add",
+        "$text"
+      ],
+      "params": {
+        "text": {
+          "kind": "fresh_id",
+          "prefix": "memo"
+        }
+      }
+    },
+    {
+      "action": "pin",
+      "argv": [
+        "pin",
+        "$note_id"
+      ],
+      "params": {
+        "note_id": {
+          "kind": "last_entity",
+          "pool": "note"
+        }
+      }
+    },
+    {
+      "action": "unpin",
+      "argv": [
+        "unpin",
+        "$note_id"
+      ],
+      "params": {
+        "note_id": {
+          "kind": "last_entity",
+          "pool": "note"
+        }
+      }
+    },
+    {
+      "action": "remove",
+      "argv": [
+        "remove",
+        "$note_id"
+      ],
+      "params": {
+        "note_id": {
+          "kind": "last_entity",
+          "pool": "note"
+        }
+      }
+    },
+    {
+      "action": "list",
+      "argv": [
+        "list"
+      ]
+    },
+    {
+      "action": "stats",
+      "argv": [
+        "stats"
+      ]
+    }
+  ]
+}

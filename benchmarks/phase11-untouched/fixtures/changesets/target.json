@@ -1,0 +1,17 @@
+{
+  "target_id": "changesets-2.27.9",
+  "target_name": "changesets",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": "pristine",
+  "workdir": "../../../target/reforge-phase11-work-changesets",
+  "state_file": "state.json",
+  "timeout_ms": 60000,
+  "actions": [
+    {"action": "add_empty", "argv": ["add_empty"]},
+    {"action": "version", "argv": ["version"]},
+    {"action": "pre_enter", "argv": ["pre_enter"]},
+    {"action": "pre_exit", "argv": ["pre_exit"]}
+  ]
+}

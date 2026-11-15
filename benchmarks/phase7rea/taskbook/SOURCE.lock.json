@@ -1,0 +1,9 @@
+{
+  "target": "taskbook",
+  "version": "0.3.0",
+  "license": "MIT",
+  "package": "taskbook@0.3.0",
+  "source": "https://github.com/klaussinani/taskbook",
+  "install": "npm install --prefix runtime --omit=dev taskbook@0.3.0",
+  "rea_version": "6.7.0"
+}

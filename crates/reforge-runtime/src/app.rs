@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use reforge_behavior::TwinEngine;
 use reforge_capability::LoadedPackage;
 use reforge_compose::{ApplicationIr, BindingDecl, CompileResult, EndpointKind, OnDeletePolicy};
+use reforge_investigate::{DataProgram, DataStatus};
 use reforge_types::*;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -16,7 +17,7 @@ const MAX_EVENT_DEPTH: usize = 32;
 pub enum RuntimeError {
     #[error("unknown instance '{0}'")]
     UnknownInstance(String),
-    #[error("instance '{0}' has no twin")]
+    #[error("instance '{0}' has no executable implementation")]
     NoTwin(String),
     #[error("persist: {0}")]
     Persist(#[from] PersistError),
@@ -39,9 +40,73 @@ pub struct DispatchResult {
     pub link_diagnostics: Vec<Diagnostic>,
 }
 
+/// Typed data-aware execution state. Unlike the abstract twin this owns
+/// concrete entities, so IDs, derived fields and restart persistence survive.
+struct DataProgramEngine {
+    program: DataProgram,
+    state: serde_json::Value,
+    step_index: u64,
+}
+
+impl DataProgramEngine {
+    fn execute(&mut self, action: &str, parameters: IndexMap<String, TypedValue>) -> TraceStep {
+        let params: std::collections::BTreeMap<String, serde_json::Value> = parameters
+            .iter()
+            .map(|(k, v)| (k.clone(), typed_to_json(v)))
+            .collect();
+        let before = self.state.clone();
+        let execution = self
+            .program
+            .execute_with_trace(&self.state, action, &params);
+        self.state = execution.state;
+        self.step_index += 1;
+        let outputs = execution
+            .outcome
+            .outputs
+            .into_iter()
+            .map(|(k, v)| (k, json_to_typed(v)))
+            .collect();
+        let transition_id = execution
+            .outcome
+            .rule
+            .as_deref()
+            .and_then(|id| Id::new(id.to_string()).ok());
+        let result = match execution.outcome.status {
+            DataStatus::Success => StepResult::Success,
+            DataStatus::Rejected => StepResult::Rejected {
+                reason: execution
+                    .outcome
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "rejected".into()),
+            },
+            DataStatus::Unknown => StepResult::Unknown {
+                message: execution
+                    .outcome
+                    .detail
+                    .clone()
+                    .unwrap_or_else(|| "unmodeled action".into()),
+            },
+        };
+        TraceStep {
+            index: self.step_index,
+            action: action.into(),
+            parameters,
+            result,
+            transition_id,
+            state_before: before.to_string(),
+            state_after: self.state.to_string(),
+            variables_after: IndexMap::new(),
+            outputs,
+            events: execution.outcome.events,
+        }
+    }
+}
+
 pub struct AppRuntime {
     pub ir: ApplicationIr,
     engines: IndexMap<String, TwinEngine>,
+    data_engines: IndexMap<String, DataProgramEngine>,
     #[allow(dead_code)]
     packages: IndexMap<String, LoadedPackage>,
     pub links: LinkStore,
@@ -51,13 +116,28 @@ pub struct AppRuntime {
 impl AppRuntime {
     pub fn from_compile(compiled: CompileResult) -> Result<Self, RuntimeError> {
         let mut engines = IndexMap::new();
+        let mut data_engines = IndexMap::new();
         for (name, pkg) in &compiled.packages {
-            let twin = pkg
-                .twin
-                .clone()
-                .ok_or_else(|| RuntimeError::NoTwin(name.clone()))?;
-            let engine = TwinEngine::new(twin).map_err(|e| RuntimeError::Other(e.to_string()))?;
-            engines.insert(name.clone(), engine);
+            if let Some(program) = pkg.data_program.clone() {
+                // A typed data-aware program is the functional implementation.
+                // The abstract twin remains package evidence and is not selected
+                // just because it was extracted first.
+                let state = program.initial_state.clone();
+                data_engines.insert(
+                    name.clone(),
+                    DataProgramEngine {
+                        program,
+                        state,
+                        step_index: 0,
+                    },
+                );
+            } else if let Some(twin) = pkg.twin.clone() {
+                let engine =
+                    TwinEngine::new(twin).map_err(|e| RuntimeError::Other(e.to_string()))?;
+                engines.insert(name.clone(), engine);
+            } else {
+                return Err(RuntimeError::NoTwin(name.clone()));
+            }
         }
         let mut links = LinkStore::default();
         for rel in &compiled.ir.relationships {
@@ -66,6 +146,7 @@ impl AppRuntime {
         Ok(Self {
             ir: compiled.ir,
             engines,
+            data_engines,
             packages: compiled.packages,
             links,
             store: None,
@@ -81,6 +162,15 @@ impl AppRuntime {
                     // Reconstruct runtime by replaying is hard; restore snapshot fields.
                     // TwinEngine doesn't expose setters — use a restore helper via reset+inject.
                     restore_engine_state(engine, state, vars)?;
+                }
+            }
+        }
+        for name in self.data_engines.keys().cloned().collect::<Vec<_>>() {
+            if let Some((state, _)) = store.load_instance(&name)? {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&state).map_err(|e| RuntimeError::Other(e.to_string()))?;
+                if let Some(engine) = self.data_engines.get_mut(&name) {
+                    engine.state = parsed;
                 }
             }
         }
@@ -108,6 +198,9 @@ impl AppRuntime {
                 &engine.runtime().variables,
             )?;
         }
+        for (name, engine) in &self.data_engines {
+            store.save_instance(name, &engine.state.to_string(), &IndexMap::new())?;
+        }
         store.save_links(&self.links)?;
         Ok(())
     }
@@ -121,6 +214,16 @@ impl AppRuntime {
                     "current_state": engine.runtime().current_state,
                     "variables": engine.runtime().variables,
                     "coverage": engine.coverage(),
+                }),
+            );
+        }
+        for (name, engine) in &self.data_engines {
+            instances.insert(
+                name.clone(),
+                serde_json::json!({
+                    "data_program": true,
+                    "state": engine.state,
+                    "rule_count": engine.program.rules.len(),
                 }),
             );
         }
@@ -205,12 +308,12 @@ impl AppRuntime {
             }
         }
 
-        let step = {
-            let engine = self
-                .engines
-                .get_mut(instance)
-                .ok_or_else(|| RuntimeError::UnknownInstance(instance.into()))?;
+        let step = if let Some(engine) = self.engines.get_mut(instance) {
             engine.execute(action, parameters)
+        } else if let Some(engine) = self.data_engines.get_mut(instance) {
+            engine.execute(action, parameters)
+        } else {
+            return Err(RuntimeError::UnknownInstance(instance.into()));
         };
 
         let mut result = DispatchResult {
@@ -343,6 +446,53 @@ impl AppRuntime {
 
     pub fn engine(&self, instance: &str) -> Option<&TwinEngine> {
         self.engines.get(instance)
+    }
+
+    pub fn has_data_program(&self, instance: &str) -> bool {
+        self.data_engines.contains_key(instance)
+    }
+}
+
+fn typed_to_json(value: &TypedValue) -> serde_json::Value {
+    match value {
+        TypedValue::Null => serde_json::Value::Null,
+        TypedValue::Bool(v) => serde_json::Value::Bool(*v),
+        TypedValue::Int(v) => serde_json::Value::Number((*v).into()),
+        TypedValue::Float(v) => serde_json::Number::from_f64(*v)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        TypedValue::String(v) | TypedValue::BytesHex(v) => serde_json::Value::String(v.clone()),
+        TypedValue::List(items) => {
+            serde_json::Value::Array(items.iter().map(typed_to_json).collect())
+        }
+        TypedValue::Map(map) => serde_json::Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), typed_to_json(v)))
+                .collect(),
+        ),
+    }
+}
+
+fn json_to_typed(value: serde_json::Value) -> TypedValue {
+    match value {
+        serde_json::Value::Null => TypedValue::Null,
+        serde_json::Value::Bool(v) => TypedValue::Bool(v),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                TypedValue::Int(i)
+            } else {
+                TypedValue::Float(n.as_f64().unwrap_or(0.0))
+            }
+        }
+        serde_json::Value::String(v) => TypedValue::String(v),
+        serde_json::Value::Array(items) => {
+            TypedValue::List(items.into_iter().map(json_to_typed).collect())
+        }
+        serde_json::Value::Object(map) => TypedValue::Map(
+            map.into_iter()
+                .map(|(k, v)| (k, json_to_typed(v)))
+                .collect(),
+        ),
     }
 }
 

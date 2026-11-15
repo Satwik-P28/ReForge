@@ -1,0 +1,18 @@
+{
+  "suite": "reforgebench-phase63-holdout",
+  "description": "Internally authored, hash-frozen three-family holdout for Phase 6.3; not third-party independent.",
+  "apps": [
+    {
+      "spec": "benchmarks/phase63-holdout/fixtures/bakery/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "benchmarks/phase63-holdout/fixtures/desk/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "benchmarks/phase63-holdout/fixtures/notes/target.json",
+      "split": "holdout"
+    }
+  ]
+}

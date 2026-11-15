@@ -1,0 +1,79 @@
+{
+  "app": "cli-desk",
+  "workflows": [
+    {
+      "name": "open-assign-escalate-close-twice",
+      "steps": [
+        {
+          "action": "open",
+          "params": {
+            "subject": "alpha"
+          }
+        },
+        {
+          "action": "assign",
+          "params": {
+            "ticket_id": "t1",
+            "agent": "ada"
+          }
+        },
+        {
+          "action": "escalate",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "closed-rejects-assign-and-escalate",
+      "steps": [
+        {
+          "action": "open",
+          "params": {
+            "subject": "beta"
+          }
+        },
+        {
+          "action": "close",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "escalate",
+          "params": {
+            "ticket_id": "t1"
+          }
+        },
+        {
+          "action": "assign",
+          "params": {
+            "ticket_id": "t1",
+            "agent": "ada"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

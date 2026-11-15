@@ -1,0 +1,42 @@
+{
+  "app": "cli-sqlite",
+  "workflows": [
+    {
+      "name": "two-items-increment-list",
+      "steps": [
+        {"action": "add_item", "params": {"name": "alpha"}},
+        {"action": "increment", "params": {"item_id": "1"}},
+        {"action": "add_item", "params": {"name": "beta"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "rename-remove-total",
+      "steps": [
+        {"action": "add_item", "params": {"name": "gamma"}},
+        {"action": "add_item", "params": {"name": "delta"}},
+        {"action": "rename", "params": {"item_id": "1", "name": "renamed gamma"}},
+        {"action": "remove", "params": {"item_id": "2"}},
+        {"action": "total", "params": {}}
+      ]
+    },
+    {
+      "name": "reject-missing-then-update",
+      "steps": [
+        {"action": "increment", "params": {"item_id": "9"}},
+        {"action": "add_item", "params": {"name": "epsilon"}},
+        {"action": "increment", "params": {"item_id": "1"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "delete-first-total",
+      "steps": [
+        {"action": "add_item", "params": {"name": "zeta"}},
+        {"action": "add_item", "params": {"name": "eta"}},
+        {"action": "remove", "params": {"item_id": "1"}},
+        {"action": "total", "params": {}}
+      ]
+    }
+  ]
+}

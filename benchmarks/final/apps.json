@@ -1,0 +1,34 @@
+{
+  "suite": "reforgebench-final",
+  "description": "Independently authored final evaluation workflows. Frozen before execution; development suites are regressions only.",
+  "apps": [
+    {
+      "spec": "fixtures/v02/cli-taskboard/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-inventory/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-forms/target.json",
+      "split": "train"
+    },
+    {
+      "spec": "fixtures/v02/cli-contacts/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v02/cli-events/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v03/cli-library/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v03/cli-tickets/target.json",
+      "split": "holdout"
+    }
+  ]
+}

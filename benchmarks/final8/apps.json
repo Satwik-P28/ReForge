@@ -1,0 +1,14 @@
+{
+  "suite": "reforgebench-final8",
+  "description": "Untouched two-application holdout for causal collection synthesis, derived outputs, string guards, nested baselines and persistence; frozen before first execution.",
+  "apps": [
+    {
+      "spec": "fixtures/v07/cli-foundry/target.json",
+      "split": "holdout"
+    },
+    {
+      "spec": "fixtures/v07/cli-orchard/target.json",
+      "split": "holdout"
+    }
+  ]
+}

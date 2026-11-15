@@ -1,0 +1,39 @@
+{
+  "phase": 11,
+  "purpose": "Every target family already used by ReForge development, tuning or a previous freeze.",
+  "excluded_families": [
+    {"family": "final2", "targets": ["cli-taskboard", "cli-inventory", "cli-forms", "cli-contacts", "cli-events", "cli-library", "cli-tickets"], "reason": "implementation and regression"},
+    {"family": "final3", "targets": ["cli-garden", "cli-ledger"], "reason": "implementation and regression"},
+    {"family": "final4", "targets": ["cli-depot"], "reason": "implementation and regression"},
+    {"family": "final5", "targets": ["cli-atelier"], "reason": "implementation and regression"},
+    {"family": "final8", "targets": ["cli-foundry", "cli-orchard"], "reason": "implementation and regression"},
+    {"family": "phase6.3-holdout", "targets": ["cli-bakery", "cli-desk", "cli-notes"], "reason": "internally authored holdout development"},
+    {"family": "causal-holdout", "targets": ["cli-kiln"], "reason": "causal holdout development"},
+    {"family": "phase6.4-external", "targets": ["cli-hledger", "cli-topydo", "cli-sqlite"], "reason": "external adapter development"},
+    {"family": "phase6.5-external", "targets": ["cli-notecli"], "reason": "identity and allocation development"},
+    {"family": "phase6.6-external", "targets": ["cli-parcel", "cli-vault"], "reason": "external reconstruction baseline"},
+    {"family": "phase7.1-external", "targets": ["json-server-0.17.4", "todo.txt-cli-2.12.0"], "reason": "Phase 7 development and tuning"},
+    {"family": "phase7.4-taskbook", "targets": ["taskbook-0.3.0"], "reason": "composition and export development"},
+    {"family": "phase8-independent", "targets": ["npm-cli-11.20.0", "buku-5.1"], "reason": "Phase 8-10 development suite"},
+    {"family": "invalidated-or-version-variants", "targets": ["all earlier versions of the above"], "reason": "version changes do not create independent evidence"}
+  ],
+  "new_targets": [
+    {
+      "target": "changesets-2.27.9",
+      "family": "changesets release planner",
+      "language": "JavaScript on Node",
+      "persistence": "package manifest, changeset markdown files, prerelease mode JSON, generated changelog",
+      "why_unfamiliar": "Never appears in any benchmark fixture, target spec or prior Phase 6-10 suite; selected before any Phase 11 reconstruction.",
+      "rea_source": "not used (black-box only)"
+    },
+    {
+      "target": "dbmate-2.20.0",
+      "family": "dbmate schema migration CLI",
+      "language": "Go",
+      "persistence": "SQLite database with a schema_migrations ledger",
+      "why_unfamiliar": "Never appears in any benchmark fixture, target spec or prior Phase 6-10 suite; selected before any Phase 11 reconstruction.",
+      "rea_source": "not used (black-box only)"
+    }
+  ],
+  "selection_rule": "Exact target families, not version numbers, are excluded. These two applications are the only Phase 11 untouched targets."
+}

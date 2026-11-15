@@ -1,0 +1,30 @@
+{
+  "json-server": {
+    "install": "npm install --prefix json-server/runtime --no-save --save-exact json-server@0.17.4",
+    "license": "MIT",
+    "tarball": "json-server-0.17.4.tgz",
+    "tarball_sha256": "254297dda7a85d5faa48985e1a81ffa05cea5e8bf6aaf3036d58ac1db2798cd1",
+    "upstream": "https://github.com/typicode/json-server",
+    "version": "0.17.4"
+  },
+  "platform": {
+    "arch": "x86_64",
+    "node": "26.13.0",
+    "npm": "11.20.0",
+    "os": "Ubuntu 24.04.5 LTS",
+    "python": "3.12.3"
+  },
+  "rea": {
+    "command": ".phase7-audit/rea/node_modules/.bin/rea",
+    "license": "MIT",
+    "version": "6.7.0"
+  },
+  "todo.txt-cli": {
+    "install": "benchmarks/phase71-external/install.sh",
+    "license": "GPL-3.0-or-later",
+    "tarball": "todo.txt_cli-2.12.0.tar.gz",
+    "tarball_sha256": "e6da9b2c8022658c514a0b1613b3eae52f6240bf2b3494a83dae713ea445d13e",
+    "upstream": "https://github.com/todotxt/todo.txt-cli",
+    "version": "2.12.0"
+  }
+}

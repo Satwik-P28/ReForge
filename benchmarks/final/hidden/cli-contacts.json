@@ -1,0 +1,119 @@
+{
+  "app": "cli-contacts",
+  "workflows": [
+    {
+      "name": "tag-update-unarchive-remove",
+      "steps": [
+        {
+          "action": "create",
+          "params": {
+            "name": "alice"
+          }
+        },
+        {
+          "action": "tag",
+          "params": {
+            "contact_id": "c1",
+            "tag": "vip"
+          }
+        },
+        {
+          "action": "update",
+          "params": {
+            "contact_id": "c1",
+            "name": "bob"
+          }
+        },
+        {
+          "action": "unarchive",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "remove",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "archive-cycle-and-search",
+      "steps": [
+        {
+          "action": "create",
+          "params": {
+            "name": "dave"
+          }
+        },
+        {
+          "action": "archive",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "unarchive",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "remove",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "search",
+          "params": {
+            "query": "da"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "remove-active-then-mutate",
+      "steps": [
+        {
+          "action": "create",
+          "params": {
+            "name": "eve"
+          }
+        },
+        {
+          "action": "remove",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "archive",
+          "params": {
+            "contact_id": "c1"
+          }
+        },
+        {
+          "action": "update",
+          "params": {
+            "contact_id": "c1",
+            "name": "z"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

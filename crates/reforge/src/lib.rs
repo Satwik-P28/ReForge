@@ -10,6 +10,7 @@ pub use reforge_dependency as dependency;
 pub use reforge_evidence as evidence;
 pub use reforge_export as export;
 pub use reforge_expr as expr;
+pub use reforge_rea as rea;
 pub use reforge_runtime as runtime;
 pub use reforge_schema as schema;
 pub use reforge_types as types;

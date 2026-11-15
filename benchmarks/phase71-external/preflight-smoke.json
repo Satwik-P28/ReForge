@@ -1,0 +1,14 @@
+{
+  "json-server-0.17.4": [
+    {"action": "create_post", "params": {"title": "smoke post"}},
+    {"action": "read_post", "params": {"id": "2"}},
+    {"action": "publish_post", "params": {"id": "2"}},
+    {"action": "post_count", "params": {}}
+  ],
+  "todo.txt-cli-2.12.0": [
+    {"action": "add_task", "params": {"title": "smoke task"}},
+    {"action": "read_task", "params": {"id": "1"}},
+    {"action": "complete_task", "params": {"id": "1"}},
+    {"action": "stats", "params": {}}
+  ]
+}

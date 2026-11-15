@@ -1,0 +1,17 @@
+{
+  "hledger": [
+    {"action": "record_food", "params": {"description": "smoke meal"}},
+    {"action": "record_rent", "params": {"description": "smoke rent"}},
+    {"action": "balance", "params": {}}
+  ],
+  "topydo": [
+    {"action": "add", "params": {"text": "smoke task"}},
+    {"action": "complete", "params": {"task_id": "1"}},
+    {"action": "list", "params": {}}
+  ],
+  "sqlite": [
+    {"action": "add_item", "params": {"name": "smoke item"}},
+    {"action": "increment", "params": {"item_id": "1"}},
+    {"action": "list", "params": {}}
+  ]
+}

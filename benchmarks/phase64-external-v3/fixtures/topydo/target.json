@@ -1,0 +1,83 @@
+{
+  "target_id": "cli-topydo",
+  "target_name": "topydo",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/adapter.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase65-work-topydo-v3",
+  "state_file": "state.json",
+  "timeout_ms": 15000,
+  "actions": [
+    {
+      "action": "add",
+      "argv": [
+        "add",
+        "$text"
+      ],
+      "params": {
+        "text": {
+          "kind": "fresh_id",
+          "prefix": "task"
+        }
+      }
+    },
+    {
+      "action": "complete",
+      "argv": [
+        "complete",
+        "$task_id"
+      ],
+      "params": {
+        "task_id": {
+          "kind": "last_entity",
+          "pool": "task"
+        }
+      }
+    },
+    {
+      "action": "delete",
+      "argv": [
+        "delete",
+        "$task_id"
+      ],
+      "params": {
+        "task_id": {
+          "kind": "last_entity",
+          "pool": "task"
+        }
+      }
+    },
+    {
+      "action": "priority",
+      "argv": [
+        "priority",
+        "$task_id",
+        "$priority"
+      ],
+      "params": {
+        "task_id": {
+          "kind": "last_entity",
+          "pool": "task"
+        },
+        "priority": {
+          "kind": "literal",
+          "value": {
+            "kind": "string",
+            "value": "A"
+          }
+        }
+      }
+    },
+    {
+      "action": "list",
+      "argv": [
+        "list"
+      ]
+    }
+  ]
+}

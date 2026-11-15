@@ -1,0 +1,68 @@
+{
+  "target_id": "cli-hledger",
+  "target_name": "hledger",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": [
+    "{spec_dir}/adapter.py",
+    "--state",
+    "."
+  ],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase65-work-hledger-v3",
+  "state_file": "state.json",
+  "timeout_ms": 20000,
+  "actions": [
+    {
+      "action": "record_food",
+      "argv": [
+        "record_food",
+        "$description"
+      ],
+      "params": {
+        "description": {
+          "kind": "fresh_id",
+          "prefix": "meal"
+        }
+      }
+    },
+    {
+      "action": "record_rent",
+      "argv": [
+        "record_rent",
+        "$description"
+      ],
+      "params": {
+        "description": {
+          "kind": "fresh_id",
+          "prefix": "rent"
+        }
+      }
+    },
+    {
+      "action": "record_income",
+      "argv": [
+        "record_income",
+        "$description"
+      ],
+      "params": {
+        "description": {
+          "kind": "fresh_id",
+          "prefix": "income"
+        }
+      }
+    },
+    {
+      "action": "balance",
+      "argv": [
+        "balance"
+      ]
+    },
+    {
+      "action": "list",
+      "argv": [
+        "list"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "app": "cli-forms",
+  "workflows": [
+    {
+      "name": "email-replace-then-confirm",
+      "steps": [
+        { "action": "start", "params": {} },
+        { "action": "set-email", "params": { "email": "first@example.test" } },
+        { "action": "set-email", "params": { "email": "second@example.test" } },
+        { "action": "set-name", "params": { "name": "nina" } },
+        { "action": "confirm", "params": {} },
+        { "action": "status", "params": {} }
+      ]
+    },
+    {
+      "name": "edit-before-start-confirm-cancel",
+      "steps": [
+        { "action": "set-name", "params": { "name": "omar" } },
+        { "action": "start", "params": {} },
+        { "action": "set-plan", "params": { "plan": "team" } },
+        { "action": "confirm", "params": {} },
+        { "action": "cancel", "params": {} },
+        { "action": "status", "params": {} }
+      ]
+    }
+  ]
+}

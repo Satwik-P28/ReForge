@@ -1,0 +1,44 @@
+{
+  "target_id": "buku-5.1",
+  "target_name": "buku",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": "pristine",
+  "workdir": "../../../target/reforge-phase8-work-buku",
+  "state_file": "state.json",
+  "timeout_ms": 30000,
+  "actions": [
+    {
+      "action": "add_bookmark",
+      "argv": ["add_bookmark", "$url", "$title", "$tag"],
+      "params": {
+        "url": {"kind": "fresh_id", "prefix": "https://example.com/buku-"},
+        "title": {"kind": "fresh_id", "prefix": "Entry "},
+        "tag": {"kind": "literal", "value": {"kind": "string", "value": "work"}}
+      },
+      "parameters": {"url": {"kind": "string"}, "title": {"kind": "string"}, "tag": {"kind": "string"}}
+    },
+    {
+      "action": "update_bookmark",
+      "argv": ["update_bookmark", "$id", "$title", "$tag"],
+      "params": {
+        "id": {"kind": "last_entity", "pool": "bookmark"},
+        "title": {"kind": "fresh_id", "prefix": "Updated "},
+        "tag": {"kind": "literal", "value": {"kind": "string", "value": "edited"}}
+      },
+      "parameters": {"id": {"kind": "string"}, "title": {"kind": "string"}, "tag": {"kind": "string"}}
+    },
+    {
+      "action": "delete_bookmark",
+      "argv": ["delete_bookmark", "$id"],
+      "params": {"id": {"kind": "last_entity", "pool": "bookmark"}},
+      "parameters": {"id": {"kind": "string"}}
+    },
+    {"action": "add_duplicate", "argv": ["add_duplicate"]},
+    {"action": "delete_missing", "argv": ["delete_missing"]},
+    {"action": "list_bookmarks", "argv": ["list_bookmarks"]},
+    {"action": "search_work", "argv": ["search_work"]},
+    {"action": "stats", "argv": ["stats"]}
+  ]
+}

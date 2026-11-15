@@ -1,0 +1,31 @@
+{
+  "app": "cli-foundry",
+  "workflows": [
+    {
+      "name": "duplicate-label-and-status",
+      "steps": [
+        {"action": "label", "params": {"text": "abc"}},
+        {"action": "label", "params": {"text": "abc"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "short-rejected-then-labels",
+      "steps": [
+        {"action": "label", "params": {"text": "ab"}},
+        {"action": "label", "params": {"text": "a"}},
+        {"action": "label", "params": {"text": "abcd"}},
+        {"action": "label", "params": {"text": "abcde"}},
+        {"action": "status", "params": {}}
+      ]
+    },
+    {
+      "name": "initial-status-and-label",
+      "steps": [
+        {"action": "status", "params": {}},
+        {"action": "label", "params": {"text": "xyz"}},
+        {"action": "status", "params": {}}
+      ]
+    }
+  ]
+}

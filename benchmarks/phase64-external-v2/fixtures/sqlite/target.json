@@ -1,0 +1,38 @@
+{
+  "target_id": "cli-sqlite",
+  "target_name": "sqlite",
+  "authorization": "authorized_test_target",
+  "program": "python3",
+  "program_args": ["{spec_dir}/adapter.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-phase64-work-sqlite",
+  "state_file": "state.json",
+  "timeout_ms": 15000,
+  "actions": [
+    {
+      "action": "add_item",
+      "argv": ["add_item", "$name"],
+      "params": {"name": {"kind": "fresh_id", "prefix": "item"}}
+    },
+    {
+      "action": "increment",
+      "argv": ["increment", "$item_id"],
+      "params": {"item_id": {"kind": "last_entity", "pool": "item"}}
+    },
+    {
+      "action": "rename",
+      "argv": ["rename", "$item_id", "$name"],
+      "params": {
+        "item_id": {"kind": "last_entity", "pool": "item"},
+        "name": {"kind": "fresh_id", "prefix": "renamed"}
+      }
+    },
+    {
+      "action": "remove",
+      "argv": ["remove", "$item_id"],
+      "params": {"item_id": {"kind": "last_entity", "pool": "item"}}
+    },
+    {"action": "list", "argv": ["list"]},
+    {"action": "total", "argv": ["total"]}
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "app": "cli-notes",
+  "workflows": [
+    {
+      "name": "lazy-add-pin-remove",
+      "steps": [
+        {
+          "action": "list",
+          "params": {}
+        },
+        {
+          "action": "add",
+          "params": {
+            "text": "memo"
+          }
+        },
+        {
+          "action": "pin",
+          "params": {
+            "note_id": "n1"
+          }
+        },
+        {
+          "action": "add",
+          "params": {
+            "text": "memo"
+          }
+        },
+        {
+          "action": "remove",
+          "params": {
+            "note_id": "n1"
+          }
+        },
+        {
+          "action": "list",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "reject-pin-then-recover",
+      "steps": [
+        {
+          "action": "pin",
+          "params": {
+            "note_id": "n9"
+          }
+        },
+        {
+          "action": "add",
+          "params": {
+            "text": "memo"
+          }
+        },
+        {
+          "action": "unpin",
+          "params": {
+            "note_id": "n1"
+          }
+        },
+        {
+          "action": "pin",
+          "params": {
+            "note_id": "n1"
+          }
+        },
+        {
+          "action": "pin",
+          "params": {
+            "note_id": "n1"
+          }
+        },
+        {
+          "action": "stats",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

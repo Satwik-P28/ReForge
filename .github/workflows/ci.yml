@@ -59,4 +59,4 @@ jobs:
           tar -tzf "${OUT}" > /tmp/archive-list.txt
           head -5 /tmp/archive-list.txt
           (cd dist && sha256sum "$(basename "${OUT}")" | tee SHA256SUMS)
-          sha256sum -c dist/SHA256SUMS
+          (cd dist && sha256sum -c SHA256SUMS)

@@ -1,0 +1,23 @@
+{
+  "app": "cli-inventory",
+  "workflows": [
+    {
+      "name": "reserve-then-ship",
+      "steps": [
+        { "action": "add-item", "params": { "name": "widget", "qty": 2 } },
+        { "action": "reserve", "params": { "sku": "sku1", "qty": 1 } },
+        { "action": "ship", "params": { "sku": "sku1", "qty": 1 } },
+        { "action": "stats", "params": {} }
+      ]
+    },
+    {
+      "name": "over-reserve-release",
+      "steps": [
+        { "action": "add-item", "params": { "name": "gadget", "qty": 1 } },
+        { "action": "reserve", "params": { "sku": "sku1", "qty": 2 } },
+        { "action": "release", "params": { "sku": "sku1", "qty": 1 } },
+        { "action": "restock", "params": { "sku": "sku1", "qty": 2 } }
+      ]
+    }
+  ]
+}

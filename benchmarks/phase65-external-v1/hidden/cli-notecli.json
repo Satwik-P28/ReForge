@@ -1,0 +1,36 @@
+{
+  "app": "cli-notecli",
+  "workflows": [
+    {"name": "create-pin-tag-list", "steps": [
+      {"action": "add", "params": {"title": "buy milk"}},
+      {"action": "pin", "params": {"note_id": "2"}},
+      {"action": "tag", "params": {"note_id": "2", "tag": "dairy"}},
+      {"action": "list", "params": {}},
+      {"action": "stats", "params": {}}
+    ]},
+    {"name": "delete-then-create-keeps-allocator", "steps": [
+      {"action": "add", "params": {"title": "alpha"}},
+      {"action": "add", "params": {"title": "beta"}},
+      {"action": "delete", "params": {"note_id": "2"}},
+      {"action": "add", "params": {"title": "gamma"}},
+      {"action": "list", "params": {}},
+      {"action": "stats", "params": {}}
+    ]},
+    {"name": "guards-and-duplicate-tag", "steps": [
+      {"action": "tag", "params": {"note_id": "1", "tag": "intro"}},
+      {"action": "pin", "params": {"note_id": "99"}},
+      {"action": "add", "params": {"title": "   "}},
+      {"action": "rename", "params": {"note_id": "1", "title": "renamed welcome"}},
+      {"action": "tag", "params": {"note_id": "1", "tag": "work"}},
+      {"action": "stats", "params": {}}
+    ]},
+    {"name": "rename-tag-delete", "steps": [
+      {"action": "add", "params": {"title": "zeta"}},
+      {"action": "rename", "params": {"note_id": "2", "title": "renamed zeta"}},
+      {"action": "tag", "params": {"note_id": "2", "tag": "work"}},
+      {"action": "delete", "params": {"note_id": "1"}},
+      {"action": "list", "params": {}},
+      {"action": "stats", "params": {}}
+    ]}
+  ]
+}

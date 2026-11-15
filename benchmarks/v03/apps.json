@@ -1,0 +1,8 @@
+{
+  "suite": "reforgebench-v03-independent",
+  "description": "Two independently authored CLI applications added for v0.3. The library app is the training split; the ticket app is held out from any neural training and is used only for evaluation.",
+  "apps": [
+    { "spec": "fixtures/v03/cli-library/target.json", "split": "train" },
+    { "spec": "fixtures/v03/cli-tickets/target.json", "split": "holdout" }
+  ]
+}

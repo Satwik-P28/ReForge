@@ -1,0 +1,32 @@
+{
+  "app": "npm-cli-11.20.0",
+  "workflows": [
+    {"name": "install-list-bump", "steps": [
+      {"action": "install_alpha"},
+      {"action": "list_packages"},
+      {"action": "bump_version"},
+      {"action": "stats"}
+    ]},
+    {"name": "relationship-and-remove", "steps": [
+      {"action": "install_beta"},
+      {"action": "list_packages"},
+      {"action": "install_alpha"},
+      {"action": "uninstall_alpha"},
+      {"action": "list_packages"}
+    ]},
+    {"name": "missing-recovery", "steps": [
+      {"action": "install_missing"},
+      {"action": "install_alpha"},
+      {"action": "uninstall_alpha"},
+      {"action": "install_alpha"},
+      {"action": "stats"}
+    ]},
+    {"name": "version-prune", "steps": [
+      {"action": "bump_version"},
+      {"action": "install_beta"},
+      {"action": "prune_packages"},
+      {"action": "uninstall_beta"},
+      {"action": "list_packages"}
+    ]}
+  ]
+}

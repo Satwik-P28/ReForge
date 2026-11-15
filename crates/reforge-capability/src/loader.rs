@@ -2,6 +2,7 @@ use crate::package::{LoadedPackage, PackageInspectReport};
 use crate::validate::validate_package_dir;
 use reforge_canon::{digest_of_canonical, digest_of_raw};
 use reforge_evidence::EvidenceGraph;
+use reforge_investigate::DataProgram;
 use reforge_types::*;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -39,6 +40,7 @@ pub fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, PackageErro
         serde_json::from_str(&text).map_err(|e| PackageError::Parse(e.to_string()))?;
 
     let twin = load_optional_json::<BehavioralTwin>(&root, "twin.json")?;
+    let data_program = load_optional_json::<DataProgram>(&root, "data-program.json")?;
     let mut evidence = EvidenceGraph::new();
     let evidence_dir = root.join("evidence");
     if evidence_dir.is_dir() {
@@ -62,6 +64,7 @@ pub fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, PackageErro
         manifest,
         root,
         twin,
+        data_program,
         evidence,
         content_digest,
     })
@@ -80,6 +83,12 @@ pub fn export_package(
         .map_err(|e| PackageError::Parse(e.to_string()))?;
     fs::write(dest.join(MANIFEST_NAME), manifest_json)
         .map_err(|e| PackageError::Io(e.to_string()))?;
+    if let Some(data_program) = &package.data_program {
+        let json = serde_json::to_string_pretty(data_program)
+            .map_err(|e| PackageError::Parse(e.to_string()))?;
+        fs::write(dest.join("data-program.json"), json)
+            .map_err(|e| PackageError::Io(e.to_string()))?;
+    }
     if let Some(twin) = &package.twin {
         let twin_json =
             serde_json::to_string_pretty(twin).map_err(|e| PackageError::Parse(e.to_string()))?;
@@ -139,6 +148,7 @@ pub fn inspect_package(package: &LoadedPackage) -> PackageInspectReport {
             .map(|d| format!("{} {}", d.capability_id, d.version_req.as_str()))
             .collect(),
         has_twin: package.twin.is_some(),
+        has_data_program: package.data_program.is_some(),
         evidence_count: package.evidence.evidence.len(),
         content_digest: package.content_digest.hex.clone(),
     }

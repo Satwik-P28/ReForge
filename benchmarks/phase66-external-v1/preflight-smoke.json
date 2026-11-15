@@ -1,0 +1,14 @@
+{
+  "parcel": [
+    {"action": "ship", "params": {"name": "smoke parcel"}},
+    {"action": "load", "params": {"parcel_id": "2", "item": "smoke-item"}},
+    {"action": "inspect", "params": {"parcel_id": "2"}},
+    {"action": "summary", "params": {}}
+  ],
+  "vault": [
+    {"action": "create", "params": {"label": "smoke"}},
+    {"action": "put", "params": {"bucket_id": "b2", "key": "smoke-key"}},
+    {"action": "show", "params": {"bucket_id": "b2"}},
+    {"action": "stats", "params": {}}
+  ]
+}

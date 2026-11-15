@@ -1,0 +1,80 @@
+{
+  "app": "cli-events",
+  "workflows": [
+    {
+      "name": "process-before-ack",
+      "steps": [
+        {
+          "action": "subscribe",
+          "params": {
+            "channel": "orders"
+          }
+        },
+        {
+          "action": "publish",
+          "params": {
+            "channel": "orders",
+            "payload": "p1"
+          }
+        },
+        {
+          "action": "process",
+          "params": {}
+        },
+        {
+          "action": "status",
+          "params": {}
+        },
+        {
+          "action": "ack",
+          "params": {}
+        },
+        {
+          "action": "purge",
+          "params": {}
+        },
+        {
+          "action": "status",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "name": "publish-before-subscribe",
+      "steps": [
+        {
+          "action": "publish",
+          "params": {
+            "channel": "orders",
+            "payload": "p2"
+          }
+        },
+        {
+          "action": "subscribe",
+          "params": {
+            "channel": "orders"
+          }
+        },
+        {
+          "action": "process",
+          "params": {}
+        },
+        {
+          "action": "ack",
+          "params": {}
+        },
+        {
+          "action": "publish",
+          "params": {
+            "channel": "orders",
+            "payload": "p3"
+          }
+        },
+        {
+          "action": "process",
+          "params": {}
+        }
+      ]
+    }
+  ]
+}

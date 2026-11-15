@@ -1,0 +1,21 @@
+{
+  "target_id": "cli-inventory",
+  "target_name": "inventory",
+  "authorization": "local_fixture",
+  "program": "python3",
+  "program_args": ["{spec_dir}/inventory.py", "--state", "."],
+  "pristine_dir": ".",
+  "workdir": "../../../target/reforge-v02-work-inventory",
+  "state_file": "state.json",
+  "timeout_ms": 10000,
+  "actions": [
+    { "action": "add-item", "argv": ["add-item", "$name", "$qty"], "params": { "name": { "kind": "fresh_id", "prefix": "item" }, "qty": { "kind": "literal", "value": { "kind": "int", "value": 2 } } } },
+    { "action": "list", "argv": ["list"] },
+    { "action": "detail", "argv": ["detail", "$sku"], "params": { "sku": { "kind": "last_entity", "pool": "sku" } } },
+    { "action": "reserve", "argv": ["reserve", "$sku", "$qty"], "params": { "sku": { "kind": "last_entity", "pool": "sku" }, "qty": { "kind": "literal", "value": { "kind": "int", "value": 1 } } } },
+    { "action": "release", "argv": ["release", "$sku", "$qty"], "params": { "sku": { "kind": "last_entity", "pool": "sku" }, "qty": { "kind": "literal", "value": { "kind": "int", "value": 1 } } } },
+    { "action": "ship", "argv": ["ship", "$sku", "$qty"], "params": { "sku": { "kind": "last_entity", "pool": "sku" }, "qty": { "kind": "literal", "value": { "kind": "int", "value": 1 } } } },
+    { "action": "restock", "argv": ["restock", "$sku", "$qty"], "params": { "sku": { "kind": "last_entity", "pool": "sku" }, "qty": { "kind": "literal", "value": { "kind": "int", "value": 3 } } } },
+    { "action": "stats", "argv": ["stats"] }
+  ]
+}

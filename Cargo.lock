@@ -1065,6 +1065,7 @@ dependencies = [
  "reforge-evidence",
  "reforge-export",
  "reforge-expr",
+ "reforge-rea",
  "reforge-runtime",
  "reforge-schema",
  "reforge-types",
@@ -1097,6 +1098,11 @@ dependencies = [
  "criterion",
  "indexmap",
  "reforge",
+ "reforge-diff",
+ "reforge-investigate",
+ "reforge-observe",
+ "reforge-rea",
+ "reforge-types",
  "serde",
  "serde_json",
 ]
@@ -1123,6 +1129,7 @@ dependencies = [
  "reforge-behavior",
  "reforge-canon",
  "reforge-evidence",
+ "reforge-investigate",
  "reforge-types",
  "semver",
  "serde",
@@ -1141,7 +1148,12 @@ dependencies = [
  "indexmap",
  "reforge",
  "reforge-compose",
+ "reforge-diff",
  "reforge-export",
+ "reforge-extract",
+ "reforge-investigate",
+ "reforge-observe",
+ "reforge-rea",
  "reforge-runtime",
  "reforge-verify",
  "serde",
@@ -1183,6 +1195,22 @@ dependencies = [
  "reforge-types",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "reforge-diff"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "reforge-behavior",
+ "reforge-canon",
+ "reforge-investigate",
+ "reforge-observe",
+ "reforge-types",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -1231,6 +1259,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "reforge-extract"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "reforge-behavior",
+ "reforge-canon",
+ "reforge-capability",
+ "reforge-evidence",
+ "reforge-investigate",
+ "reforge-observe",
+ "reforge-rea",
+ "reforge-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "reforge-investigate"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "indexmap",
+ "reforge-behavior",
+ "reforge-canon",
+ "reforge-evidence",
+ "reforge-observe",
+ "reforge-types",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "reforge-observe"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "indexmap",
+ "proptest",
+ "reforge-canon",
+ "reforge-evidence",
+ "reforge-types",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "reforge-rea"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "indexmap",
+ "reforge-canon",
+ "reforge-evidence",
+ "reforge-investigate",
+ "reforge-observe",
+ "reforge-types",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "reforge-runtime"
 version = "0.1.0"
 dependencies = [
@@ -1240,6 +1339,7 @@ dependencies = [
  "reforge-canon",
  "reforge-capability",
  "reforge-compose",
+ "reforge-investigate",
  "reforge-types",
  "rusqlite",
  "serde",

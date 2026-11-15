@@ -1,0 +1,40 @@
+{
+  "app": "cli-hledger",
+  "workflows": [
+    {
+      "name": "two-expenses-then-balance",
+      "steps": [
+        {"action": "record_food", "params": {"description": "client lunch"}},
+        {"action": "record_food", "params": {"description": "team dinner"}},
+        {"action": "balance", "params": {}}
+      ]
+    },
+    {
+      "name": "income-rent-list",
+      "steps": [
+        {"action": "record_income", "params": {"description": "salary"}},
+        {"action": "record_rent", "params": {"description": "office rent"}},
+        {"action": "list", "params": {}}
+      ]
+    },
+    {
+      "name": "mixed-ledger-balance",
+      "steps": [
+        {"action": "record_food", "params": {"description": "travel"}},
+        {"action": "record_rent", "params": {"description": "utilities"}},
+        {"action": "record_income", "params": {"description": "grant"}},
+        {"action": "balance", "params": {}}
+      ]
+    },
+    {
+      "name": "four-additions-list",
+      "steps": [
+        {"action": "record_food", "params": {"description": "audit lunch"}},
+        {"action": "record_food", "params": {"description": "audit dinner"}},
+        {"action": "record_rent", "params": {"description": "audit"}},
+        {"action": "record_food", "params": {"description": "follow-up"}},
+        {"action": "list", "params": {}}
+      ]
+    }
+  ]
+}

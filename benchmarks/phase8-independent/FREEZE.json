@@ -1,0 +1,149 @@
+{
+  "access_boundary": {
+    "action_schema": "manually specified in target.json",
+    "adapter_role": "benchmark harness; target source is not imported by the adapter",
+    "hidden_workflows_visible_to_investigator": false,
+    "investigator_source_access": "REA arm reads npm source only; black-box arm receives none",
+    "rea_source": "target/phase8-tools/npm-src/package"
+  },
+  "created_utc": "2026-11-11T20:19:50.113917+00:00",
+  "evaluation": {
+    "apps": [
+      "npm-cli-11.20.0",
+      "buku-5.1"
+    ],
+    "arms": [
+      "black_box",
+      "rea_guided"
+    ],
+    "budgets": [
+      32,
+      64,
+      128
+    ],
+    "experiment_budget": 128,
+    "policy": "coverage",
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "strategy": "hybrid"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "9c64ccf2cd51d4707d011aa9c217fe48bad89a164f95718dcb3a1956ac765108"
+    },
+    {
+      "path": "SELECTION.md",
+      "sha256": "390c65681005dcb8731e295c0631a8220fa0c4d947e02fb31be7eb4f7a4a7782"
+    },
+    {
+      "path": "TARGET_EXCLUSION.json",
+      "sha256": "730e711b70410621ec0f6ef3102bdf5159c25bea7f1dd1e5f2d9c6cda8eb41f4"
+    },
+    {
+      "path": "apps.json",
+      "sha256": "5eca68360ef61b366511ecb3675becad399a5a873e2c988742422c5c4b11714e"
+    },
+    {
+      "path": "fixtures/buku/adapter.py",
+      "sha256": "e6f071eaa7bc59307a3cfe46ca67872df07e22491b6021977ca9e5f5093d32a3"
+    },
+    {
+      "path": "fixtures/buku/pristine/README.txt",
+      "sha256": "32405d8e4802f406e81715851029942043f0e1e9dfd8ca6db7dc40a4b31d9389"
+    },
+    {
+      "path": "fixtures/buku/target.json",
+      "sha256": "26fb88f63fba2d152968ade4dcde8560e7831560d241ccb4a79abc15175d4cbe"
+    },
+    {
+      "path": "fixtures/npm/adapter.py",
+      "sha256": "796c5081e6fbb342ad3e6e4d0254c3759fda52329317b76fd3a845083ca6b078"
+    },
+    {
+      "path": "fixtures/npm/pristine/package.json",
+      "sha256": "6a477b99adacf71aadfc3459c9fa5bd3980d5738d46e6b2a2a7cda39f629f35c"
+    },
+    {
+      "path": "fixtures/npm/pristine/vendor/pkg-alpha/index.js",
+      "sha256": "f2b0da17cba8fde6423bf2d2ea55a4f780fb34b41893163b04794532f1dd9de5"
+    },
+    {
+      "path": "fixtures/npm/pristine/vendor/pkg-alpha/package.json",
+      "sha256": "71a3b73ea19c0fa06e8898d97e6cb829211c55b3aac058b1c6d07cc4a90a7dd0"
+    },
+    {
+      "path": "fixtures/npm/pristine/vendor/pkg-beta/index.js",
+      "sha256": "ad41d512befd16158c6ef178bd2e5a9f66dd65478117e5ade9062e2d542bdd9d"
+    },
+    {
+      "path": "fixtures/npm/pristine/vendor/pkg-beta/package.json",
+      "sha256": "5f1e6be9abe2446fbbc0bdc1e038071c71adcf3069a97df912793517608b067d"
+    },
+    {
+      "path": "fixtures/npm/target.json",
+      "sha256": "3cfa27fae19d774765b598c57eb550afc1fbd8a2b1fa6f216d2f1036cd961f23"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "7d157a0841084e13b5a4d3a39c5495ab5d365cf88386e5c91607b4f818eef1e1"
+    },
+    {
+      "path": "hidden/buku-5.1.json",
+      "sha256": "aeccc048847f356c1d242e2601e0bc754f916f7056c619dbe3c5cc3980cc492f"
+    },
+    {
+      "path": "hidden/npm-cli-11.20.0.json",
+      "sha256": "e3574c7ef1742e347170f458d48b1f0f30c26cc04d65c709ff2fda88c8282d40"
+    },
+    {
+      "path": "preflight.py",
+      "sha256": "d05e99196b71cc463f196cf5e04b20c67b6c4b0691fe5ccc29a50a8993f28cb1"
+    },
+    {
+      "path": "targets.lock.json",
+      "sha256": "9dbcf305a5f126c06feb7dfcddaec7dce573aee9b6d1cff394d9bd44a38171c5"
+    }
+  ],
+  "frozen_before_first_evaluation": true,
+  "notes": [
+    "Neither application or version was used in ReForge development or tuning before this freeze.",
+    "The adapters were validated against public CLI behavior and persisted state before freeze.",
+    "Any source, adapter, workflow or normalization change after this freeze requires a new suite version."
+  ],
+  "scoring": {
+    "comparison": "state, status, error, outputs, events, persistence and restart",
+    "engine": "reforgebench_v02 data-aware totals",
+    "excluded_steps_are_not_passes": true
+  },
+  "source_commit": "321dececf973a3bb2528ba1b872beaea5c0ad258",
+  "source_tree": "642c5c6abfed1b896cf4d11fd604af320b2dcfe5",
+  "suite": "reforgebench-phase8-independent",
+  "tools": {
+    "buku": {
+      "distribution": "PyPI buku==5.1",
+      "executable_sha256": "9e250e8fa9b6bdf0cadcd354e8ff316750847ab6103aa0e6da1832ba0954c05e",
+      "exposed_subset": "add bookmark, add duplicate, update bookmark, delete bookmark, delete missing, list, search tag, stats",
+      "kind": "external-python-cli",
+      "license": "GPL-3.0",
+      "module_path": "target/phase8-tools/buku-venv/lib/python3.12/site-packages/buku.py",
+      "python_version": "3.12.3",
+      "version": "5.1"
+    },
+    "npm-cli": {
+      "exposed_subset": "install alpha, install beta, uninstall alpha, uninstall beta, install missing, bump version, prune, list, stats",
+      "kind": "external-node-cli",
+      "license": "Artistic-2.0",
+      "node_sha256": "0adde40d1b7dfa57c8bc83cbc319758c3ec6ebba21363bb2fa752ea6b267ad1b",
+      "node_version": "26.13.0",
+      "package_json_sha256": "61a7554a8e9eef42eca2ad2bee87ba3f34b3200368e2a681bdf186fb214cd780",
+      "source_tree": "target/phase8-tools/npm-src/package",
+      "tarball": "https://registry.npmjs.org/npm/-/npm-11.20.0.tgz",
+      "tarball_sha256": "d1a92f40e6c407b84c3a00c3cf978a10b24fd42f153c527e2016cef7bb34a483",
+      "version": "11.20.0"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "app": "cli-contacts",
+  "workflows": [
+    {
+      "name": "tags-update-archive",
+      "steps": [
+        { "action": "create", "params": { "name": "alice" } },
+        { "action": "tag", "params": { "contact_id": "c1", "tag": "lead" } },
+        { "action": "tag", "params": { "contact_id": "c1", "tag": "vip" } },
+        { "action": "search", "params": { "query": "al" } },
+        { "action": "update", "params": { "contact_id": "c1", "name": "alicia" } },
+        { "action": "archive", "params": { "contact_id": "c1" } },
+        { "action": "list", "params": {} }
+      ]
+    },
+    {
+      "name": "archive-remove-then-mutate",
+      "steps": [
+        { "action": "create", "params": { "name": "dave" } },
+        { "action": "archive", "params": { "contact_id": "c1" } },
+        { "action": "remove", "params": { "contact_id": "c1" } },
+        { "action": "update", "params": { "contact_id": "c1", "name": "dan" } },
+        { "action": "unarchive", "params": { "contact_id": "c1" } },
+        { "action": "stats", "params": {} }
+      ]
+    }
+  ]
+}

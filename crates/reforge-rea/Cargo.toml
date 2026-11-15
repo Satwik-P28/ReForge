@@ -1,0 +1,25 @@
+[package]
+name = "reforge-rea"
+description = "Pinned REA process provider and normalized structural evidence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+reforge-types = { workspace = true }
+reforge-canon = { workspace = true }
+reforge-evidence = { workspace = true }
+reforge-investigate = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+indexmap = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+reforge-observe = { workspace = true }
+tempfile = { workspace = true }

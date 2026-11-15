@@ -1,0 +1,214 @@
+{
+  "phase": 11,
+  "starting_head": "33cb132958590c7c63a34eb1557d6498b6fa2bfc",
+  "implementation_commit": "17606a4d8abd1918a5b615651a7002db5032e862",
+  "branch": "develop/neural-symbolic",
+  "objective": "isolate the causal contribution of the Phase 10 candidate-aware experiment scheduler by controlled ablation, audit candidate prediction quality, and evaluate frozen untouched transfer on two never-used applications",
+  "ablation": {
+    "suite": "benchmarks/phase8-independent",
+    "targets": ["npm", "buku"],
+    "config": {
+      "budget": 32,
+      "seed": 1,
+      "policy": "coverage",
+      "experiment_strategy": "hybrid",
+      "experiment_budget": 128
+    },
+    "arms": {
+      "A": {
+        "software": "Phase 9 tree 724f629",
+        "probe_setup": "phase9",
+        "semantic_repairs": false,
+        "scheduler": false,
+        "contrasts": false,
+        "matching_steps": 11,
+        "steps_attempted": 37,
+        "steps_executed": 19,
+        "unverified_steps": 1,
+        "excluded_steps": 18,
+        "divergences": 7,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "counterfactual_interactions": 218,
+        "wall_seconds": 107.4,
+        "peak_rss_kb": 96792
+      },
+      "B": {
+        "software": "Phase 9 tree 724f629 with corrected probe setup",
+        "probe_setup": "corrected",
+        "semantic_repairs": false,
+        "scheduler": false,
+        "contrasts": false,
+        "matching_steps": 12,
+        "steps_attempted": 37,
+        "steps_executed": 20,
+        "unverified_steps": 1,
+        "excluded_steps": 17,
+        "divergences": 7,
+        "workflows_fully_matching": 0,
+        "workflows_attempted": 8,
+        "counterfactual_interactions": 213,
+        "wall_seconds": 106.88,
+        "peak_rss_kb": 96280,
+        "reproduction": {"matching_steps": 12, "divergences": 7, "wall_seconds": 108.48}
+      },
+      "C": {
+        "software": "Phase 11",
+        "probe_setup": "corrected",
+        "semantic_repairs": true,
+        "scheduler": false,
+        "contrasts": false,
+        "matching_steps": 30,
+        "steps_attempted": 37,
+        "steps_executed": 32,
+        "unverified_steps": 2,
+        "excluded_steps": 5,
+        "divergences": 0,
+        "workflows_fully_matching": 6,
+        "workflows_attempted": 8,
+        "counterfactual_interactions": 196,
+        "wall_seconds": 103.42,
+        "peak_rss_kb": 96784
+      },
+      "D": {
+        "software": "Phase 11",
+        "probe_setup": "corrected",
+        "semantic_repairs": true,
+        "scheduler": true,
+        "contrasts": false,
+        "matching_steps": 30,
+        "steps_attempted": 37,
+        "steps_executed": 32,
+        "unverified_steps": 2,
+        "excluded_steps": 5,
+        "divergences": 0,
+        "workflows_fully_matching": 6,
+        "workflows_attempted": 8,
+        "counterfactual_interactions": 202,
+        "wall_seconds": 112.16,
+        "peak_rss_kb": 96160
+      },
+      "P": {
+        "software": "Phase 11",
+        "probe_setup": "corrected",
+        "semantic_repairs": true,
+        "scheduler": true,
+        "contrasts": true,
+        "matching_steps": 30,
+        "steps_attempted": 37,
+        "steps_executed": 32,
+        "unverified_steps": 2,
+        "excluded_steps": 5,
+        "divergences": 0,
+        "workflows_fully_matching": 6,
+        "workflows_attempted": 8,
+        "counterfactual_interactions": 206,
+        "wall_seconds": 111.64,
+        "peak_rss_kb": 96396
+      }
+    },
+    "attribution": {
+      "probe_setup_fix_matching_step_delta": 1,
+      "semantic_repairs_matching_step_delta": 19,
+      "scheduler_matching_step_delta": 0,
+      "contrasts_matching_step_delta": 0,
+      "verified_steps_per_interaction": {
+        "A": 0.05,
+        "B": 0.056,
+        "C": 0.153,
+        "D": 0.149,
+        "P": 0.146
+      },
+      "primary_cause": "semantic repairs (output derivation, collection semantics, guard synthesis, state projection)"
+    }
+  },
+  "calibration": {
+    "D": {
+      "npm": {"calibrated_experiments": 19, "resolved": 13, "base_predictions_scored": 13, "base_predictions_matched": 2, "eliminated": 2, "predicted_discrimination_total": 93},
+      "buku": {"calibrated_experiments": 19, "resolved": 10, "base_predictions_scored": 13, "base_predictions_matched": 0, "eliminated": 1, "predicted_discrimination_total": 72}
+    },
+    "P": {
+      "npm": {"calibrated_experiments": 18, "resolved": 12, "base_predictions_scored": 12, "base_predictions_matched": 0, "eliminated": 0, "predicted_discrimination_total": 99},
+      "buku": {"calibrated_experiments": 21, "resolved": 11, "base_predictions_scored": 15, "base_predictions_matched": 0, "eliminated": 1, "predicted_discrimination_total": 79}
+    },
+    "conclusion": "base predictions over disputed paths match realized state in 2/26 scored cases in arm D and 0/27 in arm P; unresolved predictions are recorded as unresolved and never counted as eliminations"
+  },
+  "residual_uncertainty": {
+    "unverified_steps": 2,
+    "excluded_steps": 5,
+    "cause": "rejection-only actions (install_missing, delete_missing) have no successful contrast, so no guard can be falsified; downstream steps are excluded rather than guessed",
+    "resolution": "classified and recorded as unsupported; matching numerator unchanged, denominator remains 37; no target-specific patch",
+    "known_accounting_artifact": "hidden workflow reset state is null while the program records an empty state document, so initial_state_matches is false without affecting step counts"
+  },
+  "untouched_evaluation": {
+    "suite": "benchmarks/phase11-untouched",
+    "freeze_source_commit": "17606a4d8abd1918a5b615651a7002db5032e862",
+    "frozen_files": 19,
+    "preflight": "ok",
+    "targets": [
+      {"name": "changesets", "version": "2.27.9", "family": "javascript file state", "steps_attempted": 18, "workflows_attempted": 5},
+      {"name": "dbmate", "version": "2.20.0", "family": "go binary sqlite migration ledger", "steps_attempted": 22, "workflows_attempted": 5}
+    ],
+    "config": {
+      "budget": 32,
+      "seed": 1,
+      "policy": "coverage",
+      "experiment_strategy": "hybrid",
+      "experiment_budget": 128
+    },
+    "arms": {
+      "A": {"matching_steps": 8, "steps_attempted": 40, "steps_executed": 17, "excluded_steps": 23, "divergences": 9, "workflows_fully_matching": 1, "workflows_attempted": 10, "counterfactual_interactions": 231, "wall_seconds": 47.94, "peak_rss_kb": 85304},
+      "D": {"matching_steps": 8, "steps_attempted": 40, "steps_executed": 17, "excluded_steps": 23, "divergences": 9, "workflows_fully_matching": 1, "workflows_attempted": 10, "counterfactual_interactions": 227, "wall_seconds": 49.14, "peak_rss_kb": 84888},
+      "P": {"matching_steps": 8, "steps_attempted": 40, "steps_executed": 17, "excluded_steps": 23, "divergences": 9, "workflows_fully_matching": 1, "workflows_attempted": 10, "counterfactual_interactions": 230, "wall_seconds": 52.29, "peak_rss_kb": 85852}
+    },
+    "per_target": {
+      "changesets": {"matching_steps": 0, "steps_attempted": 18, "workflows_fully_matching": 0, "workflows_attempted": 5, "divergences": 5},
+      "dbmate": {"matching_steps": 8, "steps_attempted": 22, "workflows_fully_matching": 1, "workflows_attempted": 5, "divergences": 4}
+    },
+    "divergence_causes": {
+      "changesets": ["version output omits the released version", "changeset_count not derived from the changeset collection", "prerelease mode state and its rejection guards not learned"],
+      "dbmate": ["rollback_one does not decrement applied_count after the first application", "nothing_applied rejection guard not learned", "migration bookkeeping after create_database on an existing database"]
+    },
+    "transfer_conclusion": "zero transfer: Phase 9, Phase 10 and Phase 11 arms reconstruct identically on both untouched targets",
+    "eliminations": {"D": {"changesets": 0, "dbmate": 1}, "P": {"changesets": 4, "dbmate": 3}},
+    "base_prediction_matches": {"D": {"changesets": 0, "dbmate": 0}, "P": {"changesets": 6, "dbmate": 3}}
+  },
+  "capability_extraction": {
+    "target": "dbmate 2.20.0",
+    "package_id": "capability.extracted.756a986d",
+    "content_digest": "5f6cd88b3e0397471419d5fdf3c8312395e64408cf28999c94e943253736f19c",
+    "commands": ["apply_pending", "create_database", "drop_database", "rollback_one", "status"],
+    "evidence_payloads": 33,
+    "package_validation": "valid",
+    "implementation_status": "partial",
+    "composed_with": "examples/notes",
+    "reference_removed_before_execution": true,
+    "unseen_sequence": ["apply_pending", "rollback_one", "rollback_one", "status"],
+    "observed_outputs": {"apply_pending": {"applied_count": 3}, "rollback_one": {"applied_count": 2}, "rollback_one_again": {"applied_count": 2}, "status": {"applied_count": 2, "pending_count": 2}},
+    "restart_persistence": "verified across separate processes on the same SQLite database",
+    "export": "reforge export --target local-web",
+    "export_build": "pass",
+    "export_execution": "ran apply_pending, status and rollback_one; a fresh process read applied_count 2 back from its own database",
+    "fidelity_limits": ["second rollback does not reject", "pending_count not derived", "same defects as the holdout divergences"]
+  },
+  "regressions": {
+    "final2": {"matching_steps": 82, "steps_attempted": 84, "workflows_fully_matching": 13, "workflows_attempted": 14},
+    "final3": {"matching_steps": 25, "steps_attempted": 25, "workflows_fully_matching": 4, "workflows_attempted": 4},
+    "final4": {"matching_steps": 11, "steps_attempted": 11, "workflows_fully_matching": 2, "workflows_attempted": 2},
+    "final5": {"matching_steps": 19, "steps_attempted": 19, "workflows_fully_matching": 3, "workflows_attempted": 3},
+    "final8": {"matching_steps": 21, "steps_attempted": 21, "workflows_fully_matching": 6, "workflows_attempted": 6},
+    "phase63": {"matching_steps": 34, "steps_attempted": 34, "workflows_fully_matching": 6, "workflows_attempted": 6},
+    "phase66-external-v1": {"matching_steps": 26, "steps_attempted": 39, "workflows_fully_matching": 2, "workflows_attempted": 6, "divergences": 4},
+    "notecli": {"matching_steps": 23, "steps_attempted": 23, "workflows_fully_matching": 4, "workflows_attempted": 4},
+    "external-v3": {"matching_steps": 49, "steps_attempted": 49, "workflows_fully_matching": 12, "workflows_attempted": 12}
+  },
+  "gates": {
+    "cargo_fmt_check": "pass",
+    "cargo_clippy_workspace_all_targets_deny_warnings": "pass",
+    "cargo_test_workspace_all_targets": "pass",
+    "git_diff_check": "pass",
+    "browser_integration_tests": "skipped: browser not provisioned in this environment"
+  },
+  "cost_note": "arms ran serially; the npm and buku adapters share one state-checkout directory and concurrent runs corrupt each other",
+  "artifacts_local_only": ["bench-results/phase11-armA.json", "bench-results/phase11-armB.json", "bench-results/phase11-armC.json", "bench-results/phase11-armD.json", "bench-results/phase11-armP3.json", "bench-results/phase11-holdout-A.json", "bench-results/phase11-holdout-D.json", "bench-results/phase11-holdout-P.json"]
+}
